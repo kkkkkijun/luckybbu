@@ -17,6 +17,36 @@
   var MEMO_MAX = 5000;
   var SUPPORT_STATUS = ['todo', 'applied', 'received', 'na'];
   var SUPPORT_STATUS_LABEL = { todo: '확인 전', applied: '신청함', received: '받음', na: '해당 없음' };
+  // 화면: portal(luckybbu 첫 화면) · ledger(가계부) · 나머지는 마미백 공간
+  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos'];
+  // 마미백 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
+  var GROUPS = ['birth', 'baby'];
+  function defaultGroupFor(name) { return /아기|축복|육아|신생아|베이비|baby/i.test(String(name || '')) ? 'baby' : 'birth'; }
+  // 가계부
+  var LEDGER_OUT_CATS = ['식비', '생활', '육아·출산', '교통', '의료', '쇼핑', '기타'];
+  var LEDGER_IN_CATS = ['급여', '부수입', '기타'];
+  var LEDGER_PAYS = { card: '카드', cash: '현금', bank: '계좌' };
+  var LEDGER_TEXT_MAX = 60, LEDGER_MAX = 5000;
+  function normalizeLedger(raw) {
+    var out = [], seen = {};
+    listOf(raw).forEach(function (e) {
+      if (!e || typeof e !== 'object') return;
+      var id = typeof e.id === 'string' ? e.id.trim() : '';
+      var amount = typeof e.amount === 'number' && isFinite(e.amount) ? Math.round(e.amount) : NaN;
+      var date = typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? e.date : '';
+      if (!id || seen[id] || !date || !(amount > 0) || amount > PRICE_MAX) return; // broken entries are dropped
+      seen[id] = true;
+      var type = e.type === 'in' ? 'in' : 'out';
+      var cats = type === 'in' ? LEDGER_IN_CATS : LEDGER_OUT_CATS;
+      out.push({ id: id, date: date, type: type, amount: amount, cat: cats.indexOf(e.cat) !== -1 ? e.cat : '기타',
+        text: typeof e.text === 'string' ? e.text.trim().slice(0, LEDGER_TEXT_MAX) : '',
+        who: typeof e.who === 'string' ? e.who.trim().slice(0, 12) : '',
+        pay: LEDGER_PAYS[e.pay] ? e.pay : '', t: typeof e.t === 'number' ? e.t : 0 });
+    });
+    // 기기·서버가 같은 순서를 갖도록 적은 시각 → id 순으로 둔다
+    out.sort(function (a, b) { return (a.t - b.t) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
+    return out.slice(0, LEDGER_MAX);
+  }
   function asArray(v) {
     if (Array.isArray(v)) return v;
     if (v && typeof v === 'object') return Object.keys(v).map(function (k) { return v[k]; });
@@ -254,9 +284,9 @@
     var categories = [];
     var items = [];
     DEFAULT_TEMPLATE.forEach(function (cat) {
-      categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [] });
+      categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', memo: '', memos: [], supports: [] };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0 };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -285,7 +315,9 @@
         icon = cleanIcon(c.icon);
         if (ICON_TONE_UPGRADES[icon]) { icon = ICON_TONE_UPGRADES[icon]; migrated = true; }
       }
-      categories.push({ id: cid, name: cname.slice(0, 40), icon: icon, doneTabs: c.doneTabs === true, subs: normalizeSubs(c.subs) });
+      var group = GROUPS.indexOf(c.group) !== -1 ? c.group : defaultGroupFor(cname);
+      if (c.group === undefined) migrated = true;
+      categories.push({ id: cid, name: cname.slice(0, 40), icon: icon, doneTabs: c.doneTabs === true, subs: normalizeSubs(c.subs), group: group });
     }
 
     var items = [];
@@ -398,6 +430,9 @@
     }
 
     var dueDate = typeof raw.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.dueDate) ? raw.dueDate : '';
+    var anniversary = typeof raw.anniversary === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.anniversary) ? raw.anniversary : '';
+    var ledger = normalizeLedger(raw.ledger);
+    var budget = typeof raw.budget === 'number' && isFinite(raw.budget) && raw.budget > 0 ? Math.min(Math.round(raw.budget), PRICE_MAX) : 0;
     var memo = typeof raw.memo === 'string' ? raw.memo.replace(/\r\n?/g, '\n').slice(0, MEMO_MAX) : '';
     var memos = [];
     var seenMemo = {};
@@ -438,7 +473,7 @@
           link: str(sp.link, 300), status: spstatus, memo: str(sp.memo, 500) });
       }
     }
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, memo: memo, memos: memos, supports: supports } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget } };
   }
 
   /* ---------- storage ---------- */
@@ -520,7 +555,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {} };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -554,7 +589,8 @@
         if (parsed.collapsed && typeof parsed.collapsed === 'object') ui.collapsed = parsed.collapsed;
         if (typeof parsed.activeCategory === 'string') ui.activeCategory = parsed.activeCategory;
         ui.highlightsCollapsed = parsed.highlightsCollapsed === true;
-        if (['home','checklist','notes','picks','names','settings','supports','memos'].indexOf(parsed.view) !== -1) ui.view = parsed.view;
+        if (VIEWS.indexOf(parsed.view) !== -1) ui.view = parsed.view;
+        ui.portalSeeded = parsed.portalSeeded === true;
         ui.onboardingDismissed = parsed.onboardingDismissed === true;
         if (typeof parsed.deviceName === 'string') ui.deviceName = parsed.deviceName.slice(0, 12);
         if (typeof parsed.autoName === 'string') ui.autoName = parsed.autoName.slice(0, 12);
@@ -598,6 +634,7 @@
         doneTab: ui.doneTab,
         tagFilter: ui.tagFilter,
         toastRemote: ui.toastRemote,
+        portalSeeded: ui.portalSeeded,
         highlightsCollapsed: ui.highlightsCollapsed
       }));
     } catch (e) { /* ignore */ }
@@ -719,9 +756,17 @@
     return null;
   }
 
-  function setView(view) {
-    if (['home','checklist','notes','picks','names','settings','supports','memos'].indexOf(view) === -1) return;
-    if (ui.view === view) return;
+  // 지금 화면이 속한 공간: portal · ledger · mamibag (포털에서 연 설정은 'settings')
+  function spaceOf(view) {
+    if (view === 'portal' || view === 'ledger') return view;
+    if (view === 'settings' && ui.settingsFrom !== 'mamibag') return 'settings';
+    return 'mamibag';
+  }
+  function setView(view, from) {
+    if (VIEWS.indexOf(view) === -1) return;
+    if (view === 'settings') ui.settingsFrom = from || (spaceOf(ui.view) === 'mamibag' ? 'mamibag' : spaceOf(ui.view));
+    if (ui.view === view) { render(); return; }
+    if (view !== 'ledger') ui.ledgerForm = null;
     if (ui.view === 'memos' && ui.memoOpen) closeMemo();
     if (ui.view === 'notes' && ui.noteOpen && view !== 'notes') closeNote();
     if (view !== 'notes' && view !== 'memos') ui.detailFrom = null;
@@ -734,9 +779,11 @@
     ui.nameEdit = null;
     ui.supportEdit = null;
     saveUiPrefs();
+    try { window.sessionStorage.setItem(SESSION_VIEW_KEY, view); } catch (e) { /* ignore */ }
     render();
     window.scrollTo(0, 0);
   }
+  var SESSION_VIEW_KEY = 'luckybbu:view';
 
   function renderPrimaryTabs() {
     var p = computeProgress(state.items);
@@ -765,6 +812,16 @@
       btn.setAttribute('aria-selected', active ? 'true' : 'false');
       btn.tabIndex = active ? 0 : -1;
     });
+    var space = spaceOf(ui.view);
+    document.body.dataset.space = space;
+    var vpo = $('#view-portal'); if (vpo) vpo.hidden = ui.view !== 'portal';
+    var vle = $('#view-ledger'); if (vle) vle.hidden = ui.view !== 'ledger';
+    var ptabsNav = $('#primary-tabs'); if (ptabsNav) ptabsNav.hidden = space !== 'mamibag';
+    var back = $('#space-back'); if (back) back.hidden = space === 'portal';
+    var titleText = $('#app-title-text');
+    if (titleText) titleText.textContent = space === 'ledger' ? '가계부' : space === 'settings' ? '설정' : '마미백';
+    var titleBtn = $('#app-title-btn');
+    if (titleBtn) { titleBtn.dataset.action = space === 'mamibag' ? 'go-home' : (space === 'ledger' ? 'go-ledger' : 'go-portal'); titleBtn.setAttribute('aria-label', space === 'mamibag' ? '마미백 홈으로' : titleText ? titleText.textContent : ''); }
     var vh = $('#view-home');
     if (vh) vh.hidden = ui.view !== 'home';
     var vs = $('#view-settings'); if (vs) vs.hidden = ui.view !== 'settings';
@@ -816,6 +873,8 @@
     updateTabScroll($('#category-tabs'));
     updateTabScroll($('#pick-tabs'));
     renderHome();
+    renderPortal();
+    renderLedger();
     renderHighlightsStrip();
     renderDday();
     renderMemo();
@@ -968,6 +1027,7 @@
       });
       html += '<button type="button" class="icon-presets__btn icon-presets__btn--none' + (!cat.icon ? ' is-active' : '') + '" data-action="pick-icon" data-icon="" aria-pressed="' + (!cat.icon ? 'true' : 'false') + '">없음</button>';
       html += '<label class="cat-opt"><input type="checkbox" data-action="toggle-done-tabs" data-focus-key="cat-dt:' + escapeHtml(cat.id) + '"' + (cat.doneTabs ? ' checked' : '') + '> 완료/미완료 탭 표시</label>';
+      html += '<label class="cat-opt">마미백 홈 묶음 <select data-action="set-group" data-focus-key="cat-group:' + escapeHtml(cat.id) + '"><option value="birth"' + (cat.group === 'birth' ? ' selected' : '') + '>출산</option><option value="baby"' + (cat.group === 'baby' ? ' selected' : '') + '>육아</option></select></label>';
     } else {
       html += '<h2 id="' + titleId + '" class="category__title">';
       html += '<button type="button" class="category__toggle" data-action="toggle-collapse" data-focus-key="cat-toggle:' + escapeHtml(cat.id) + '" aria-expanded="' + (collapsed ? 'false' : 'true') + '" aria-controls="' + bodyId + '">';
@@ -1910,31 +1970,329 @@ datesSorted().forEach(function (d) {
   }
 
   /* ---------- 홈 (개요) ---------- */
+  /* ---------- 선 아이콘 ---------- */
+  var SVG_PATHS = {
+    bag: '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7"/><path d="M9 13.5l2 2 4-4"/>',
+    wallet: '<path d="M17 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2"/><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M21 11h-4a2 2 0 0 0 0 4h4"/>',
+    clinic: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M12 9v6M9 12h6"/>',
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    gov: '<path d="M3 21h18M5 21V10M19 21V10M9.5 21V10M14.5 21V10M2.5 10L12 4l9.5 6z"/>',
+    pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
+    syringe: '<path d="M17 3l4 4M19 5l-9.5 9.5M14 4l6 6M11 8l5 5M7.5 12.5l4 4L8 20H4v-4z"/>',
+    growth: '<path d="M3 20h18M5 16l4-5 4 3 6-8"/>',
+    book: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    back: '<path d="M15 18l-6-6 6-6"/>',
+    next: '<path d="M9 6l6 6-6 6"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    settings: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'
+  };
+  function svgIcon(name, size) {
+    var s = size || 24;
+    return '<svg class="ico" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + SVG_PATHS[name] + '</svg>';
+  }
+
+  /* ---------- 마미백 홈: 출산 · 육아 아이콘 묶음 ---------- */
+  var MB_FIXED = {
+    birth: [
+      { label: '산부인과 일지', icon: 'clinic', view: 'notes' },
+      { label: '택일', icon: 'calendar', view: 'picks' },
+      { label: '정부 지원', icon: 'gov', view: 'supports' }
+    ],
+    baby: [
+      { label: '작명', icon: 'pen', view: 'names' },
+      { label: '예방접종', icon: 'syringe' },
+      { label: '성장 기록', icon: 'growth' },
+      { label: '육아 일지', icon: 'book' }
+    ]
+  };
+  function fixedTileMeta(view) {
+    if (view === 'notes') return state.notes.length ? state.notes.length + '개' : '';
+    if (view === 'picks') return state.dates.length ? '후보 ' + state.dates.length : '';
+    if (view === 'supports') return state.supports.length ? state.supports.filter(function (x) { return x.status === 'applied' || x.status === 'received'; }).length + '/' + state.supports.length : '';
+    if (view === 'names') return state.names.length ? '후보 ' + state.names.length : '';
+    return '';
+  }
   function renderHome() {
-    if (!$('#view-home')) return;
-    var p = computeProgress(state.items);
-    var txt = progressText(p);
-    $('#home-progress-text').innerHTML = progressHtml(p);
-    $('#home-progress-fill').style.width = p.percent + '%';
-    $('#home-progress-bar').setAttribute('aria-valuenow', String(p.percent));
-    $('#home-progress-bar').setAttribute('aria-valuetext', txt);
-    $('#home-cats').innerHTML = state.categories.map(function (cat) {
-      var cp = computeProgress(itemsOf(cat.id));
-      return '<li><button type="button" class="home-cat" data-action="go-category" data-category-id="' + escapeHtml(cat.id) + '">' +
-        '<span class="home-cat__name">' + (cat.icon ? escapeHtml(cat.icon) + ' ' : '') + escapeHtml(cat.name) + '</span>' +
-        '<span class="home-cat__bar"><span style="width:' + cp.percent + '%"></span></span>' +
-        '<span class="home-cat__num">' + (cp.total ? cp.done + '/' + cp.total : '0') + '</span></button></li>';
-    }).join('');
-    var sum = $('#supports-summary');
-    if (sum) {
-      var n = state.supports.length;
-      if (!n) sum.textContent = '받을 수 있는 지원을 정리하고 신청 상태를 관리하세요';
-      else {
-        var rec = state.supports.filter(function (x) { return x.status === 'received'; }).length;
-        var app = state.supports.filter(function (x) { return x.status === 'applied'; }).length;
-        sum.textContent = n + '개 항목 · 받음 ' + rec + ' · 신청함 ' + app;
-      }
+    GROUPS.forEach(function (g) {
+      var grid = $('#mb-' + g);
+      if (!grid) return;
+      var cats = state.categories.filter(function (c) { return c.group === g; });
+      var ids = {}; cats.forEach(function (c) { ids[c.id] = true; });
+      var p = computeProgress(state.items.filter(function (it) { return ids[it.categoryId]; }));
+      var sum = $('#mb-' + g + '-sum');
+      if (sum) sum.textContent = p.total ? '준비물 ' + p.done + '/' + p.total : '';
+      var html = cats.map(function (cat) {
+        var cp = computeProgress(itemsOf(cat.id));
+        return '<button type="button" class="mb-tile" data-action="go-category" data-category-id="' + escapeHtml(cat.id) + '">' +
+          '<span class="mb-tile__icon mb-tile__icon--solid">' + (cat.icon ? '<span class="mb-tile__emoji" aria-hidden="true">' + escapeHtml(cat.icon) + '</span>' : svgIcon('bag', 28)) + '</span>' +
+          '<span class="mb-tile__label">' + escapeHtml(cat.name) + '</span>' +
+          '<span class="mb-tile__meta">' + (cp.total ? cp.done + '/' + cp.total : '비어 있음') + '</span></button>';
+      }).join('');
+      html += MB_FIXED[g].map(function (f) {
+        var meta = f.view ? fixedTileMeta(f.view) : '준비 중';
+        return '<button type="button" class="mb-tile' + (f.view ? '' : ' is-soon') + '" data-action="' + (f.view ? 'mb-open' : 'mb-soon') + '"' + (f.view ? ' data-target="' + f.view + '"' : '') + ' data-label="' + escapeHtml(f.label) + '">' +
+          '<span class="mb-tile__icon">' + svgIcon(f.icon, 28) + '</span>' +
+          '<span class="mb-tile__label">' + escapeHtml(f.label) + '</span>' +
+          '<span class="mb-tile__meta">' + escapeHtml(meta) + '</span></button>';
+      }).join('');
+      grid.innerHTML = html;
+    });
+  }
+
+  /* ---------- luckybbu 포털: 디데이 두 개 ---------- */
+  var WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+  function dateOf(iso) { var p = iso.split('-'); return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)); }
+  function todayDate() { var n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()); }
+  function daysFromToday(iso) { return Math.round((dateOf(iso) - todayDate()) / 86400000); }
+  function shortDate(iso) { var d = dateOf(iso); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + WEEKDAYS[d.getDay()] + ')'; }
+  // 결혼한 날을 1일로 센다
+  function marriedDays() { return state.anniversary ? 1 - daysFromToday(state.anniversary) : 0; }
+  function nextMilestone(a) {
+    var w = dateOf(state.anniversary), today = todayDate();
+    var years = today.getFullYear() - w.getFullYear();
+    if (years > 0 && today.getMonth() === w.getMonth() && today.getDate() === w.getDate()) return '오늘 ' + years + '주년이에요';
+    if (a % 100 === 0) return '오늘 ' + formatNumber(a) + '일이에요';
+    var next = new Date(today.getFullYear(), w.getMonth(), w.getDate());
+    if (next <= today) next = new Date(today.getFullYear() + 1, w.getMonth(), w.getDate());
+    var toYear = Math.round((next - today) / 86400000);
+    var hundred = (Math.floor(a / 100) + 1) * 100, toHundred = hundred - a;
+    if (toYear < toHundred) return (next.getFullYear() - w.getFullYear()) + '주년까지 ' + toYear + '일';
+    return formatNumber(hundred) + '일까지 ' + toHundred + '일';
+  }
+  var HEART_SVG = '<svg class="dday__heart" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.5-9.3C1.1 8.3 3.2 4.5 6.8 4.5c2.1 0 3.6 1.1 5.2 3 1.6-1.9 3.1-3 5.2-3 3.6 0 5.7 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg>';
+  function renderPortal() {
+    var box = $('#portal-ddays');
+    if (!box) return;
+    var html = '';
+    if (state.dueDate) {
+      var d = daysFromToday(state.dueDate);
+      html += '<div class="dday dday--baby"><p class="dday__label">' + (d > 0 ? '축복이 만나기까지' : d === 0 ? '오늘 축복이를 만나요' : '축복이와 만난 지') + '</p>' +
+        '<p class="dday__num">' + escapeHtml(ddayText(state.dueDate)) + '</p><p class="dday__sub">' + escapeHtml(shortDate(state.dueDate)) + '</p></div>';
+    } else {
+      html += '<button type="button" class="dday-empty" data-action="open-settings">출산 예정일을 넣으면 축복이 D-day가 보여요</button>';
     }
+    html += '<span class="dday-sep" aria-hidden="true"></span>';
+    if (state.anniversary) {
+      var a = marriedDays();
+      if (a >= 1) {
+        html += '<div class="dday dday--love"><p class="dday__label">' + HEART_SVG + '우리 결혼한 지</p>' +
+          '<p class="dday__num">+' + formatNumber(a) + '<span class="dday__unit">일</span></p>' +
+          '<p class="dday__sub">' + escapeHtml(formatNoteDate(state.anniversary)) + '부터 · ' + escapeHtml(nextMilestone(a)) + '</p></div>';
+      } else {
+        html += '<div class="dday dday--love"><p class="dday__label">' + HEART_SVG + '결혼식까지</p><p class="dday__num">D-' + (1 - a) + '</p><p class="dday__sub">' + escapeHtml(shortDate(state.anniversary)) + '</p></div>';
+      }
+    } else {
+      html += '<button type="button" class="dday-empty" data-action="open-settings">결혼기념일을 넣으면 함께한 날이 보여요</button>';
+    }
+    box.innerHTML = html;
+  }
+
+  // 처음 한 번: 비어 있는 날짜에 우리 가족 날짜를 채운다(이미 적힌 값은 건드리지 않음)
+  var FAMILY_DUE = '2026-11-09', FAMILY_ANNIVERSARY = '2026-05-23';
+  function seedFamilyDatesOnce() {
+    if (ui.portalSeeded) return;
+    ui.portalSeeded = true;
+    saveUiPrefs();
+    var changed = false;
+    if (!state.anniversary) { state.anniversary = FAMILY_ANNIVERSARY; changed = true; }
+    if (!state.dueDate) { state.dueDate = FAMILY_DUE; changed = true; }
+    if (changed) commit();
+  }
+
+  /* ---------- 가계부 ---------- */
+  var LEDGER_COLORS = { '식비': '#7FD6AE', '생활': '#8DB9FF', '육아·출산': '#FFA48C', '교통': '#FFD966', '의료': '#C9B8FF', '쇼핑': '#FFB3C8', '기타': '#D9DEDB', '급여': '#7FD6AE', '부수입': '#8DB9FF' };
+  var LEDGER_WHO = TAG_NAMES.slice(0, 2);
+  function currentMonth() { return todayStamp().slice(0, 7); }
+  function ledgerMonth() { return /^\d{4}-\d{2}$/.test(ui.ledgerMonth) ? ui.ledgerMonth : currentMonth(); }
+  function shiftMonth(m, by) {
+    var d = new Date(parseInt(m.slice(0, 4), 10), parseInt(m.slice(5, 7), 10) - 1 + by, 1);
+    return d.getFullYear() + '-' + (d.getMonth() < 9 ? '0' : '') + (d.getMonth() + 1);
+  }
+  function monthLabel(m) { return m.slice(0, 4) + '년 ' + parseInt(m.slice(5, 7), 10) + '월'; }
+  function findEntry(id) { for (var i = 0; i < state.ledger.length; i++) if (state.ledger[i].id === id) return state.ledger[i]; return null; }
+  function signedWon(e) { return (e.type === 'in' ? '+' : '−') + formatNumber(e.amount); }
+  function entriesOfMonth(m) {
+    return state.ledger.filter(function (e) { return e.date.slice(0, 7) === m; })
+      .sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.t || 0) - (a.t || 0); });
+  }
+  function renderLedger() {
+    var root = $('#ledger-root');
+    if (!root) return;
+    var m = ledgerMonth(), mo = parseInt(m.slice(5, 7), 10);
+    var list = entriesOfMonth(m);
+    var out = 0, inn = 0, byCat = {};
+    list.forEach(function (e) {
+      if (e.type === 'in') inn += e.amount;
+      else { out += e.amount; byCat[e.cat] = (byCat[e.cat] || 0) + e.amount; }
+    });
+    var html = '<div class="ledger-month">' +
+      '<button type="button" class="icon-btn" data-action="ledger-month" data-by="-1" aria-label="이전 달">' + svgIcon('back', 18) + '</button>' +
+      '<h2 class="ledger-month__label" aria-live="polite">' + monthLabel(m) + '</h2>' +
+      '<button type="button" class="icon-btn" data-action="ledger-month" data-by="1" aria-label="다음 달">' + svgIcon('next', 18) + '</button>' +
+      (m !== currentMonth() ? '<button type="button" class="btn btn--small ledger-month__today" data-action="ledger-month" data-by="0">이번 달</button>' : '') + '</div>';
+
+    html += '<section class="ledger-sum" aria-labelledby="ledger-sum-title">' +
+      '<h3 class="ledger-sum__label" id="ledger-sum-title">' + mo + '월 지출</h3>' +
+      '<p class="ledger-sum__num">' + formatNumber(out) + '원</p>';
+    if (ui.budgetEdit) {
+      html += '<form class="ledger-budget-form" data-action="ledger-budget"><label for="ledger-budget-input">한 달 예산</label>' +
+        '<input type="text" id="ledger-budget-input" inputmode="numeric" autocomplete="off" data-price-input value="' + (state.budget ? formatNumber(state.budget) : '') + '" placeholder="예: 2,000,000">' +
+        '<button type="submit" class="btn btn--primary btn--small">저장</button>' +
+        (state.budget ? '<button type="button" class="btn btn--small" data-action="ledger-budget-clear">예산 없애기</button>' : '') +
+        '<button type="button" class="btn btn--small" data-action="ledger-budget-cancel">취소</button></form>';
+    } else if (state.budget) {
+      var pct = Math.round(out / state.budget * 100), left = state.budget - out;
+      html += '<div class="ledger-bar" role="progressbar" aria-label="예산 사용" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.min(100, pct) + '"><span style="width:' + Math.min(100, pct) + '%"' + (left < 0 ? ' class="is-over"' : '') + '></span></div>' +
+        '<p class="ledger-sum__budget">예산 ' + formatNumber(state.budget) + '원 중 ' + pct + '% · ' + (left >= 0 ? '남은 예산 <strong>' + formatNumber(left) + '원</strong>' : '<strong>' + formatNumber(-left) + '원</strong> 넘었어요') +
+        ' <button type="button" class="link-btn" data-action="ledger-budget-edit">예산 수정</button></p>';
+    } else {
+      html += '<p class="ledger-sum__budget"><button type="button" class="link-btn" data-action="ledger-budget-edit">한 달 예산 정하기</button></p>';
+    }
+    var net = inn - out;
+    html += '<div class="ledger-sum__row"><div><span>수입</span><strong>' + formatNumber(inn) + '원</strong></div>' +
+      '<div><span>수입 − 지출</span><strong>' + (net > 0 ? '+' : net < 0 ? '−' : '') + formatNumber(Math.abs(net)) + '원</strong></div></div></section>';
+
+    if (out > 0) {
+      var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
+      html += '<section class="ledger-card" aria-labelledby="ledger-cat-title"><h3 class="ledger-card__title" id="ledger-cat-title">분류별 지출</h3>' +
+        '<div class="ledger-stack" role="img" aria-label="' + escapeHtml(cats.map(function (c) { return c + ' ' + Math.round(byCat[c] / out * 100) + '%'; }).join(', ')) + '">' +
+        cats.map(function (c) { return '<span style="width:' + (byCat[c] / out * 100) + '%;background:' + LEDGER_COLORS[c] + '"></span>'; }).join('') + '</div>' +
+        '<ul class="ledger-legend">' + cats.map(function (c) {
+          return '<li><span class="ledger-legend__dot" style="background:' + LEDGER_COLORS[c] + '"></span><span class="ledger-legend__name">' + escapeHtml(c) + '</span><strong>' + formatNumber(byCat[c]) + '</strong></li>';
+        }).join('') + '</ul></section>';
+    }
+
+    html += '<section class="ledger-card" aria-labelledby="ledger-list-title"><h3 class="ledger-card__title" id="ledger-list-title">내역 <span class="notes__count">' + (list.length ? list.length + '건' : '') + '</span></h3>';
+    if (!list.length) {
+      html += '<p class="ledger-empty">' + (state.ledger.length ? mo + '월에는 기록이 없어요.' : '아직 기록이 없어요. 아래 ‘기록’을 눌러 첫 지출이나 수입을 적어 보세요.') + '</p>';
+    } else {
+      var day = '';
+      list.forEach(function (e) {
+        if (e.date !== day) {
+          if (day) html += '</ul>';
+          day = e.date;
+          var dayOut = 0; list.forEach(function (x) { if (x.date === day && x.type === 'out') dayOut += x.amount; });
+          html += '<p class="ledger-day">' + escapeHtml(shortDate(day)) + (dayOut ? '<span>−' + formatNumber(dayOut) + '원</span>' : '') + '</p><ul class="ledger-list">';
+        }
+        var meta = [e.who, LEDGER_PAYS[e.pay] || ''].filter(Boolean).join(' · ');
+        html += '<li><button type="button" class="ledger-row" data-action="ledger-edit" data-id="' + escapeHtml(e.id) + '" data-focus-key="ledger:' + escapeHtml(e.id) + '">' +
+          '<span class="ledger-row__cat" style="background:' + LEDGER_COLORS[e.cat] + '">' + escapeHtml(e.cat.replace('·출산', '')) + '</span>' +
+          '<span class="ledger-row__body"><span class="ledger-row__text">' + escapeHtml(e.text || e.cat) + '</span>' + (meta ? '<span class="ledger-row__meta">' + escapeHtml(meta) + '</span>' : '') + '</span>' +
+          '<span class="ledger-row__amt' + (e.type === 'in' ? ' is-in' : '') + '">' + signedWon(e) + '</span></button></li>';
+      });
+      html += '</ul>';
+    }
+    html += '</section>';
+    root.innerHTML = html;
+    renderLedgerSheet();
+  }
+
+  function ledgerChips(name, options, selected) {
+    return options.map(function (o) {
+      var val = typeof o === 'string' ? o : o.value, label = typeof o === 'string' ? o : o.label;
+      return '<label class="choice"><input type="radio" name="' + name + '" value="' + escapeHtml(val) + '"' + (val === selected ? ' checked' : '') + '><span>' + escapeHtml(label) + '</span></label>';
+    }).join('');
+  }
+  function renderLedgerSheet() {
+    var sheet = $('#ledger-sheet');
+    if (!sheet) return;
+    var open = ui.view === 'ledger' && !!ui.ledgerForm;
+    document.body.classList.toggle('has-sheet', open);
+    if (!open) { sheet.hidden = true; sheet.innerHTML = ''; return; }
+    if (!sheet.hidden && sheet.dataset.form === ui.ledgerForm) return; // 이미 열린 폼은 입력 중인 값을 지키려고 다시 그리지 않는다
+    var e = ui.ledgerForm === 'new' ? null : findEntry(ui.ledgerForm);
+    var type = e ? e.type : ui.ledgerType;
+    var me = myName();
+    var who = e ? e.who : (LEDGER_WHO.indexOf(me) !== -1 ? me : '');
+    var m = ledgerMonth();
+    var date = e ? e.date : (m === currentMonth() ? todayStamp() : m + '-01');
+    sheet.dataset.form = ui.ledgerForm;
+    sheet.innerHTML = '<div class="sheet__backdrop" data-action="ledger-close"></div>' +
+      '<form class="sheet__panel" id="ledger-form" role="dialog" aria-modal="true" aria-labelledby="ledger-form-title" novalidate>' +
+      '<span class="sheet__handle" aria-hidden="true"></span>' +
+      '<div class="sheet__head"><h2 id="ledger-form-title">' + (e ? '기록 수정' : '기록 추가') + '</h2>' +
+      '<button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>' +
+      '<div class="seg" role="radiogroup" aria-label="종류">' + ledgerChips('type', [{ value: 'out', label: '지출' }, { value: 'in', label: '수입' }], type) + '</div>' +
+      '<div class="field"><label for="ledger-text">내용</label><input type="text" id="ledger-text" maxlength="' + LEDGER_TEXT_MAX + '" autocomplete="off" value="' + escapeHtml(e ? e.text : '') + '" placeholder="예: 점심 국밥 9천원"></div>' +
+      '<div class="field"><label for="ledger-amount">금액</label><input type="text" id="ledger-amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (e ? formatNumber(e.amount) : '') + '" placeholder="내용에 ‘9천원’처럼 적어도 돼요"></div>' +
+      '<fieldset class="chips-field"><legend>분류</legend><div class="choices" id="ledger-cat-chips">' + ledgerChips('cat', type === 'in' ? LEDGER_IN_CATS : LEDGER_OUT_CATS, e ? e.cat : (type === 'in' ? '급여' : '식비')) + '</div></fieldset>' +
+      '<div class="sheet__two"><fieldset class="chips-field"><legend>누가</legend><div class="choices">' + ledgerChips('who', LEDGER_WHO.concat([{ value: '', label: '함께' }]), who) + '</div></fieldset>' +
+      '<fieldset class="chips-field"><legend>결제</legend><div class="choices">' + ledgerChips('pay', Object.keys(LEDGER_PAYS).map(function (k) { return { value: k, label: LEDGER_PAYS[k] }; }), e ? e.pay : 'card') + '</div></fieldset></div>' +
+      '<div class="field"><label for="ledger-date">날짜</label><input type="date" id="ledger-date" value="' + date + '" required></div>' +
+      '<div class="sheet__actions"><button type="submit" class="btn btn--primary">저장</button>' +
+      (e ? '<button type="button" class="btn btn--danger" data-action="ledger-delete">삭제</button>' : '') + '</div></form>';
+    sheet.hidden = false;
+    var first = $('#ledger-text');
+    if (first) first.focus({ preventScroll: true });
+  }
+  function openLedgerForm(id) {
+    ui.ledgerForm = id || 'new';
+    if (!id) ui.ledgerType = 'out';
+    renderLedgerSheet();
+  }
+  function closeLedgerForm() {
+    var back = ui.ledgerForm && ui.ledgerForm !== 'new' ? ui.ledgerForm : null;
+    ui.ledgerForm = null;
+    renderLedgerSheet();
+    var target = back ? document.querySelector('[data-focus-key="ledger:' + back + '"]') : $('#ledger-fab');
+    if (target) target.focus({ preventScroll: true });
+  }
+  function submitLedgerForm(form) {
+    var val = function (name) { var c = form.querySelector('input[name="' + name + '"]:checked'); return c ? c.value : ''; };
+    var text = $('#ledger-text').value.trim();
+    var amountEl = $('#ledger-amount');
+    var pp = parsePrice(amountEl.value);
+    if (!pp.ok) { showToast('금액은 숫자로 적어 주세요. 예: 9000, 9천원'); amountEl.focus(); return; }
+    var amount = pp.value;
+    if (amount === null && text) {
+      var line = parseItemLine(text);
+      if (line && line.price) { amount = line.price; text = line.name; }
+    }
+    if (!amount) { showToast('금액을 입력하세요.'); amountEl.focus(); return; }
+    var date = $('#ledger-date').value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { showToast('날짜를 골라 주세요.'); $('#ledger-date').focus(); return; }
+    var type = val('type') === 'in' ? 'in' : 'out';
+    var cats = type === 'in' ? LEDGER_IN_CATS : LEDGER_OUT_CATS;
+    var cat = cats.indexOf(val('cat')) !== -1 ? val('cat') : '기타';
+    var who = LEDGER_WHO.indexOf(val('who')) !== -1 ? val('who') : '';
+    var pay = LEDGER_PAYS[val('pay')] ? val('pay') : '';
+    var e = ui.ledgerForm === 'new' ? null : findEntry(ui.ledgerForm);
+    var data = { date: date, type: type, amount: amount, cat: cat, text: text.slice(0, LEDGER_TEXT_MAX), who: who, pay: pay };
+    if (e) Object.keys(data).forEach(function (k) { e[k] = data[k]; });
+    else { data.id = uid(); data.t = Date.now(); state.ledger.push(data); }
+    ui.ledgerForm = null;
+    ui.ledgerMonth = date.slice(0, 7);
+    commit();
+    var label = (text || cat) + ' ' + formatWon(amount);
+    act('ledger', '가계부 ' + (e ? '수정: ' : (type === 'in' ? '수입: ' : '지출: ')) + label);
+    showToast((e ? '수정했어요: ' : '기록했어요: ') + label);
+    var fab = $('#ledger-fab'); if (fab && !e) fab.focus({ preventScroll: true });
+  }
+  function deleteLedgerEntry(id) {
+    var idx = -1;
+    for (var i = 0; i < state.ledger.length; i++) if (state.ledger[i].id === id) idx = i;
+    if (idx === -1) return;
+    var removed = state.ledger.splice(idx, 1)[0];
+    ui.ledgerForm = null;
+    commit();
+    act('ledger', '가계부 삭제: ' + (removed.text || removed.cat) + ' ' + formatWon(removed.amount));
+    showToast('기록을 지웠어요.', function () {
+      if (findEntry(removed.id)) return;
+      state.ledger.splice(Math.min(idx, state.ledger.length), 0, removed);
+      commit();
+      showToast('되돌렸어요.');
+    });
+  }
+  function saveBudget() {
+    var input = $('#ledger-budget-input');
+    var pp = parsePrice(input.value);
+    if (!pp.ok) { showToast('예산은 숫자로 적어 주세요.'); input.focus(); return; }
+    state.budget = pp.value || 0;
+    ui.budgetEdit = false;
+    commit();
+    act('ledger', state.budget ? '가계부 한 달 예산 ' + formatWon(state.budget) : '가계부 예산 없앰');
+    showToast(state.budget ? '한 달 예산을 ' + formatWon(state.budget) + '으로 정했어요.' : '예산을 없앴어요.');
   }
 
   /* ---------- D-day ---------- */
@@ -1950,7 +2308,7 @@ datesSorted().forEach(function (d) {
   function renderDday() {
     var pill = $('#dday-pill');
     if (!pill) return;
-    var t = ddayText(state.dueDate);
+    var t = spaceOf(ui.view) === 'mamibag' ? ddayText(state.dueDate) : '';
     pill.hidden = !t;
     if (t) {
       pill.textContent = '👶🏻 ' + t;
@@ -2274,6 +2632,7 @@ datesSorted().forEach(function (d) {
   function renderSettings() {
     var dn = $('#device-name'); if (dn && document.activeElement !== dn) { dn.value = ui.deviceName; dn.placeholder = ui.deviceName ? '예: 남편, 아내' : '예: 남편, 아내 (지금은 ' + autoName() + ')'; }
     var dd = $('#due-date'); if (dd && document.activeElement !== dd) dd.value = state.dueDate || '';
+    var an = $('#anniversary'); if (an && document.activeElement !== an) an.value = state.anniversary || '';
     var tr = $('#toast-remote'); if (tr) tr.checked = ui.toastRemote;
     renderArchive();
   }
@@ -2364,7 +2723,7 @@ datesSorted().forEach(function (d) {
     var strip = $('#highlights-strip'), body = $('#highlights-strip-body');
     if (!strip) return;
     var lines = state.highlights ? state.highlights.split('\n') : [];
-    var show = ui.view !== 'home' && lines.length > 0;
+    var show = ui.view !== 'home' && spaceOf(ui.view) === 'mamibag' && lines.length > 0;
     strip.hidden = !show;
     if (!show) { body.hidden = true; return; }
     $('#highlights-strip-text').textContent = lines[0];
@@ -2444,7 +2803,7 @@ datesSorted().forEach(function (d) {
     var n = String(name || '').trim();
     if (!n) { showToast('분류 이름을 입력하세요.'); return false; }
     var newId = uid();
-    state.categories.push({ id: newId, name: n.slice(0, 40), icon: '' });
+    state.categories.push({ id: newId, name: n.slice(0, 40), icon: '', doneTabs: false, subs: [], group: defaultGroupFor(n) });
     ui.activeCategory = newId;
     saveUiPrefs();
     commit();
@@ -2882,9 +3241,12 @@ datesSorted().forEach(function (d) {
       dates: state.dates,
       names: state.names,
       dueDate: state.dueDate,
+      anniversary: state.anniversary,
       memo: state.memo,
       memos: state.memos,
-      supports: state.supports
+      supports: state.supports,
+      ledger: state.ledger,
+      budget: state.budget
     }, null, pretty ? 2 : 0);
   }
 
@@ -2990,10 +3352,10 @@ datesSorted().forEach(function (d) {
 
   var migrationsQueued = false;
   function scheduleOneTimeMigrations() {
-    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated)) return;
+    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded)) return;
     migrationsQueued = true;
     // 방 참여 직후에는 구독(attach)이 applyRemote 뒤에 붙으므로 한 틱 뒤에 실행한다.
-    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); }, 0);
+    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); }, 0);
   }
   function applyRemote(remoteState) {
     var result = normalizeState(remoteState);
@@ -3008,6 +3370,7 @@ datesSorted().forEach(function (d) {
       // keep UI editors pointing at things that still exist
       if (ui.itemEdit && !findItem(ui.itemEdit)) ui.itemEdit = null;
       if (ui.qtyEdit && !findItem(ui.qtyEdit)) ui.qtyEdit = null;
+      if (ui.ledgerForm && ui.ledgerForm !== 'new' && !findEntry(ui.ledgerForm)) ui.ledgerForm = null;
       if (ui.noteForm && ui.noteForm !== 'new') {
         var still = state.notes.some(function (n) { return n.id === ui.noteForm; });
         if (!still) ui.noteForm = null;
@@ -3060,6 +3423,8 @@ datesSorted().forEach(function (d) {
     badge.textContent = pillText;
     badge.className = 'sync-pill' + (st.status === 'online' ? ' is-online' : st.status === 'error' ? ' is-error' : st.status === 'offline' ? ' is-offline' : st.configured ? ' is-off' : ' is-local');
     badge.hidden = false;
+    var pbadge = $('#portal-sync');
+    if (pbadge) { pbadge.textContent = pillText; pbadge.className = badge.className + ' portal__sync'; }
     renderHome();
     var html = '';
     if (!st.configured) {
@@ -3104,7 +3469,7 @@ datesSorted().forEach(function (d) {
 
   function bindShareEvents() {
     document.addEventListener('click', function (e) {
-      var t = e.target.closest('[data-action="open-share"], [data-action="open-settings"], [data-action="open-supports"], [data-action="go-home"]');
+      var t = e.target.closest('[data-action="open-share"], [data-action="open-settings"], [data-action="open-supports"], [data-action="go-home"], [data-action="go-portal"], [data-action="go-ledger"], [data-action="space-back"]');
       if (!t) return;
       closeMenu();
       var a = t.dataset.action;
@@ -3112,6 +3477,9 @@ datesSorted().forEach(function (d) {
       else if (a === 'open-settings') setView('settings');
       else if (a === 'open-supports') setView('supports');
       else if (a === 'go-home') setView('home');
+      else if (a === 'go-portal') setView('portal');
+      else if (a === 'go-ledger') setView('ledger');
+      else if (a === 'space-back') setView(ui.view === 'settings' && ui.settingsFrom === 'ledger' ? 'ledger' : 'portal');
     });
     $('#share-panel').addEventListener('click', function (e) {
       var btn = e.target.closest('[data-action]');
@@ -3278,12 +3646,71 @@ datesSorted().forEach(function (d) {
         if (!b) return;
         switch (b.dataset.action) {
           case 'go-checklist': setView('checklist'); break;
-          case 'go-category': ui.activeCategory = b.dataset.categoryId; setView('checklist'); break;
+          case 'go-category': ui.activeCategory = b.dataset.categoryId; ui.collapsed[b.dataset.categoryId] = false; delete ui.collapsed[b.dataset.categoryId]; setView('checklist'); break;
+          case 'mb-open': setView(b.dataset.target); break;
+          case 'mb-soon': showToast('‘' + b.dataset.label + '’은(는) 준비 중이에요. 곧 열어 드릴게요.'); break;
         }
       });
     }
     var strip = $('#highlights-strip');
     if (strip) strip.addEventListener('click', function () { ui.stripOpen = !ui.stripOpen; renderHighlightsStrip(); });
+
+    // 포털: 공간 열기
+    var portalView = $('#view-portal');
+    if (portalView) {
+      portalView.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-action]');
+        if (!b) return;
+        if (b.dataset.action === 'open-space') setView(b.dataset.space === 'ledger' ? 'ledger' : 'home');
+        else if (b.dataset.action === 'add-space') showToast('새 공간은 준비 중이에요. 필요한 공간을 알려 주시면 만들어 드릴게요.');
+      });
+    }
+
+    // 가계부
+    var ledgerView = $('#view-ledger');
+    if (ledgerView) {
+      ledgerView.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-action]');
+        if (!b) return;
+        switch (b.dataset.action) {
+          case 'ledger-month': {
+            var by = parseInt(b.dataset.by, 10);
+            ui.ledgerMonth = by ? shiftMonth(ledgerMonth(), by) : currentMonth();
+            renderLedger();
+            var again = ledgerView.querySelector('[data-action="ledger-month"][data-by="' + b.dataset.by + '"]');
+            if (again) again.focus({ preventScroll: true });
+            break;
+          }
+          case 'ledger-new': openLedgerForm(null); break;
+          case 'ledger-edit': openLedgerForm(b.dataset.id); break;
+          case 'ledger-close': closeLedgerForm(); break;
+          case 'ledger-delete': {
+            var de = findEntry(ui.ledgerForm);
+            if (de && window.confirm('‘' + (de.text || de.cat) + ' ' + formatWon(de.amount) + '’ 기록을 지울까요?')) deleteLedgerEntry(de.id);
+            break;
+          }
+          case 'ledger-budget-edit': ui.budgetEdit = true; renderLedger(); var bi = $('#ledger-budget-input'); if (bi) bi.focus(); break;
+          case 'ledger-budget-cancel': ui.budgetEdit = false; renderLedger(); break;
+          case 'ledger-budget-clear': $('#ledger-budget-input').value = ''; saveBudget(); break;
+        }
+      });
+      ledgerView.addEventListener('submit', function (e) {
+        if (e.target.id === 'ledger-form') { e.preventDefault(); submitLedgerForm(e.target); }
+        else if (e.target.dataset.action === 'ledger-budget') { e.preventDefault(); saveBudget(); }
+      });
+      ledgerView.addEventListener('change', function (e) {
+        if (e.target.name !== 'type') return;
+        ui.ledgerType = e.target.value === 'in' ? 'in' : 'out';
+        var chips = $('#ledger-cat-chips');
+        if (chips) chips.innerHTML = ledgerChips('cat', ui.ledgerType === 'in' ? LEDGER_IN_CATS : LEDGER_OUT_CATS, ui.ledgerType === 'in' ? '급여' : '식비');
+      });
+      ledgerView.addEventListener('input', function (e) {
+        if (e.target.hasAttribute('data-price-input') && !e.isComposing) formatPriceInput(e.target);
+      });
+      ledgerView.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && ui.ledgerForm) { e.preventDefault(); closeLedgerForm(); }
+      });
+    }
 
     // 메모: 목록 → 상세(읽기/수정), 댓글·좋아요·즐겨찾기
     var memosView = $('#view-memos');
@@ -3419,6 +3846,13 @@ datesSorted().forEach(function (d) {
       if (v === (state.dueDate || '')) return;
       state.dueDate = v; commit(); act('due', v ? '출산 예정일을 ' + formatNoteDate(v) + '로 설정' : '출산 예정일 지움');
       showToast(v ? '출산 예정일을 저장했습니다. ' + ddayText(v) : '출산 예정일을 지웠습니다.');
+    });
+    var anInput = $('#anniversary');
+    if (anInput) anInput.addEventListener('change', function () {
+      var v = anInput.value; if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) v = '';
+      if (v === (state.anniversary || '')) return;
+      state.anniversary = v; commit(); act('due', v ? '결혼기념일을 ' + formatNoteDate(v) + '로 설정' : '결혼기념일 지움');
+      showToast(v ? '결혼기념일을 저장했습니다.' : '결혼기념일을 지웠습니다.');
     });
     var trInput = $('#toast-remote');
     if (trInput) trInput.addEventListener('change', function () { ui.toastRemote = trInput.checked; saveUiPrefs(); });
@@ -3886,6 +4320,7 @@ datesSorted().forEach(function (d) {
         var ni = $('input[type="text"]', el.closest('form')); if (ni) ni.focus();
         return;
       }
+      if (el.dataset.action === 'set-group') { var gcat = findCategory(card.dataset.categoryId); if (gcat && GROUPS.indexOf(el.value) !== -1) { gcat.group = el.value; saveState(); act('category', '분류 ‘' + gcat.name + '’을 ' + (gcat.group === 'baby' ? '육아' : '출산') + ' 묶음으로'); } return; }
       if (el.dataset.action === 'toggle-done-tabs') { var dcat = findCategory(card.dataset.categoryId); if (dcat) { dcat.doneTabs = !!el.checked; saveState(); act('category', '분류 ‘' + dcat.name + '’ 완료 탭 ' + (dcat.doneTabs ? '켬' : '끔')); } return; }
       if (el.dataset.field && row) { updateItemField(row.dataset.itemId, el.dataset.field, el, row); }
     });
@@ -3923,8 +4358,11 @@ datesSorted().forEach(function (d) {
     var loaded = loadState();
     state = loaded.state;
     loadUiPrefs();
-    if (!uiPrefsFound) ui.view = 'home';
-    if (ui.view === 'supports') ui.view = 'home';
+    // 앱을 새로 열면 포털에서 시작하고, 같은 탭에서 새로고침하면 보던 화면을 이어서 보여준다
+    var sessionView = null;
+    try { sessionView = window.sessionStorage.getItem(SESSION_VIEW_KEY); } catch (e) { /* ignore */ }
+    ui.view = VIEWS.indexOf(sessionView) !== -1 ? sessionView : 'portal';
+    if (ui.view === 'settings') ui.settingsFrom = 'portal';
     bindEvents();
     if (loaded.fresh && storageOk) {
       saveState({ initial: true });
@@ -3935,7 +4373,7 @@ datesSorted().forEach(function (d) {
     render();
     var storedRoom = null;
     try { storedRoom = window.localStorage.getItem('birth-bag-checklist:room'); } catch (e) { /* ignore */ }
-    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); }
+    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); }
     // sync.js is loaded after app.js; bind once it has had a chance to run.
     window.addEventListener('load', bindShareEvents);
   }

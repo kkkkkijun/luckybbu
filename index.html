@@ -3,26 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="출산가방 준비물을 확인하고 금액을 기록하며 가방에 담은 물품을 체크하는 체크리스트">
-  <meta name="theme-color" content="#fff8f2">
-  <title>마미백 · 출산가방 체크리스트</title>
+  <meta name="description" content="우리 가족 포털 luckybbu — 마미백(출산·육아 준비)과 가계부를 한곳에서">
+  <meta name="theme-color" content="#FFFBF8">
+  <title>luckybbu</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="./favicon-48.png">
   <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="마미백">
+  <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261001f">
+  <link rel="stylesheet" href="./style.css?v=20261004a">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
 
   <header class="app-header">
     <div class="app-header__row">
-      <h1 class="app-title"><button type="button" class="app-title__btn" data-action="go-home" aria-label="마미백 홈으로">마미백💜</button></h1>
+      <button type="button" class="space-back" id="space-back" data-action="space-back" aria-label="luckybbu 포털로" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span>포털</span></button>
+      <h1 class="app-title"><button type="button" class="app-title__btn" id="app-title-btn" data-action="go-home" aria-label="마미백 홈으로"><span id="app-title-text">마미백</span></button></h1>
       <button type="button" class="dday-pill" id="dday-pill" data-action="open-settings" hidden aria-label="출산 예정일까지 남은 날. 누르면 설정"></button>
       <button type="button" class="sync-pill" id="sync-status" data-action="open-share" aria-live="polite">공유 연결하기</button>
     </div>
@@ -39,7 +41,38 @@
 
   <div id="main-area">
 
-  <!-- ===== 홈 ===== -->
+  <!-- ===== luckybbu 포털 ===== -->
+  <section id="view-portal" class="view portal" aria-labelledby="portal-title" hidden>
+    <h1 class="portal__brand" id="portal-title"><img src="./favicon-48.png" width="30" height="30" alt="">luckybbu</h1>
+    <div class="portal__ddays" id="portal-ddays" aria-live="polite"></div>
+    <nav class="portal__spaces" aria-label="공간">
+      <button type="button" class="space-tile" data-action="open-space" data-space="mamibag">
+        <span class="space-tile__icon space-tile__icon--mamibag"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7"/><path d="M9 13.5l2 2 4-4"/></svg></span>
+        <span class="space-tile__label">마미백</span>
+      </button>
+      <button type="button" class="space-tile" data-action="open-space" data-space="ledger">
+        <span class="space-tile__icon space-tile__icon--ledger"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2"/><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M21 11h-4a2 2 0 0 0 0 4h4"/></svg></span>
+        <span class="space-tile__label">가계부</span>
+      </button>
+      <button type="button" class="space-tile" data-action="add-space">
+        <span class="space-tile__icon space-tile__icon--add"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span class="space-tile__label">추가</span>
+      </button>
+    </nav>
+    <div class="portal__foot">
+      <button type="button" class="portal__settings" data-action="open-settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>설정</button>
+      <button type="button" class="sync-pill portal__sync" data-action="open-share" id="portal-sync" aria-label="가족 공유 상태"></button>
+    </div>
+  </section>
+
+  <!-- ===== 가계부 ===== -->
+  <section id="view-ledger" class="view ledger" aria-label="가계부" hidden>
+    <div id="ledger-root"></div>
+    <button type="button" class="ledger-fab" id="ledger-fab" data-action="ledger-new"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>기록</button>
+    <div class="sheet" id="ledger-sheet" hidden></div>
+  </section>
+
+  <!-- ===== 마미백 홈 ===== -->
   <section id="view-home" class="view home" role="tabpanel" aria-labelledby="ptab-home" hidden>
     <section class="highlights" id="highlights" aria-labelledby="highlights-title">
       <div class="highlights__head">
@@ -55,34 +88,15 @@
       <div id="highlights-body"></div>
     </section>
 
-    <section class="home-card" aria-labelledby="home-progress-title">
-      <div class="progress-head">
-        <h2 id="home-progress-title" class="home-card__title">🧳 준비 진행률</h2>
-        <p class="progress-text" id="home-progress-text"></p>
-      </div>
-      <div class="progress-bar" role="progressbar" id="home-progress-bar" aria-labelledby="home-progress-title" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-        <div class="progress-bar__fill" id="home-progress-fill"></div>
-      </div>
-      <ul class="home-cats" id="home-cats"></ul>
-      <button type="button" class="btn btn--primary home-card__cta" data-action="go-checklist">준비물 체크하러 가기</button>
+    <section class="mb-group mb-group--birth" aria-labelledby="mb-birth-title">
+      <div class="mb-group__head"><h2 class="mb-group__title" id="mb-birth-title">출산</h2><span class="mb-group__sum" id="mb-birth-sum"></span></div>
+      <div class="mb-grid" id="mb-birth"></div>
     </section>
-
-    <section class="home-card" id="memo-card" aria-labelledby="memo-title">
-      <div class="progress-head">
-        <h2 id="memo-title" class="home-card__title">📝 메모 <span class="notes__count" id="memo-count"></span></h2>
-        <div class="settings-actions">
-          <button type="button" class="btn btn--small" data-action="new-memo-home">새 메모</button>
-          <button type="button" class="btn btn--small" data-action="open-memos">전체 보기</button>
-        </div>
-      </div>
-      <div class="memo-preview" id="memo-preview"></div>
+    <section class="mb-group mb-group--baby" aria-labelledby="mb-baby-title">
+      <div class="mb-group__head"><h2 class="mb-group__title" id="mb-baby-title">육아</h2><span class="mb-group__sum" id="mb-baby-sum"></span></div>
+      <div class="mb-grid" id="mb-baby"></div>
     </section>
-
-    <button type="button" class="home-link" data-action="open-supports">
-      <span class="home-link__icon" aria-hidden="true">🏛️</span>
-      <span class="home-link__body"><strong>정부 출산 지원 체크리스트</strong><small id="supports-summary">받을 수 있는 지원을 정리하고 신청 상태를 관리하세요</small></span>
-      <span class="category__chevron home-link__chev" aria-hidden="true"></span>
-    </button>
+    <p class="mb-hint">분류를 출산·육아 중 어디에 둘지는 준비물 화면의 ‘편집’에서 바꿀 수 있어요.</p>
   </section>
 
   <!-- ===== 준비물 ===== -->
@@ -229,8 +243,10 @@
       <h3 id="set-profile-title" class="settings-card__title">내 정보</h3>
       <div class="field"><label for="device-name">내 이름 (변경 기록에 표시)</label>
         <input type="text" id="device-name" maxlength="12" placeholder="예: 남편, 아내" autocomplete="nickname"></div>
-      <div class="field"><label for="due-date">출산 예정일 (상단에 D-day 표시, 가족과 공유됨)</label>
+      <div class="field"><label for="due-date">출산 예정일 (포털·마미백에 D-day 표시, 가족과 공유됨)</label>
         <input type="date" id="due-date"></div>
+      <div class="field"><label for="anniversary">결혼기념일 (포털에 함께한 날 표시, 결혼한 날 = 1일)</label>
+        <input type="date" id="anniversary"></div>
     </section>
 
     <section class="settings-card" id="archive-card" aria-labelledby="archive-title">
@@ -320,9 +336,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261001f"></script>
-  <script src="./app.js?v=20261001f"></script>
-  <script src="./sync.js?v=20261001f"></script>
+  <script src="./firebase-config.js?v=20261004a"></script>
+  <script src="./app.js?v=20261004a"></script>
+  <script src="./sync.js?v=20261004a"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {

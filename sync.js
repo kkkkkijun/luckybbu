@@ -118,10 +118,10 @@
   }
 
   /* ---------- state <-> remote document ---------- */
-  // Remote layout: { version, categories:{id:{name,icon,order}}, items:{id:{...,order}}, notes:{id:{...}}, highlights }
+  // Remote layout: { version, categories:{id:{name,icon,group,order}}, items:{id:{...,order}}, notes:{id:{...}}, ledger:{id:{...}}, highlights, dueDate, anniversary, budget }
   function docFromState(s) {
     var doc = { version: s.version || 1, categories: {}, items: {}, notes: {}, highlights: s.highlights || '', picks: { gpt: (s.picks && s.picks.gpt) || '', claude: (s.picks && s.picks.claude) || '' } };
-    s.categories.forEach(function (c, i) { doc.categories[c.id] = { name: c.name, icon: c.icon || '', doneTabs: !!c.doneTabs, subs: (c.subs && c.subs.length) ? c.subs.map(function (sb) { return { id: sb.id, name: sb.name, icon: sb.icon || '' }; }) : null, order: i }; });
+    s.categories.forEach(function (c, i) { doc.categories[c.id] = { name: c.name, icon: c.icon || '', doneTabs: !!c.doneTabs, group: c.group || '', subs: (c.subs && c.subs.length) ? c.subs.map(function (sb) { return { id: sb.id, name: sb.name, icon: sb.icon || '' }; }) : null, order: i }; });
     s.items.forEach(function (it, i) {
       doc.items[it.id] = { categoryId: it.categoryId, name: it.name, price: typeof it.price === 'number' ? it.price : null, tags: Array.isArray(it.tags) && it.tags.length ? it.tags.slice() : null, sub: it.sub || '', memo: it.memo || '', done: !!it.done, excluded: !!it.excluded, order: i };
     });
@@ -129,6 +129,10 @@
     doc.dates = {};
     (s.dates || []).forEach(function (d, i) { doc.dates[d.id] = { date: d.date || '', time: d.time || '', label: d.label || '', memo: d.memo || '', fav: !!d.fav, likes: (d.likes && d.likes.length) ? d.likes.slice() : null, comments: (d.comments && d.comments.length) ? d.comments.map(function (c) { return { id: c.id, who: c.who || '', text: c.text || '', t: c.t || 0 }; }) : null, order: i }; });
     doc.dueDate = s.dueDate || '';
+    doc.anniversary = s.anniversary || '';
+    doc.budget = typeof s.budget === 'number' ? s.budget : 0;
+    doc.ledger = {};
+    (s.ledger || []).forEach(function (e) { doc.ledger[e.id] = { date: e.date, type: e.type, amount: e.amount, cat: e.cat || '', text: e.text || '', who: e.who || '', pay: e.pay || '', t: e.t || 0 }; });
     doc.memo = s.memo || '';
     doc.memos = {};
     (s.memos || []).forEach(function (m, i) { doc.memos[m.id] = { text: m.text || '', updated: m.updated || 0, who: m.who || '', fav: !!m.fav, likes: (m.likes && m.likes.length) ? m.likes.slice() : null, comments: (m.comments && m.comments.length) ? m.comments.map(function (c) { return { id: c.id, who: c.who || '', text: c.text || '', t: c.t || 0 }; }) : null, tables: (m.tables && m.tables.length) ? m.tables.map(function (t) { return { id: t.id, cols: t.cols.slice(), rowH: t.rowH.slice(), rows: t.rows.map(function (r) { return r.slice(); }) }; }) : null, order: i }; });
@@ -153,7 +157,7 @@
     doc = doc || {};
     return {
       version: typeof doc.version === 'number' ? doc.version : 1,
-      categories: sortedEntries(doc.categories).map(function (c) { return { id: c.id, name: c.name, icon: c.icon || '', doneTabs: c.doneTabs === true, subs: c.subs || [] }; }),
+      categories: sortedEntries(doc.categories).map(function (c) { return { id: c.id, name: c.name, icon: c.icon || '', doneTabs: c.doneTabs === true, subs: c.subs || [], group: c.group || undefined }; }),
       items: sortedEntries(doc.items).map(function (it) {
         return { id: it.id, categoryId: it.categoryId, name: it.name, price: typeof it.price === 'number' ? it.price : null, tags: Array.isArray(it.tags) ? it.tags : (it.tags && typeof it.tags === 'object' ? Object.keys(it.tags).map(function (k) { return it.tags[k]; }) : []), sub: typeof it.sub === 'string' ? it.sub : '', memo: it.memo || '', done: it.done === true, excluded: it.excluded === true };
       }),
@@ -162,6 +166,9 @@
       names: sortedEntries(doc.names).map(function (n) { return { id: n.id, name: n.name || '', favorite: n.favorite === true, likes: n.likes || [], comments: n.comments || [], memo: n.memo || '', hanja: asArr(n.hanja).map(function (h) { return { id: (h && h.id) || '', chars: (h && h.chars) || '', meaning: (h && h.meaning) || '' }; }), dateIds: asArr(n.dateIds).filter(function (x) { return typeof x === 'string'; }) }; }),
       highlights: typeof doc.highlights === 'string' ? doc.highlights : '',
       dueDate: typeof doc.dueDate === 'string' ? doc.dueDate : '',
+      anniversary: typeof doc.anniversary === 'string' ? doc.anniversary : '',
+      budget: typeof doc.budget === 'number' ? doc.budget : 0,
+      ledger: Object.keys(doc.ledger || {}).map(function (id) { var e = doc.ledger[id] || {}; return { id: id, date: e.date, type: e.type, amount: e.amount, cat: e.cat, text: e.text || '', who: e.who || '', pay: e.pay || '', t: typeof e.t === 'number' ? e.t : 0 }; }),
       memo: typeof doc.memo === 'string' ? doc.memo : '',
       memos: sortedEntries(doc.memos).map(function (m) { return { id: m.id, text: m.text || '', updated: typeof m.updated === 'number' ? m.updated : 0, who: m.who || '', fav: m.fav === true, likes: m.likes || [], comments: m.comments || [], tables: m.tables || [] }; }),
       supports: sortedEntries(doc.supports).map(function (x) { return { id: x.id, title: x.title || '', target: x.target || '', benefit: x.benefit || '', howto: x.howto || '', deadline: x.deadline || '', link: x.link || '', status: x.status || 'todo', memo: x.memo || '' }; }),
@@ -170,14 +177,14 @@
   }
 
   function isEmptyDoc(doc) {
-    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !doc.highlights && !doc.memo && !doc.dueDate && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
+    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
   }
 
   // Multi-path update: only entities that changed, null for removed ones.
   function diff(prev, next) {
     var updates = {};
     prev = prev || { categories: {}, items: {}, notes: {}, highlights: '' };
-    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos'].forEach(function (group) {
+    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger'].forEach(function (group) {
       var a = prev[group] || {}, b = next[group] || {};
       Object.keys(b).forEach(function (id) {
         if (!a[id] || JSON.stringify(a[id]) !== JSON.stringify(b[id])) updates[group + '/' + id] = b[id];
@@ -186,6 +193,8 @@
     });
     if ((prev.highlights || '') !== (next.highlights || '')) updates.highlights = next.highlights || '';
     if ((prev.dueDate || '') !== (next.dueDate || '')) updates.dueDate = next.dueDate || '';
+    if ((prev.anniversary || '') !== (next.anniversary || '')) updates.anniversary = next.anniversary || '';
+    if ((prev.budget || 0) !== (next.budget || 0)) updates.budget = next.budget || 0;
     if ((prev.memo || '') !== (next.memo || '')) updates.memo = next.memo || '';
     if (JSON.stringify(prev.picks || {}) !== JSON.stringify(next.picks || {})) updates.picks = next.picks || { gpt: '', claude: '' };
     if (prev.version !== next.version) updates.version = next.version;

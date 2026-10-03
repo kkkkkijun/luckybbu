@@ -1,17 +1,32 @@
 {
-  "name": "마미백 · 출산가방 체크리스트",
-  "short_name": "마미백",
-  "description": "출산가방·조리원가방 준비물을 체크하고 진료 메모와 택일 정보를 함께 관리하는 체크리스트",
+  "name": "luckybbu · 우리 가족 포털",
+  "short_name": "luckybbu",
+  "description": "마미백(출산·육아 준비)과 가계부를 한곳에서 쓰는 우리 가족 포털",
   "lang": "ko",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#fff8f2",
-  "theme_color": "#fff8f2",
+  "background_color": "#FFFBF8",
+  "theme_color": "#FFFBF8",
   "icons": [
-    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
