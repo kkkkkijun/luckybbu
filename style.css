@@ -1102,7 +1102,6 @@ body { padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding
 .mb-tile__icon--solid { background: var(--peach-fill); color: var(--peach-ink); }
 .mb-group--baby .mb-tile__icon { background: var(--sky-soft); color: #2F6BC4; }
 .mb-group--baby .mb-tile__icon--solid { background: var(--sky-fill); color: var(--sky-ink); }
-.mb-tile__emoji { font-size: 1.7rem; line-height: 1; }
 .mb-tile:hover .mb-tile__icon { transform: translateY(-2px); }
 .mb-tile__label { max-width: 100%; font-size: 0.78rem; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
 .mb-tile__meta { font-size: 0.7rem; color: var(--muted); min-height: 1em; font-variant-numeric: tabular-nums; }

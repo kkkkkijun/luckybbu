@@ -1983,6 +1983,15 @@ datesSorted().forEach(function (d) {
     growth: '<path d="M3 20h18M5 16l4-5 4 3 6-8"/>',
     book: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    suitcase: '<rect x="5" y="7" width="14" height="12" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9 11v4M15 11v4M8 19v1.5M16 19v1.5"/>',
+    bed: '<path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="2"/>',
+    bottle: '<path d="M10 3h4v3h-4z"/><path d="M8.5 9a2.5 2.5 0 0 1 2-3h3a2.5 2.5 0 0 1 2 3v10a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2z"/><path d="M8.5 13h3M8.5 16h3"/>',
+    box: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
+    shirt: '<path d="M8 3L3 6l2 4 2-1v12h10V9l2 1 2-4-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z"/>',
+    baby: '<circle cx="12" cy="13" r="8"/><path d="M11 5c1-1.5 3-1.3 3.3.2M9.5 12.5h.01M14.5 12.5h.01M10 16c1.2.8 2.8.8 4 0"/>',
+    toy: '<circle cx="12" cy="13" r="6"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><path d="M10 12.5h.01M14 12.5h.01M11 15.5h2"/>',
+    doc: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',
+    sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
     back: '<path d="M15 18l-6-6 6-6"/>',
     next: '<path d="M9 6l6 6-6 6"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
@@ -1994,6 +2003,17 @@ datesSorted().forEach(function (d) {
   }
 
   /* ---------- 마미백 홈: 출산 · 육아 아이콘 묶음 ---------- */
+  // 분류 타일은 이모지 대신 선 아이콘: 이름 → 이모지 → 기본(가방) 순으로 고른다
+  var CAT_ICON_RULES = [
+    [/병원|캐리어|출산\s*가방|입원/, 'suitcase'], [/조리원|산후/, 'bed'], [/수유|젖병|분유/, 'bottle'],
+    [/옷|의류|내의|배냇/, 'shirt'], [/장난감|놀이|인형/, 'toy'], [/서류|문서|증명/, 'doc'],
+    [/아기|축복|육아|신생아|베이비|맞이/, 'baby'], [/기타|그\s*외|잡화/, 'box']
+  ];
+  var EMOJI_ICON = { '🧳': 'suitcase', '🛏️': 'bed', '🛏': 'bed', '👶🏻': 'baby', '👶': 'baby', '🤱🏻': 'bottle', '🤱': 'bottle', '🍼': 'bottle', '🧸': 'toy', '🏥': 'clinic', '🎒': 'bag', '🧴': 'bottle', '👕': 'shirt', '📄': 'doc', '✨': 'sparkle' };
+  function categoryIcon(cat) {
+    for (var i = 0; i < CAT_ICON_RULES.length; i++) if (CAT_ICON_RULES[i][0].test(cat.name)) return CAT_ICON_RULES[i][1];
+    return EMOJI_ICON[cat.icon] || 'bag';
+  }
   var MB_FIXED = {
     birth: [
       { label: '산부인과 일지', icon: 'clinic', view: 'notes' },
@@ -2026,7 +2046,7 @@ datesSorted().forEach(function (d) {
       var html = cats.map(function (cat) {
         var cp = computeProgress(itemsOf(cat.id));
         return '<button type="button" class="mb-tile" data-action="go-category" data-category-id="' + escapeHtml(cat.id) + '">' +
-          '<span class="mb-tile__icon mb-tile__icon--solid">' + (cat.icon ? '<span class="mb-tile__emoji" aria-hidden="true">' + escapeHtml(cat.icon) + '</span>' : svgIcon('bag', 28)) + '</span>' +
+          '<span class="mb-tile__icon mb-tile__icon--solid">' + svgIcon(categoryIcon(cat), 28) + '</span>' +
           '<span class="mb-tile__label">' + escapeHtml(cat.name) + '</span>' +
           '<span class="mb-tile__meta">' + (cp.total ? cp.done + '/' + cp.total : '비어 있음') + '</span></button>';
       }).join('');
