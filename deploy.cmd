@@ -12,5 +12,5 @@ git commit -m "업데이트 %D% %T%" || (echo [오류] 커밋에 실패했습니
 git push origin main || (echo [오류] push에 실패했습니다. 인터넷 연결이나 GitHub 로그인 상태를 확인하세요. & pause & exit /b 1)
 echo.
 echo 완료! 1~2분 뒤 아래 주소에서 확인하세요. (이전 화면이 보이면 Ctrl+Shift+R)
-echo https://kkkkkijun.github.io/checklist/
+echo https://kkkkkijun.github.io/luckybbu/
 pause

@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="description" content="우리 가족 포털 luckybbu — 마미백(출산·육아 준비)과 가계부를 한곳에서">
   <meta name="theme-color" content="#FFFBF8">
   <title>luckybbu</title>
@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261004a">
+  <link rel="stylesheet" href="./style.css?v=20261005b">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
@@ -61,7 +61,7 @@
     </nav>
     <div class="portal__foot">
       <button type="button" class="portal__settings" data-action="open-settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>설정</button>
-      <button type="button" class="sync-pill portal__sync" data-action="open-share" id="portal-sync" aria-label="가족 공유 상태"></button>
+      <button type="button" class="sync-pill portal__sync" data-action="open-share" id="portal-sync"></button>
     </div>
   </section>
 
@@ -336,9 +336,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261004a"></script>
-  <script src="./app.js?v=20261004a"></script>
-  <script src="./sync.js?v=20261004a"></script>
+  <script src="./firebase-config.js?v=20261005b"></script>
+  <script src="./app.js?v=20261005b"></script>
+  <script src="./sync.js?v=20261005b"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {

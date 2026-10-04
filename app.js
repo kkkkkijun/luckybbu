@@ -31,7 +31,7 @@
     var out = [], seen = {};
     listOf(raw).forEach(function (e) {
       if (!e || typeof e !== 'object') return;
-      var id = typeof e.id === 'string' ? e.id.trim() : '';
+      var id = typeof e.id === 'string' ? e.id.trim().replace(/[.#$\[\]\/]/g, '_') : ''; // Firebase 키에 못 쓰는 글자
       var amount = typeof e.amount === 'number' && isFinite(e.amount) ? Math.round(e.amount) : NaN;
       var date = typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date) ? e.date : '';
       if (!id || seen[id] || !date || !(amount > 0) || amount > PRICE_MAX) return; // broken entries are dropped
@@ -762,8 +762,9 @@
     if (view === 'settings' && ui.settingsFrom !== 'mamibag') return 'settings';
     return 'mamibag';
   }
-  function setView(view, from) {
+  function setView(view, from, fromHistory) {
     if (VIEWS.indexOf(view) === -1) return;
+    if (!fromHistory && view !== ui.view) { try { window.history.pushState({ view: view }, ''); } catch (e) { /* ignore */ } }
     if (view === 'settings') ui.settingsFrom = from || (spaceOf(ui.view) === 'mamibag' ? 'mamibag' : spaceOf(ui.view));
     if (ui.view === view) { render(); return; }
     if (view !== 'ledger') ui.ledgerForm = null;
@@ -2050,37 +2051,84 @@ datesSorted().forEach(function (d) {
   function marriedDays() { return state.anniversary ? 1 - daysFromToday(state.anniversary) : 0; }
   function nextMilestone(a) {
     var w = dateOf(state.anniversary), today = todayDate();
+    // 그해의 결혼기념일 (2월 29일은 평년에 2월 28일로)
+    var inYear = function (y) { var d = new Date(y, w.getMonth(), w.getDate()); return d.getMonth() !== w.getMonth() ? new Date(y, w.getMonth() + 1, 0) : d; };
     var years = today.getFullYear() - w.getFullYear();
-    if (years > 0 && today.getMonth() === w.getMonth() && today.getDate() === w.getDate()) return '오늘 ' + years + '주년이에요';
+    if (years > 0 && inYear(today.getFullYear()).getTime() === today.getTime()) return '오늘 ' + years + '주년이에요';
     if (a % 100 === 0) return '오늘 ' + formatNumber(a) + '일이에요';
-    var next = new Date(today.getFullYear(), w.getMonth(), w.getDate());
-    if (next <= today) next = new Date(today.getFullYear() + 1, w.getMonth(), w.getDate());
+    var next = inYear(today.getFullYear());
+    if (next <= today) next = inYear(today.getFullYear() + 1);
     var toYear = Math.round((next - today) / 86400000);
     var hundred = (Math.floor(a / 100) + 1) * 100, toHundred = hundred - a;
     if (toYear < toHundred) return (next.getFullYear() - w.getFullYear()) + '주년까지 ' + toYear + '일';
     return formatNumber(hundred) + '일까지 ' + toHundred + '일';
   }
   var HEART_SVG = '<svg class="dday__heart" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.5-9.3C1.1 8.3 3.2 4.5 6.8 4.5c2.1 0 3.6 1.1 5.2 3 1.6-1.9 3.1-3 5.2-3 3.6 0 5.7 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg>';
+  // 디데이 카드: 글자 + 그림, 아래에 타임라인 (시안 ①)
+  var BABY_ART = '<svg class="dcard__art" width="84" height="84" viewBox="0 0 96 96" aria-hidden="true"><circle cx="48" cy="50" r="34" fill="#FFE3D6"/><path d="M44 17c4-4 10-3 11 2" fill="none" stroke="#C9A58F" stroke-width="3" stroke-linecap="round"/><path d="M36 50c2 3 6 3 8 0M52 50c2 3 6 3 8 0" fill="none" stroke="#6B5A55" stroke-width="2.6" stroke-linecap="round"/><circle cx="33" cy="60" r="5" fill="#FFB8C6" opacity="0.8"/><circle cx="63" cy="60" r="5" fill="#FFB8C6" opacity="0.8"/><path d="M44 64c2.5 2 5.5 2 8 0" fill="none" stroke="#6B5A55" stroke-width="2.4" stroke-linecap="round"/><circle cx="78" cy="22" r="4" fill="#C9B8FF"/><circle cx="16" cy="30" r="3" fill="#C9B8FF"/></svg>';
+  var RINGS_ART = '<svg class="dcard__art" width="84" height="84" viewBox="0 0 96 96" aria-hidden="true"><circle cx="38" cy="56" r="20" fill="none" stroke="#F4B7C9" stroke-width="7"/><circle cx="58" cy="56" r="20" fill="none" stroke="#FFD27F" stroke-width="7"/><path d="M48 31c-5-6-15-3-12 5 2 5 12 10 12 10s10-5 12-10c3-8-7-11-12-5z" fill="#FF7FA6"/></svg>';
+  function md(d) { return (d.getMonth() + 1) + '/' + d.getDate(); }
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  // 오늘부터 그날까지 주 단위 점 (너무 멀면 몇 주씩 건너뛴다)
+  function weekTrackHtml(daysLeft) {
+    var today = todayDate(), weeks = Math.ceil(daysLeft / 7), step = weeks > 6 ? Math.ceil(weeks / 5) : 1;
+    var pts = [{ label: '오늘', edge: true }];
+    for (var k = step; k * 7 < daysLeft; k += step) pts.push({ label: md(addDays(today, k * 7)) });
+    pts.push({ label: md(addDays(today, daysLeft)), edge: true });
+    return '<div class="dtrack dtrack--weeks" role="img" aria-label="오늘부터 ' + escapeHtml(pts[pts.length - 1].label) + '까지 ' + (step === 1 ? '한 주' : step + '주') + '씩">' +
+      pts.map(function (p, i) { return '<span class="dtrack__pt' + (i === 0 ? ' is-now' : p.edge ? ' is-end' : '') + '"><i></i>' + (p.edge ? '<b>' + p.label + '</b>' : p.label) + '</span>'; }).join('') + '</div>';
+  }
+  // 기념일 점: start일째 ~ end일째 구간에 이정표를 놓고 오늘(now일째) 위치를 표시
+  function mileTrackHtml(start, end, now, miles) {
+    var pos = function (n) { return Math.max(0, Math.min(100, (n - start) / (end - start) * 100)); };
+    return '<div class="dtrack dtrack--miles" role="img" aria-label="' + escapeHtml(miles.map(function (m) { return m.label + (m.n <= now ? ' 지남' : ''); }).join(', ')) + '">' +
+      '<span class="dtrack__line"></span><span class="dtrack__fill" style="width:' + pos(now).toFixed(1) + '%"></span>' +
+      miles.map(function (m) { return '<span class="dtrack__mile' + (m.n <= now ? ' is-done' : '') + '" style="left:' + pos(m.n).toFixed(1) + '%"><i></i><b>' + escapeHtml(m.label) + '</b>' + escapeHtml(m.date) + '</span>'; }).join('') +
+      '<span class="dtrack__now" style="left:' + pos(now).toFixed(1) + '%">오늘</span></div>';
+  }
+  // 함께한 날(첫날 = 1일)의 이정표: 지난 기념일(또는 첫날) ~ 다음 기념일 사이, 100일 단위 포함
+  function dayMilestones(startIso, n, firstLabel, yearLabel) {
+    var w = dateOf(startIso);
+    var inYear = function (y) { var d = new Date(y, w.getMonth(), w.getDate()); return d.getMonth() !== w.getMonth() ? new Date(y, w.getMonth() + 1, 0) : d; };
+    var dayOf = function (d) { return Math.round((d - w) / 86400000) + 1; };
+    var years = 0; while (dayOf(inYear(w.getFullYear() + years + 1)) <= n) years++;
+    var from = years ? dayOf(inYear(w.getFullYear() + years)) : 1, to = dayOf(inYear(w.getFullYear() + years + 1));
+    var miles = [{ n: from, label: years ? yearLabel(years) : firstLabel, date: md(addDays(w, from - 1)) }];
+    for (var h = Math.ceil((from + 1) / 100) * 100; h < to; h += 100) if (h - from >= 30 && to - h >= 30) miles.push({ n: h, label: formatNumber(h) + '일', date: md(addDays(w, h - 1)) });
+    miles.push({ n: to, label: yearLabel(years + 1), date: md(addDays(w, to - 1)) });
+    return { start: from, end: to, miles: miles };
+  }
+  function weeksLeftText(d) {
+    var wk = Math.floor(d / 7), dd = d % 7;
+    if (!wk) return d + '일 남았어요';
+    return dd ? wk + '주 ' + dd + '일 남았어요' : '딱 ' + wk + '주 남았어요';
+  }
+  function dcardHtml(kind, label, num, sub, art, track) {
+    return '<section class="dcard dcard--' + kind + '"><div class="dcard__top"><div class="dcard__text"><p class="dcard__label">' + label + '</p><p class="dcard__num">' + num + '</p><p class="dcard__sub">' + escapeHtml(sub) + '</p></div>' + art + '</div>' +
+      (track ? '<div class="dcard__track">' + track + '</div>' : '') + '</section>';
+  }
   function renderPortal() {
     var box = $('#portal-ddays');
     if (!box) return;
     var html = '';
     if (state.dueDate) {
       var d = daysFromToday(state.dueDate);
-      html += '<div class="dday dday--baby"><p class="dday__label">' + (d > 0 ? '축복이 만나기까지' : d === 0 ? '오늘 축복이를 만나요' : '축복이와 만난 지') + '</p>' +
-        '<p class="dday__num">' + escapeHtml(ddayText(state.dueDate)) + '</p><p class="dday__sub">' + escapeHtml(shortDate(state.dueDate)) + '</p></div>';
+      if (d > 0) html += dcardHtml('baby', '축복이 만나기까지', escapeHtml(ddayText(state.dueDate)), shortDate(state.dueDate) + ' · ' + weeksLeftText(d), BABY_ART, weekTrackHtml(d));
+      else if (d === 0) html += dcardHtml('baby', '오늘 축복이를 만나요', 'D-Day', shortDate(state.dueDate), BABY_ART, '');
+      else {
+        var born = 1 - d, bm = dayMilestones(state.dueDate, born, '탄생', function (y) { return y === 1 ? '돌' : y + '번째 생일'; });
+        html += dcardHtml('baby', '축복이와 만난 지', '+' + formatNumber(born) + '<span class="dcard__unit">일</span>', formatNoteDate(state.dueDate) + '부터', BABY_ART, mileTrackHtml(bm.start, bm.end, born, bm.miles));
+      }
     } else {
       html += '<button type="button" class="dday-empty" data-action="open-settings">출산 예정일을 넣으면 축복이 D-day가 보여요</button>';
     }
-    html += '<span class="dday-sep" aria-hidden="true"></span>';
     if (state.anniversary) {
       var a = marriedDays();
       if (a >= 1) {
-        html += '<div class="dday dday--love"><p class="dday__label">' + HEART_SVG + '우리 결혼한 지</p>' +
-          '<p class="dday__num">+' + formatNumber(a) + '<span class="dday__unit">일</span></p>' +
-          '<p class="dday__sub">' + escapeHtml(formatNoteDate(state.anniversary)) + '부터 · ' + escapeHtml(nextMilestone(a)) + '</p></div>';
+        var am = dayMilestones(state.anniversary, a, '결혼', function (y) { return y + '주년'; });
+        html += dcardHtml('love', HEART_SVG + '우리 결혼한 지', '+' + formatNumber(a) + '<span class="dcard__unit">일</span>', formatNoteDate(state.anniversary) + '부터 · ' + nextMilestone(a), RINGS_ART, mileTrackHtml(am.start, am.end, a, am.miles));
       } else {
-        html += '<div class="dday dday--love"><p class="dday__label">' + HEART_SVG + '결혼식까지</p><p class="dday__num">D-' + (1 - a) + '</p><p class="dday__sub">' + escapeHtml(shortDate(state.anniversary)) + '</p></div>';
+        html += dcardHtml('love', HEART_SVG + '결혼식까지', 'D-' + (1 - a), shortDate(state.anniversary), RINGS_ART, weekTrackHtml(1 - a));
       }
     } else {
       html += '<button type="button" class="dday-empty" data-action="open-settings">결혼기념일을 넣으면 함께한 날이 보여요</button>';
@@ -2199,6 +2247,8 @@ datesSorted().forEach(function (d) {
     if (!sheet) return;
     var open = ui.view === 'ledger' && !!ui.ledgerForm;
     document.body.classList.toggle('has-sheet', open);
+    // 시트가 열린 동안 뒤 화면은 탭·스크린리더가 닿지 않게 한다
+    ['.app-header', '#ledger-root', '#ledger-fab'].forEach(function (sel) { var n = $(sel); if (n) { if (open) n.setAttribute('inert', ''); else n.removeAttribute('inert'); } });
     if (!open) { sheet.hidden = true; sheet.innerHTML = ''; return; }
     if (!sheet.hidden && sheet.dataset.form === ui.ledgerForm) return; // 이미 열린 폼은 입력 중인 값을 지키려고 다시 그리지 않는다
     var e = ui.ledgerForm === 'new' ? null : findEntry(ui.ledgerForm);
@@ -2211,7 +2261,7 @@ datesSorted().forEach(function (d) {
     sheet.innerHTML = '<div class="sheet__backdrop" data-action="ledger-close"></div>' +
       '<form class="sheet__panel" id="ledger-form" role="dialog" aria-modal="true" aria-labelledby="ledger-form-title" novalidate>' +
       '<span class="sheet__handle" aria-hidden="true"></span>' +
-      '<div class="sheet__head"><h2 id="ledger-form-title">' + (e ? '기록 수정' : '기록 추가') + '</h2>' +
+      '<div class="sheet__head"><h2 id="ledger-form-title" tabindex="-1">' + (e ? '기록 수정' : '기록 추가') + '</h2>' +
       '<button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>' +
       '<div class="seg" role="radiogroup" aria-label="종류">' + ledgerChips('type', [{ value: 'out', label: '지출' }, { value: 'in', label: '수입' }], type) + '</div>' +
       '<div class="field"><label for="ledger-text">내용</label><input type="text" id="ledger-text" maxlength="' + LEDGER_TEXT_MAX + '" autocomplete="off" value="' + escapeHtml(e ? e.text : '') + '" placeholder="예: 점심 국밥 9천원"></div>' +
@@ -2223,17 +2273,26 @@ datesSorted().forEach(function (d) {
       '<div class="sheet__actions"><button type="submit" class="btn btn--primary">저장</button>' +
       (e ? '<button type="button" class="btn btn--danger" data-action="ledger-delete">삭제</button>' : '') + '</div></form>';
     sheet.hidden = false;
-    var first = $('#ledger-text');
+    // 새 기록은 바로 입력하도록 내용 칸에, 수정은 키보드가 먼저 뜨지 않게 제목에 초점을 둔다
+    var first = e ? $('#ledger-form-title') : $('#ledger-text');
     if (first) first.focus({ preventScroll: true });
   }
   function openLedgerForm(id) {
     ui.ledgerForm = id || 'new';
     if (!id) ui.ledgerType = 'out';
+    // 뒤로 가기(안드로이드 버튼·스와이프)로 입력 창만 닫히도록 기록을 하나 쌓는다
+    try { window.history.pushState({ view: 'ledger', sheet: true }, ''); } catch (e) { /* ignore */ }
     renderLedgerSheet();
   }
-  function closeLedgerForm() {
+  // 저장·삭제·닫기 뒤에 시트용 기록을 걷어낸다 → 다음 뒤로 가기가 바로 이전 화면으로 간다
+  function dropSheetHistory() {
+    if (window.history.state && window.history.state.sheet) { sheetPopSilently = true; window.history.back(); }
+  }
+  var sheetPopSilently = false;
+  function closeLedgerForm(fromHistory) {
     var back = ui.ledgerForm && ui.ledgerForm !== 'new' ? ui.ledgerForm : null;
     ui.ledgerForm = null;
+    if (!fromHistory) dropSheetHistory();
     renderLedgerSheet();
     var target = back ? document.querySelector('[data-focus-key="ledger:' + back + '"]') : $('#ledger-fab');
     if (target) target.focus({ preventScroll: true });
@@ -2258,16 +2317,18 @@ datesSorted().forEach(function (d) {
     var who = LEDGER_WHO.indexOf(val('who')) !== -1 ? val('who') : '';
     var pay = LEDGER_PAYS[val('pay')] ? val('pay') : '';
     var e = ui.ledgerForm === 'new' ? null : findEntry(ui.ledgerForm);
-    var data = { date: date, type: type, amount: amount, cat: cat, text: text.slice(0, LEDGER_TEXT_MAX), who: who, pay: pay };
+    var data = { id: e ? e.id : uid(), date: date, type: type, amount: amount, cat: cat, text: text.slice(0, LEDGER_TEXT_MAX), who: who, pay: pay, t: e ? e.t : Date.now() };
     if (e) Object.keys(data).forEach(function (k) { e[k] = data[k]; });
-    else { data.id = uid(); data.t = Date.now(); state.ledger.push(data); }
+    else state.ledger.push(data);
     ui.ledgerForm = null;
     ui.ledgerMonth = date.slice(0, 7);
+    dropSheetHistory();
     commit();
     var label = (text || cat) + ' ' + formatWon(amount);
     act('ledger', '가계부 ' + (e ? '수정: ' : (type === 'in' ? '수입: ' : '지출: ')) + label);
     showToast((e ? '수정했어요: ' : '기록했어요: ') + label);
-    var fab = $('#ledger-fab'); if (fab && !e) fab.focus({ preventScroll: true });
+    var back = e ? document.querySelector('[data-focus-key="ledger:' + e.id + '"]') : $('#ledger-fab');
+    if (back) back.focus({ preventScroll: true });
   }
   function deleteLedgerEntry(id) {
     var idx = -1;
@@ -2275,6 +2336,7 @@ datesSorted().forEach(function (d) {
     if (idx === -1) return;
     var removed = state.ledger.splice(idx, 1)[0];
     ui.ledgerForm = null;
+    dropSheetHistory();
     commit();
     act('ledger', '가계부 삭제: ' + (removed.text || removed.cat) + ' ' + formatWon(removed.amount));
     showToast('기록을 지웠어요.', function () {
@@ -3347,7 +3409,7 @@ datesSorted().forEach(function (d) {
     if (el.readOnly || el.disabled) return false; // readonly share-link etc. must not block sync
     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'button') return false;
     // Only editable fields inside an item/note/highlights editor should defer a remote update.
-    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .memo-detail, .note__comments, .rx-comments, #view-settings');
+    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
   }
 
   var migrationsQueued = false;
@@ -3707,9 +3769,19 @@ datesSorted().forEach(function (d) {
       ledgerView.addEventListener('input', function (e) {
         if (e.target.hasAttribute('data-price-input') && !e.isComposing) formatPriceInput(e.target);
       });
-      ledgerView.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && ui.ledgerForm) { e.preventDefault(); closeLedgerForm(); }
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && ui.ledgerForm && ui.view === 'ledger') { e.preventDefault(); closeLedgerForm(); }
       });
+      // 화면 키보드가 올라오면 그 높이만큼 시트를 올린다(iOS는 화면 크기가 줄지 않음)
+      if (window.visualViewport) {
+        var setKb = function () {
+          var vv = window.visualViewport;
+          var kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+          document.documentElement.style.setProperty('--kb', kb + 'px');
+        };
+        window.visualViewport.addEventListener('resize', setKb);
+        window.visualViewport.addEventListener('scroll', setKb);
+      }
     }
 
     // 메모: 목록 → 상세(읽기/수정), 댓글·좋아요·즐겨찾기
@@ -4374,6 +4446,18 @@ datesSorted().forEach(function (d) {
     var storedRoom = null;
     try { storedRoom = window.localStorage.getItem('birth-bag-checklist:room'); } catch (e) { /* ignore */ }
     if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); }
+    try { window.history.replaceState({ view: ui.view }, ''); } catch (e) { /* ignore */ }
+    window.addEventListener('popstate', function (e) {
+      if (sheetPopSilently) { sheetPopSilently = false; return; }
+      if (ui.ledgerForm) { closeLedgerForm(true); return; }
+      var v = e.state && VIEWS.indexOf(e.state.view) !== -1 ? e.state.view : 'portal';
+      setView(v, v === 'settings' ? ui.settingsFrom : undefined, true);
+    });
+    // 앱을 켜 둔 채 날짜가 바뀌면(밤새 백그라운드) 다시 열 때 디데이를 새로 계산한다
+    var shownDay = todayStamp();
+    var refreshDay = function () { if (document.visibilityState === 'visible' && todayStamp() !== shownDay) { shownDay = todayStamp(); render(); } };
+    document.addEventListener('visibilitychange', refreshDay);
+    window.addEventListener('pageshow', refreshDay);
     // sync.js is loaded after app.js; bind once it has had a chance to run.
     window.addEventListener('load', bindShareEvents);
   }
@@ -4479,6 +4563,7 @@ datesSorted().forEach(function (d) {
     function reset() { active = false; dist = 0; startY = null; el.classList.remove('is-ready', 'is-visible', 'is-loading'); el.style.transform = ''; }
     document.addEventListener('touchstart', function (e) {
       if (e.touches.length !== 1 || window.scrollY > 0 || isTyping()) return;
+      if (document.body.classList.contains('has-sheet') || (e.target.closest && e.target.closest('.sheet, textarea'))) return;
       startY = e.touches[0].clientY; active = true; dist = 0;
     }, { passive: true });
     document.addEventListener('touchmove', function (e) {

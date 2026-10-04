@@ -149,17 +149,17 @@ window.FIREBASE_CONFIG = {
 
 **주의**: 링크를 아는 사람은 누구나 읽고 쓸 수 있습니다. 진료 메모 등 민감한 내용이 구글 클라우드(Firebase)에 저장되므로 링크는 가족에게만 보내세요.
 
-로컬 개발 시 `http://localhost:포트/checklist/?sync=mock` 으로 열면 Firebase 없이 브라우저 저장소를 가짜 서버로 써서 탭 간 동기화를 시험할 수 있습니다.
+로컬 개발 시 `http://localhost:포트/?sync=mock` 으로 열면 Firebase 없이 브라우저 저장소를 가짜 서버로 써서 탭 간 동기화를 시험할 수 있습니다.
 
 ## 5. GitHub Pages 배포 절차
 
-이 저장소는 루트에 `index.html`이 있으므로 기본 설정으로 배포할 수 있습니다. 모든 리소스 경로가 상대 경로(`./style.css`, `./app.js`)이므로 `/checklist/` 하위 경로에서도 정상 로드됩니다. `.nojekyll` 파일이 있어 Jekyll 처리를 건너뜁니다.
+이 저장소는 루트에 `index.html`이 있으므로 기본 설정으로 배포할 수 있습니다. 모든 리소스 경로가 상대 경로(`./style.css`, `./app.js`)이므로 `/luckybbu/` 하위 경로에서도 정상 로드됩니다. `.nojekyll` 파일이 있어 Jekyll 처리를 건너뜁니다.
 
 1. 저장소가 **Public**이어야 합니다(무료 플랜에서 Private 저장소는 Pages를 사용할 수 없습니다).
 2. GitHub 저장소 페이지에서 **Settings → Pages** 로 이동합니다.
 3. **Build and deployment → Source**에서 **Deploy from a branch**를 선택합니다.
 4. **Branch**에서 `main`, 폴더는 `/ (root)` 를 선택하고 **Save**를 누릅니다.
-5. 1~2분 뒤 같은 화면 상단에 배포 주소가 표시됩니다. 예상 주소: `https://kkkkkijun.github.io/checklist/`
+5. 1~2분 뒤 같은 화면 상단에 배포 주소가 표시됩니다. 예상 주소: `https://kkkkkijun.github.io/luckybbu/`
 
 ## 6. 수정 후 재배포 방법
 

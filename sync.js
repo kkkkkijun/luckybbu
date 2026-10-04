@@ -428,7 +428,7 @@
       var local = app.getState();
       var same = JSON.stringify(app.normalize(remoteState)) === JSON.stringify(local);
       if (!same && !opts.silent && !app.isPristine()) {
-        var ok = window.confirm('이 공유 링크에는 이미 목록(분류 ' + remoteState.categories.length + '개, 준비물 ' + remoteState.items.length + '개, 진료 메모 ' + remoteState.notes.length + '개)이 있습니다.\n이 기기의 현재 목록을 그 목록으로 교체하고 함께 사용할까요?\n(취소하면 참여하지 않습니다. 현재 목록은 백업 메뉴에서 먼저 내보낼 수 있습니다.)');
+        var ok = window.confirm('이 공유 링크에는 이미 목록(분류 ' + remoteState.categories.length + '개, 준비물 ' + remoteState.items.length + '개, 진료 메모 ' + remoteState.notes.length + '개' + (remoteState.ledger && remoteState.ledger.length ? ', 가계부 ' + remoteState.ledger.length + '건' : '') + ')이 있습니다.\n이 기기의 현재 목록' + (local.ledger && local.ledger.length ? '(가계부 ' + local.ledger.length + '건 포함)' : '') + '을 그 목록으로 교체하고 함께 사용할까요?\n(취소하면 참여하지 않습니다. 현재 목록은 백업 메뉴에서 먼저 내보낼 수 있습니다.)');
         if (!ok) { setStatus('off'); return null; }
       }
       sync.lastDoc = JSON.parse(JSON.stringify(doc));
