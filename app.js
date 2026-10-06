@@ -563,7 +563,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportOpen: {}, supportFilter: 'all', supportsSeeded: false };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -781,6 +781,7 @@
     if (ui.view === 'memos' && ui.memoOpen) closeMemo();
     if (ui.view === 'notes' && ui.noteOpen && view !== 'notes') closeNote();
     if (view !== 'notes' && view !== 'memos') ui.detailFrom = null;
+    if (ui.view === 'supports' && ui.supportModal) { ui.supportModal = null; document.body.classList.remove('has-modal'); }
     ui.view = view;
     if (view === 'notes' || view === 'memos') ui.recordTab = view;
     if (view === 'picks' || view === 'names') ui.planTab = view;
@@ -2791,10 +2792,10 @@ datesSorted().forEach(function (d) {
     return h + '</p>';
   }
   function supportCardHtml(sp) {
-    var id = escapeHtml(sp.id), open = !!ui.supportOpen[sp.id], href = safeHref(sp.link);
-    var h = '<li class="support support--' + sp.status + (open ? ' is-open' : '') + '" data-support-id="' + id + '">';
-    h += '<button type="button" class="support__head" data-action="toggle-support" data-focus-key="sp-head:' + id + '" aria-expanded="' + (open ? 'true' : 'false') + '">';
-    h += '<span class="support__title">' + escapeHtml(sp.title) + '</span><span class="sp-stat sp-stat--' + sp.status + '">' + SUPPORT_STATUS_LABEL[sp.status] + '</span></button>';
+    var id = escapeHtml(sp.id), href = safeHref(sp.link);
+    var h = '<li class="support support--' + sp.status + '" data-support-id="' + id + '">';
+    h += '<button type="button" class="support__head" data-action="open-support" data-focus-key="sp-head:' + id + '" aria-haspopup="dialog">';
+    h += '<span class="support__title">' + escapeHtml(sp.title) + '</span><span class="support__more" aria-hidden="true">자세히 ›</span><span class="sp-stat sp-stat--' + sp.status + '">' + SUPPORT_STATUS_LABEL[sp.status] + '</span></button>';
     if (sp.amount) h += '<p class="support__amount">' + escapeHtml(sp.amount) + '</p>';
     h += supportDueHtml(sp);
     if (sp.where) h += '<div class="support__where">' + sp.where.split(/\s*,\s*/).filter(Boolean).map(function (w) { return '<span>' + escapeHtml(w) + '</span>'; }).join('') + (href ? '<a class="support__where-link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">공식 안내 ↗</a>' : '') + '</div>';
@@ -2803,18 +2804,57 @@ datesSorted().forEach(function (d) {
       var idx = ['todo', 'applied', 'received'].indexOf(sp.status), ki = ['todo', 'applied', 'received'].indexOf(k);
       return '<button type="button" class="support__step' + (sp.status === k ? ' is-on' : (idx > ki ? ' is-past' : '')) + '" data-action="sp-status" data-status="' + k + '" aria-pressed="' + (sp.status === k ? 'true' : 'false') + '">' + SUPPORT_STATUS_LABEL[k] + '</button>';
     }).join('') + '<button type="button" class="support__step support__step--na' + (sp.status === 'na' ? ' is-on' : '') + '" data-action="sp-status" data-status="na" aria-pressed="' + (sp.status === 'na' ? 'true' : 'false') + '">해당 없음</button></div>';
-    if (open) {
-      h += '<div class="support__detail">';
-      if (sp.target) h += '<p class="support__row"><b>대상</b>' + escapeHtml(sp.target) + '</p>';
-      if (sp.benefit) h += '<p class="support__row"><b>내용</b>' + escapeHtml(sp.benefit) + '</p>';
-      if (sp.howto) h += '<p class="support__row"><b>신청</b>' + escapeHtml(sp.howto) + '</p>';
-      if (sp.memo) h += '<p class="support__row"><b>메모</b>' + escapeHtml(sp.memo) + '</p>';
-      if (!sp.target && !sp.benefit && !sp.howto && !sp.memo) h += '<p class="support__row support__row--empty">자세한 내용이 없습니다. ‘수정’으로 대상·내용·신청 방법을 적어 두세요.</p>';
-      h += '<div class="support__actions"><button type="button" class="btn btn--small" data-action="edit-support" data-focus-key="sp-edit:' + id + '">수정</button><button type="button" class="btn btn--small btn--danger" data-action="delete-support">삭제</button></div></div>';
-    }
     return h + '</li>';
   }
+  function supportStepsHtml(sp) {
+    return '<div class="support__steps" role="group" aria-label="상태">' + ['todo', 'applied', 'received'].map(function (k) {
+      var idx = ['todo', 'applied', 'received'].indexOf(sp.status), ki = ['todo', 'applied', 'received'].indexOf(k);
+      return '<button type="button" class="support__step' + (sp.status === k ? ' is-on' : (idx > ki ? ' is-past' : '')) + '" data-action="sp-status" data-status="' + k + '" aria-pressed="' + (sp.status === k ? 'true' : 'false') + '">' + SUPPORT_STATUS_LABEL[k] + '</button>';
+    }).join('') + '<button type="button" class="support__step support__step--na' + (sp.status === 'na' ? ' is-on' : '') + '" data-action="sp-status" data-status="na" aria-pressed="' + (sp.status === 'na' ? 'true' : 'false') + '">해당 없음</button></div>';
+  }
+  // 팝업: 카드 하나의 자세한 내용(또는 수정 폼)
+  function supportModalHtml(sp) {
+    var id = escapeHtml(sp.id), href = safeHref(sp.link), editing = ui.supportEdit === sp.id;
+    var h = '<div class="modal__head"><h3 class="modal__title" id="support-modal-title">' + escapeHtml(sp.title) + '</h3><button type="button" class="modal__close" data-action="modal-close" aria-label="닫기" data-focus-key="sp-modal-close">×</button></div>';
+    if (editing) return h + supportFormHtml(sp);
+    h += '<div class="modal__body">';
+    h += '<p class="modal__meta"><span class="sp-stat sp-stat--' + sp.status + '">' + SUPPORT_STATUS_LABEL[sp.status] + '</span><span class="modal__stage">' + SUPPORT_STAGE_LABEL[sp.stage] + '</span></p>';
+    if (sp.amount) h += '<p class="support__amount support__amount--big">' + escapeHtml(sp.amount) + '</p>';
+    h += supportDueHtml(sp);
+    if (sp.where || href) h += '<div class="support__where">' + (sp.where ? sp.where.split(/\s*,\s*/).filter(Boolean).map(function (w) { return '<span>' + escapeHtml(w) + '</span>'; }).join('') : '') + (href ? '<a class="support__where-link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">공식 안내 열기 ↗</a>' : '') + '</div>';
+    h += supportStepsHtml(sp);
+    h += '<div class="modal__rows">';
+    if (sp.target) h += '<p class="support__row"><b>대상</b>' + escapeHtml(sp.target) + '</p>';
+    if (sp.benefit) h += '<p class="support__row"><b>내용</b>' + escapeHtml(sp.benefit) + '</p>';
+    if (sp.howto) h += '<p class="support__row"><b>신청</b>' + escapeHtml(sp.howto) + '</p>';
+    if (sp.memo) h += '<p class="support__row"><b>메모</b>' + escapeHtml(sp.memo) + '</p>';
+    if (!sp.target && !sp.benefit && !sp.howto && !sp.memo) h += '<p class="support__row support__row--empty">자세한 내용이 없습니다. ‘수정’으로 대상·내용·신청 방법을 적어 두세요.</p>';
+    h += '</div>';
+    h += '<div class="modal__actions"><button type="button" class="btn btn--small" data-action="edit-support" data-focus-key="sp-edit:' + id + '">수정</button><button type="button" class="btn btn--small btn--danger" data-action="delete-support">삭제</button><button type="button" class="btn btn--primary btn--small modal__done" data-action="modal-close">닫기</button></div>';
+    return h + '</div>';
+  }
+  function renderSupportModal() {
+    var modal = $('#support-modal'); if (!modal) return;
+    var sp = ui.supportModal ? findSupport(ui.supportModal) : null;
+    if (!sp) { ui.supportModal = null; modal.hidden = true; modal.innerHTML = ''; document.body.classList.remove('has-modal'); return; }
+    var box = modal.querySelector('.modal__box');
+    modal.innerHTML = '<div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="support-modal-title" data-support-id="' + escapeHtml(sp.id) + '">' + supportModalHtml(sp) + '</div>';
+    modal.hidden = false; document.body.classList.add('has-modal');
+  }
+  function openSupportModal(id) {
+    if (!findSupport(id)) return;
+    ui.supportModal = id; ui.supportEdit = null;
+    renderSupports();
+    var c = document.querySelector('[data-focus-key="sp-modal-close"]'); if (c) c.focus();
+  }
+  function closeSupportModal() {
+    var was = ui.supportModal;
+    ui.supportModal = null; if (ui.supportEdit && ui.supportEdit !== 'new') ui.supportEdit = null;
+    renderSupports();
+    var back = was ? document.querySelector('[data-focus-key="sp-head:' + was + '"]') : null; if (back) back.focus();
+  }
   function renderSupports() {
+    renderSupportModal();
     var list = $('#support-list'); if (!list) return;
     var stats = $('#supports-stats');
     var all = state.supports;
@@ -2855,7 +2895,7 @@ datesSorted().forEach(function (d) {
       var stageSoon = items.filter(function (x) { var iso = supportDueDate(x); return iso && (x.status === 'todo' || x.status === 'applied') && daysFromToday(iso) <= 30; }).length;
       html += '<li class="sp-stage" id="sp-stage-' + st + '"><span class="sp-stage__name">' + SUPPORT_STAGE_LABEL[st] + '</span><span class="sp-stage__meta">' + items.length + '건' + (stageSoon ? ' · 기한 주의 ' + stageSoon : '') + '</span></li>';
       items.forEach(function (sp) {
-        if (ui.supportEdit === sp.id) html += '<li class="support support--editing" data-support-id="' + escapeHtml(sp.id) + '">' + supportFormHtml(sp) + '</li>';
+        if (ui.supportEdit === sp.id && ui.supportModal !== sp.id) html += '<li class="support support--editing" data-support-id="' + escapeHtml(sp.id) + '">' + supportFormHtml(sp) + '</li>';
         else html += supportCardHtml(sp);
       });
     });
@@ -2886,7 +2926,7 @@ datesSorted().forEach(function (d) {
     if (key === 'new') {
       var created = { id: uid() }; Object.keys(v).forEach(function (k) { created[k] = v[k]; });
       state.supports.push(created);
-      ui.supportEdit = null; ui.supportOpen[created.id] = true; commit(); act('support', '지원 항목 ‘' + v.title + '’ 추가'); showToast('지원 항목을 저장했습니다.');
+      ui.supportEdit = null; ui.supportModal = created.id; commit(); act('support', '지원 항목 ‘' + v.title + '’ 추가'); showToast('지원 항목을 저장했습니다.');
     } else {
       var sp = findSupport(key); if (!sp) { ui.supportEdit = null; render(); return; }
       Object.keys(v).forEach(function (k) { sp[k] = v[k]; });
@@ -2902,7 +2942,7 @@ datesSorted().forEach(function (d) {
     if (idx < 0) return;
     var sp = state.supports[idx];
     if (!window.confirm('‘' + sp.title + '’ 항목을 삭제할까요?')) return;
-    state.supports.splice(idx, 1); if (ui.supportEdit === id) ui.supportEdit = null;
+    state.supports.splice(idx, 1); if (ui.supportEdit === id) ui.supportEdit = null; if (ui.supportModal === id) ui.supportModal = null;
     commit(); act('support', '지원 항목 ‘' + sp.title + '’ 삭제');
     showToast('지원 항목을 삭제했습니다.', function () { state.supports.splice(Math.min(idx, state.supports.length), 0, sp); commit(); showToast('삭제를 취소했습니다.'); });
   }
@@ -4095,10 +4135,11 @@ datesSorted().forEach(function (d) {
         var sid = li ? li.dataset.supportId : null;
         switch (btn.dataset.action) {
           case 'sp-filter': ui.supportFilter = btn.dataset.filter; renderSupports(); break;
-          case 'toggle-support': { if (ui.supportOpen[sid]) delete ui.supportOpen[sid]; else ui.supportOpen[sid] = true; renderSupports(); var hb = document.querySelector('[data-focus-key="sp-head:' + sid + '"]'); if (hb) hb.focus(); break; }
+          case 'open-support': openSupportModal(sid); break;
+          case 'modal-close': closeSupportModal(); break;
           case 'sp-status': setSupportStatus(sid, btn.dataset.status); break;
           case 'edit-support': ui.supportEdit = sid; renderSupports(); var ff = document.querySelector('[data-focus-key="sp-title:' + sid + '"]'); if (ff) ff.focus(); break;
-          case 'cancel-support': ui.supportEdit = null; renderSupports(); var back = li ? document.querySelector('[data-focus-key="sp-head:' + sid + '"]') : $('#add-support-btn'); if (back) back.focus(); break;
+          case 'cancel-support': ui.supportEdit = null; renderSupports(); var back = ui.supportModal ? document.querySelector('[data-focus-key="sp-modal-close"]') : (li ? document.querySelector('[data-focus-key="sp-head:' + sid + '"]') : $('#add-support-btn')); if (back) back.focus(); break;
           case 'delete-support': deleteSupport(sid); break;
         }
       });
@@ -4106,6 +4147,10 @@ datesSorted().forEach(function (d) {
         var form = e.target.closest('form[data-support-form]'); if (!form) return;
         e.preventDefault(); submitSupportForm(form);
       });
+      // 팝업: 바깥을 누르거나 Esc로 닫기
+      var sModal = $('#support-modal');
+      if (sModal) sModal.addEventListener('click', function (e) { if (e.target === sModal) closeSupportModal(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ui.supportModal) { e.preventDefault(); closeSupportModal(); } });
       supView.addEventListener('input', function (e) {
         if (e.target.name === 'amountWon') { var d = e.target.value.replace(/[^\d]/g, '').slice(0, 11); e.target.value = d ? formatNumber(d) : ''; }
       });
