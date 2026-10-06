@@ -21,7 +21,7 @@
   var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos'];
   // 마미백 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
   var GROUPS = ['birth', 'baby'];
-  function defaultGroupFor(name) { return /아기|축복|육아|신생아|베이비|baby/i.test(String(name || '')) ? 'baby' : 'birth'; }
+  function defaultGroupFor(name) { var n = String(name || ''); if (/맞이|의류|출산|병원|조리원/.test(n)) return 'birth'; return /육아|이유식|예방접종|성장/i.test(n) ? 'baby' : 'birth'; }
   // 가계부
   var LEDGER_OUT_CATS = ['식비', '생활', '육아·출산', '교통', '의료', '쇼핑', '기타'];
   var LEDGER_IN_CATS = ['급여', '부수입', '기타'];
@@ -2018,10 +2018,10 @@ datesSorted().forEach(function (d) {
     birth: [
       { label: '산부인과 일지', icon: 'clinic', view: 'notes' },
       { label: '택일', icon: 'calendar', view: 'picks' },
+      { label: '작명', icon: 'pen', view: 'names' },
       { label: '정부 지원', icon: 'gov', view: 'supports' }
     ],
     baby: [
-      { label: '작명', icon: 'pen', view: 'names' },
       { label: '예방접종', icon: 'syringe' },
       { label: '성장 기록', icon: 'growth' },
       { label: '육아 일지', icon: 'book' }
