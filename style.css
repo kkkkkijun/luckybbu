@@ -1073,6 +1073,8 @@ body { padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding
 .dcard--baby .dtrack__mile.is-done i { background: var(--lav); }
 .dtrack__now { position: absolute; top: -8px; transform: translateX(-50%); padding: 1px 6px; border-radius: 99px; background: var(--rose-ink); color: #fff; font-size: 0.62rem; font-weight: 700; white-space: nowrap; }
 .dcard--baby .dtrack__now { background: var(--lav-ink); }
+.dcard--baby .dtrack--miles .dtrack__fill { height: 4px; top: 4px; border-radius: 99px; }
+.dcard--baby .dtrack--miles .dtrack__line { height: 4px; top: 4px; border-radius: 99px; }
 .dday-empty { min-height: 56px; padding: 10px 18px; border: 1.5px dashed #E8E0D9; border-radius: 16px; background: transparent; color: var(--muted); font: inherit; font-size: 0.9rem; cursor: pointer; }
 .portal__spaces { margin-top: auto; padding-top: 28px; align-self: stretch; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; justify-items: center; }
 .space-tile { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 4px; border: 0; background: none; font: inherit; font-size: 0.9rem; font-weight: 600; color: var(--text); cursor: pointer; border-radius: 26px; }

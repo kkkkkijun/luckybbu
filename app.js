@@ -2099,12 +2099,12 @@ datesSorted().forEach(function (d) {
       pts.map(function (p, i) { return '<span class="dtrack__pt' + (i === 0 ? ' is-now' : p.edge ? ' is-end' : '') + '"><i></i>' + (p.edge ? '<b>' + p.label + '</b>' : p.label) + '</span>'; }).join('') + '</div>';
   }
   // 기념일 점: start일째 ~ end일째 구간에 이정표를 놓고 오늘(now일째) 위치를 표시
-  function mileTrackHtml(start, end, now, miles) {
+  function mileTrackHtml(start, end, now, miles, nowLabel) {
     var pos = function (n) { return Math.max(0, Math.min(100, (n - start) / (end - start) * 100)); };
     return '<div class="dtrack dtrack--miles" role="img" aria-label="' + escapeHtml(miles.map(function (m) { return m.label + (m.n <= now ? ' 지남' : ''); }).join(', ')) + '">' +
       '<span class="dtrack__line"></span><span class="dtrack__fill" style="width:' + pos(now).toFixed(1) + '%"></span>' +
       miles.map(function (m) { return '<span class="dtrack__mile' + (m.n <= now ? ' is-done' : '') + '" style="left:' + pos(m.n).toFixed(1) + '%"><i></i><b>' + escapeHtml(m.label) + '</b>' + escapeHtml(m.date) + '</span>'; }).join('') +
-      '<span class="dtrack__now" style="left:' + pos(now).toFixed(1) + '%">오늘</span></div>';
+      '<span class="dtrack__now" style="left:' + pos(now).toFixed(1) + '%">' + escapeHtml(nowLabel || '오늘') + '</span></div>';
   }
   // 함께한 날(첫날 = 1일)의 이정표: 지난 기념일(또는 첫날) ~ 다음 기념일 사이, 100일 단위 포함
   function dayMilestones(startIso, n, firstLabel, yearLabel) {
@@ -2117,6 +2117,16 @@ datesSorted().forEach(function (d) {
     for (var h = Math.ceil((from + 1) / 100) * 100; h < to; h += 100) if (h - from >= 30 && to - h >= 30) miles.push({ n: h, label: formatNumber(h) + '일', date: md(addDays(w, h - 1)) });
     miles.push({ n: to, label: yearLabel(years + 1), date: md(addDays(w, to - 1)) });
     return { start: from, end: to, miles: miles };
+  }
+  // 축복이 만나기까지: 임신 시작(예정일 280일 전)부터 예정일까지 채워지는 진행 바. 날이 지날 때마다 '오늘'이 오른쪽으로 간다.
+  function pregnancyTrackHtml(daysLeft) {
+    var total = 280, now = total - daysLeft;
+    var due = dateOf(state.dueDate), start = addDays(due, -total);
+    var mark = function (week, label) { var n = week * 7; return { n: n, label: label || (week + '주'), date: md(addDays(start, n)) }; };
+    var miles = [mark(0, '시작'), mark(12), mark(20), mark(28), mark(40, '출산 예정')];
+    var w = Math.floor(Math.max(0, now) / 7), dd = Math.max(0, now) % 7;
+    var nowLabel = now < 0 ? '오늘' : '오늘 ' + w + '주' + (dd ? ' ' + dd + '일' : '');
+    return mileTrackHtml(0, total, Math.max(0, now), miles, nowLabel);
   }
   function weeksLeftText(d) {
     var wk = Math.floor(d / 7), dd = d % 7;
@@ -2133,7 +2143,7 @@ datesSorted().forEach(function (d) {
     var html = '';
     if (state.dueDate) {
       var d = daysFromToday(state.dueDate);
-      if (d > 0) html += dcardHtml('baby', '축복이 만나기까지', escapeHtml(ddayText(state.dueDate)), shortDate(state.dueDate) + ' · ' + weeksLeftText(d), BABY_ART, weekTrackHtml(d));
+      if (d > 0) html += dcardHtml('baby', '축복이 만나기까지', escapeHtml(ddayText(state.dueDate)), shortDate(state.dueDate) + ' · ' + weeksLeftText(d), BABY_ART, pregnancyTrackHtml(d));
       else if (d === 0) html += dcardHtml('baby', '오늘 축복이를 만나요', 'D-Day', shortDate(state.dueDate), BABY_ART, '');
       else {
         var born = 1 - d, bm = dayMilestones(state.dueDate, born, '탄생', function (y) { return y === 1 ? '돌' : y + '번째 생일'; });
@@ -4610,6 +4620,12 @@ datesSorted().forEach(function (d) {
     document.addEventListener('touchcancel', reset, { passive: true });
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { init(); setupCategoryDrag(); setupPullToRefresh(); });
-  else { init(); setupCategoryDrag(); setupPullToRefresh(); }
+  function watchDayChange() {
+    var day = todayStamp();
+    var check = function () { var t = todayStamp(); if (t !== day) { day = t; render(); } };
+    setInterval(check, 60000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') check(); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { init(); setupCategoryDrag(); setupPullToRefresh(); watchDayChange(); });
+  else { init(); setupCategoryDrag(); setupPullToRefresh(); watchDayChange(); }
 })();
