@@ -2017,8 +2017,7 @@ datesSorted().forEach(function (d) {
   var MB_FIXED = {
     birth: [
       { label: '산부인과 일지', icon: 'clinic', view: 'notes' },
-      { label: '택일', icon: 'calendar', view: 'picks' },
-      { label: '작명', icon: 'pen', view: 'names' },
+      { label: '택일·작명', icon: 'calendar', view: 'plan' },
       { label: '정부 지원', icon: 'gov', view: 'supports' }
     ],
     baby: [
@@ -2030,6 +2029,7 @@ datesSorted().forEach(function (d) {
   function fixedTileMeta(view) {
     if (view === 'notes') return state.notes.length ? state.notes.length + '개' : '';
     if (view === 'picks') return state.dates.length ? '후보 ' + state.dates.length : '';
+    if (view === 'plan') { var parts = []; if (state.dates.length) parts.push('택일 ' + state.dates.length); if (state.names.length) parts.push('이름 ' + state.names.length); return parts.join(' · '); }
     if (view === 'supports') return state.supports.length ? state.supports.filter(function (x) { return x.status === 'applied' || x.status === 'received'; }).length + '/' + state.supports.length : '';
     if (view === 'names') return state.names.length ? '후보 ' + state.names.length : '';
     return '';
@@ -3741,7 +3741,7 @@ datesSorted().forEach(function (d) {
         switch (b.dataset.action) {
           case 'go-checklist': setView('checklist'); break;
           case 'go-category': ui.activeCategory = b.dataset.categoryId; ui.collapsed[b.dataset.categoryId] = false; delete ui.collapsed[b.dataset.categoryId]; setView('checklist'); break;
-          case 'mb-open': setView(b.dataset.target); break;
+          case 'mb-open': setView(b.dataset.target === 'plan' ? ui.planTab : b.dataset.target); break;
           case 'mb-soon': showToast('‘' + b.dataset.label + '’은(는) 준비 중이에요. 곧 열어 드릴게요.'); break;
         }
       });
