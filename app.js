@@ -2120,13 +2120,15 @@ datesSorted().forEach(function (d) {
   }
   // 축복이 만나기까지: 임신 시작(예정일 280일 전)부터 예정일까지 채워지는 진행 바. 날이 지날 때마다 '오늘'이 오른쪽으로 간다.
   function pregnancyTrackHtml(daysLeft) {
+    // 남은 일정 위주: 막달 구간(30주→출산)만 보여 주고, 아직 30주 전이면 20주→출산 구간. 날이 지날수록 '오늘'이 오른쪽으로 간다.
     var total = 280, now = total - daysLeft;
-    var due = dateOf(state.dueDate), start = addDays(due, -total);
-    var mark = function (week, label) { var n = week * 7; return { n: n, label: label || (week + '주'), date: md(addDays(start, n)) }; };
-    var miles = [mark(0, '시작'), mark(12), mark(20), mark(28), mark(40, '출산 예정')];
+    var due = dateOf(state.dueDate), start0 = addDays(due, -total);
+    var fromWeek = daysLeft > 70 ? 20 : 30;
+    var mark = function (week, label) { var n = week * 7; return { n: n, label: label || (week + '주'), date: md(addDays(start0, n)) }; };
+    var miles = fromWeek === 30 ? [mark(30), mark(34), mark(37, '만삭'), mark(40, '출산 예정')] : [mark(20), mark(28), mark(34), mark(40, '출산 예정')];
     var w = Math.floor(Math.max(0, now) / 7), dd = Math.max(0, now) % 7;
-    var nowLabel = now < 0 ? '오늘' : '오늘 ' + w + '주' + (dd ? ' ' + dd + '일' : '');
-    return mileTrackHtml(0, total, Math.max(0, now), miles, nowLabel);
+    var nowLabel = now < fromWeek * 7 ? '오늘' : '오늘 ' + w + '주' + (dd ? ' ' + dd + '일' : '');
+    return mileTrackHtml(fromWeek * 7, total, Math.max(fromWeek * 7, now), miles, nowLabel);
   }
   function weeksLeftText(d) {
     var wk = Math.floor(d / 7), dd = d % 7;
