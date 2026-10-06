@@ -17,6 +17,9 @@
   var MEMO_MAX = 5000;
   var SUPPORT_STATUS = ['todo', 'applied', 'received', 'na'];
   var SUPPORT_STATUS_LABEL = { todo: '확인 전', applied: '신청함', received: '받음', na: '해당 없음' };
+  var SUPPORT_STAGES = ['now', 'birth', 'monthly', 'local'];
+  var SUPPORT_STAGE_LABEL = { now: '지금 · 임신 중', birth: '출산 직후 · 60일 안', monthly: '매달 받는 것', local: '우리 지역 (서울 마포구)' };
+  var SUPPORT_DUE_BASE = ['', 'due', 'birth'];
   // 화면: portal(luckybbu 첫 화면) · ledger(가계부) · 나머지는 마미백 공간
   var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos'];
   // 마미백 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
@@ -470,7 +473,12 @@
         var spstatus = SUPPORT_STATUS.indexOf(sp.status) !== -1 ? sp.status : 'todo';
         supports.push({ id: spid, title: sptitle, target: str(sp.target, 300), benefit: str(sp.benefit, 500), howto: str(sp.howto, 500),
           deadline: (typeof sp.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sp.deadline)) ? sp.deadline : '',
-          link: str(sp.link, 300), status: spstatus, memo: str(sp.memo, 500) });
+          link: str(sp.link, 300), status: spstatus, memo: str(sp.memo, 500),
+          stage: SUPPORT_STAGES.indexOf(sp.stage) !== -1 ? sp.stage : 'birth',
+          amount: str(sp.amount, 40), amountWon: (typeof sp.amountWon === 'number' && isFinite(sp.amountWon) && sp.amountWon >= 0) ? Math.round(sp.amountWon) : null,
+          where: str(sp.where, 120), dueText: str(sp.dueText, 60),
+          dueBase: SUPPORT_DUE_BASE.indexOf(sp.dueBase) !== -1 ? sp.dueBase : '',
+          dueDays: (typeof sp.dueDays === 'number' && isFinite(sp.dueDays)) ? Math.round(sp.dueDays) : null });
       }
     }
     return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget } };
@@ -555,7 +563,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportOpen: {}, supportFilter: 'all', supportsSeeded: false };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -597,6 +605,7 @@
         ui.templateCleared = parsed.templateCleared === true;
         ui.tagsMigrated = parsed.tagsMigrated === true;
         ui.subsMigrated = parsed.subsMigrated === true;
+        ui.supportsSeeded = parsed.supportsSeeded === true;
         if (parsed.addSub && typeof parsed.addSub === 'object') ui.addSub = parsed.addSub;
         if (parsed.archiveTab === 'fav' || parsed.archiveTab === 'like') ui.archiveTab = parsed.archiveTab;
         if (parsed.recordTab === 'notes' || parsed.recordTab === 'memos') ui.recordTab = parsed.recordTab;
@@ -626,6 +635,7 @@
         templateCleared: ui.templateCleared,
         tagsMigrated: ui.tagsMigrated,
         subsMigrated: ui.subsMigrated,
+        supportsSeeded: ui.supportsSeeded,
         recordTab: ui.recordTab,
         archiveTab: ui.archiveTab,
         addSub: ui.addSub,
@@ -2735,14 +2745,21 @@ datesSorted().forEach(function (d) {
   function findSupport(id) { for (var i = 0; i < state.supports.length; i++) if (state.supports[i].id === id) return state.supports[i]; return null; }
   function supportFormHtml(sp) {
     var isNew = !sp; var id = isNew ? 'new' : escapeHtml(sp.id);
-    var v = function (k) { return isNew ? '' : escapeHtml(sp[k] || ''); };
+    var v = function (k) { return isNew ? '' : escapeHtml(sp[k] === null || sp[k] === undefined ? '' : sp[k]); };
     var h = '<form class="support-form" data-support-form="' + id + '">';
     h += '<div class="field"><label for="sp-title-' + id + '">지원 이름</label><input type="text" id="sp-title-' + id + '" name="title" data-focus-key="sp-title:' + id + '" value="' + v('title') + '" maxlength="60" placeholder="예: 첫만남이용권" required></div>';
+    h += '<div class="field-row"><div class="field"><label for="sp-stage-' + id + '">단계</label><select id="sp-stage-' + id + '" name="stage">' + SUPPORT_STAGES.map(function (k) { return '<option value="' + k + '"' + ((isNew ? 'birth' : sp.stage) === k ? ' selected' : '') + '>' + SUPPORT_STAGE_LABEL[k] + '</option>'; }).join('') + '</select></div>';
+    h += '<div class="field"><label for="sp-status-' + id + '">상태</label><select id="sp-status-' + id + '" name="status">' + SUPPORT_STATUS.map(function (k) { return '<option value="' + k + '"' + (!isNew && sp.status === k ? ' selected' : '') + '>' + SUPPORT_STATUS_LABEL[k] + '</option>'; }).join('') + '</select></div></div>';
+    h += '<div class="field-row"><div class="field"><label for="sp-amount-' + id + '">금액 (표시용)</label><input type="text" id="sp-amount-' + id + '" name="amount" value="' + v('amount') + '" maxlength="40" placeholder="예: 200만원, 월 100만원"></div>';
+    h += '<div class="field"><label for="sp-amountwon-' + id + '">합계 계산용 금액(원)</label><input type="text" id="sp-amountwon-' + id + '" name="amountWon" inputmode="numeric" value="' + (isNew || sp.amountWon === null ? '' : formatNumber(sp.amountWon)) + '" placeholder="예: 2,000,000"></div></div>';
     h += '<div class="field"><label for="sp-target-' + id + '">대상·조건</label><input type="text" id="sp-target-' + id + '" name="target" value="' + v('target') + '" maxlength="300" placeholder="누가 받을 수 있는지"></div>';
     h += '<div class="field"><label for="sp-benefit-' + id + '">지원 내용</label><textarea id="sp-benefit-' + id + '" name="benefit" rows="2" maxlength="500" placeholder="금액·바우처·기간 등">' + v('benefit') + '</textarea></div>';
     h += '<div class="field"><label for="sp-howto-' + id + '">신청 방법·유의사항</label><textarea id="sp-howto-' + id + '" name="howto" rows="2" maxlength="500" placeholder="어디서, 무엇을 준비해서, 주의할 점">' + v('howto') + '</textarea></div>';
-    h += '<div class="field-row"><div class="field"><label for="sp-deadline-' + id + '">신청 기한</label><input type="date" id="sp-deadline-' + id + '" name="deadline" value="' + v('deadline') + '"></div>';
-    h += '<div class="field"><label for="sp-status-' + id + '">상태</label><select id="sp-status-' + id + '" name="status">' + SUPPORT_STATUS.map(function (k) { return '<option value="' + k + '"' + (!isNew && sp.status === k ? ' selected' : '') + '>' + SUPPORT_STATUS_LABEL[k] + '</option>'; }).join('') + '</select></div></div>';
+    h += '<div class="field"><label for="sp-where-' + id + '">신청처 (쉼표로 구분)</label><input type="text" id="sp-where-' + id + '" name="where" value="' + v('where') + '" maxlength="120" placeholder="예: 복지로, 정부24, 주민센터"></div>';
+    h += '<div class="field-row"><div class="field"><label for="sp-duebase-' + id + '">기한 기준</label><select id="sp-duebase-' + id + '" name="dueBase"><option value=""' + (isNew || !sp.dueBase ? ' selected' : '') + '>없음</option><option value="birth"' + (!isNew && sp.dueBase === 'birth' ? ' selected' : '') + '>출생일부터</option><option value="due"' + (!isNew && sp.dueBase === 'due' ? ' selected' : '') + '>예정일부터</option></select></div>';
+    h += '<div class="field"><label for="sp-duedays-' + id + '">며칠 안 (음수는 전)</label><input type="text" id="sp-duedays-' + id + '" name="dueDays" inputmode="numeric" value="' + (isNew || sp.dueDays === null ? '' : sp.dueDays) + '" placeholder="예: 30"></div></div>';
+    h += '<div class="field-row"><div class="field"><label for="sp-duetext-' + id + '">기한 설명</label><input type="text" id="sp-duetext-' + id + '" name="dueText" value="' + v('dueText') + '" maxlength="60" placeholder="예: 출생 후 1개월 안"></div>';
+    h += '<div class="field"><label for="sp-deadline-' + id + '">기한 날짜 직접 지정</label><input type="date" id="sp-deadline-' + id + '" name="deadline" value="' + v('deadline') + '"></div></div>';
     h += '<div class="field"><label for="sp-link-' + id + '">공식 링크</label><input type="url" id="sp-link-' + id + '" name="link" value="' + v('link') + '" maxlength="300" placeholder="https://www.bokjiro.go.kr/ 등" inputmode="url"></div>';
     h += '<div class="field"><label for="sp-memo-' + id + '">메모</label><textarea id="sp-memo-' + id + '" name="memo" rows="2" maxlength="500">' + v('memo') + '</textarea></div>';
     h += '<p class="field-error" data-error hidden></p>';
@@ -2752,42 +2769,114 @@ datesSorted().forEach(function (d) {
   function safeHref(u) {
     return /^https?:\/\//i.test(u) ? u : '';
   }
+  // 기한: 직접 지정한 날짜 > (출생일/예정일 + n일). 아직 태어나기 전에는 예정일을 출생일로 본다.
+  function supportDueDate(sp) {
+    if (sp.deadline) return sp.deadline;
+    if (!sp.dueBase || sp.dueDays === null || !state.dueDate) return '';
+    var d = addDays(dateOf(state.dueDate), sp.dueDays);
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  function supportDueHtml(sp) {
+    var iso = supportDueDate(sp);
+    if (!iso && !sp.dueText) return '';
+    var h = '<p class="support__due">';
+    if (sp.dueText) h += '<span>' + escapeHtml(sp.dueText) + '</span>';
+    if (iso) {
+      var left = daysFromToday(iso);
+      var cls = sp.status === 'received' || sp.status === 'na' ? '' : (left < 0 ? ' is-over' : left <= 30 ? ' is-soon' : '');
+      h += '<b class="support__date' + cls + '">' + escapeHtml(shortDate(iso)) + (sp.status === 'received' || sp.status === 'na' ? '' : (left < 0 ? ' · 지남' : left === 0 ? ' · 오늘까지' : ' · D-' + left)) + '</b>';
+      if (!sp.deadline && sp.dueBase) h += '<small>' + (daysFromToday(state.dueDate) > 0 ? '예정일 기준' : '출생일 기준') + '</small>';
+    }
+    return h + '</p>';
+  }
+  function supportCardHtml(sp) {
+    var id = escapeHtml(sp.id), open = !!ui.supportOpen[sp.id], href = safeHref(sp.link);
+    var h = '<li class="support support--' + sp.status + (open ? ' is-open' : '') + '" data-support-id="' + id + '">';
+    h += '<button type="button" class="support__head" data-action="toggle-support" data-focus-key="sp-head:' + id + '" aria-expanded="' + (open ? 'true' : 'false') + '">';
+    h += '<span class="support__title">' + escapeHtml(sp.title) + '</span><span class="sp-stat sp-stat--' + sp.status + '">' + SUPPORT_STATUS_LABEL[sp.status] + '</span></button>';
+    if (sp.amount) h += '<p class="support__amount">' + escapeHtml(sp.amount) + '</p>';
+    h += supportDueHtml(sp);
+    if (sp.where) h += '<div class="support__where">' + sp.where.split(/\s*,\s*/).filter(Boolean).map(function (w) { return '<span>' + escapeHtml(w) + '</span>'; }).join('') + (href ? '<a class="support__where-link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">공식 안내 ↗</a>' : '') + '</div>';
+    else if (href) h += '<div class="support__where"><a class="support__where-link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">공식 안내 ↗</a></div>';
+    h += '<div class="support__steps" role="group" aria-label="상태">' + ['todo', 'applied', 'received'].map(function (k) {
+      var idx = ['todo', 'applied', 'received'].indexOf(sp.status), ki = ['todo', 'applied', 'received'].indexOf(k);
+      return '<button type="button" class="support__step' + (sp.status === k ? ' is-on' : (idx > ki ? ' is-past' : '')) + '" data-action="sp-status" data-status="' + k + '" aria-pressed="' + (sp.status === k ? 'true' : 'false') + '">' + SUPPORT_STATUS_LABEL[k] + '</button>';
+    }).join('') + '<button type="button" class="support__step support__step--na' + (sp.status === 'na' ? ' is-on' : '') + '" data-action="sp-status" data-status="na" aria-pressed="' + (sp.status === 'na' ? 'true' : 'false') + '">해당 없음</button></div>';
+    if (open) {
+      h += '<div class="support__detail">';
+      if (sp.target) h += '<p class="support__row"><b>대상</b>' + escapeHtml(sp.target) + '</p>';
+      if (sp.benefit) h += '<p class="support__row"><b>내용</b>' + escapeHtml(sp.benefit) + '</p>';
+      if (sp.howto) h += '<p class="support__row"><b>신청</b>' + escapeHtml(sp.howto) + '</p>';
+      if (sp.memo) h += '<p class="support__row"><b>메모</b>' + escapeHtml(sp.memo) + '</p>';
+      if (!sp.target && !sp.benefit && !sp.howto && !sp.memo) h += '<p class="support__row support__row--empty">자세한 내용이 없습니다. ‘수정’으로 대상·내용·신청 방법을 적어 두세요.</p>';
+      h += '<div class="support__actions"><button type="button" class="btn btn--small" data-action="edit-support" data-focus-key="sp-edit:' + id + '">수정</button><button type="button" class="btn btn--small btn--danger" data-action="delete-support">삭제</button></div></div>';
+    }
+    return h + '</li>';
+  }
   function renderSupports() {
     var list = $('#support-list'); if (!list) return;
     var stats = $('#supports-stats');
+    var all = state.supports;
     var counts = { todo: 0, applied: 0, received: 0, na: 0 };
-    state.supports.forEach(function (x) { counts[x.status] = (counts[x.status] || 0) + 1; });
-    if (stats) stats.innerHTML = state.supports.length ? SUPPORT_STATUS.map(function (k) { return '<span class="sp-stat sp-stat--' + k + '">' + SUPPORT_STATUS_LABEL[k] + ' ' + counts[k] + '</span>'; }).join('') : '';
-    var cnt = $('#supports-count'); if (cnt) cnt.textContent = state.supports.length ? state.supports.length + '개' : '';
+    var won = 0, soon = 0;
+    all.forEach(function (x) {
+      counts[x.status] = (counts[x.status] || 0) + 1;
+      if (x.status !== 'na' && typeof x.amountWon === 'number') won += x.amountWon;
+      var iso = supportDueDate(x);
+      if (iso && (x.status === 'todo' || x.status === 'applied') && daysFromToday(iso) <= 30) soon++;
+    });
+    var done = counts.applied + counts.received, total = all.length - counts.na;
+    if (stats) {
+      if (!all.length) stats.innerHTML = '';
+      else stats.innerHTML = '<div class="sp-sum"><div><b>' + (won ? '약 ' + escapeHtml(formatWonShort(won)) : '–') + '</b><small>받을 수 있는 금액</small></div><div class="sp-sum__mid"><b>' + done + ' / ' + total + '</b><small>신청·수령</small></div><div><b class="' + (soon ? 'is-soon' : '') + '">' + soon + '건</b><small>기한 30일 안</small></div></div>' +
+        '<div class="sp-filter" role="group" aria-label="상태로 보기">' + [['all', '전체', all.length], ['todo', '할 일', counts.todo], ['applied', '신청함', counts.applied], ['received', '받음', counts.received]].map(function (o) {
+          return '<button type="button" class="sp-filter__btn' + (ui.supportFilter === o[0] ? ' is-active' : '') + '" data-action="sp-filter" data-filter="' + o[0] + '" aria-pressed="' + (ui.supportFilter === o[0] ? 'true' : 'false') + '">' + o[1] + '<b>' + o[2] + '</b></button>';
+        }).join('') + '</div>';
+    }
+    var cnt = $('#supports-count'); if (cnt) cnt.textContent = all.length ? all.length + '개' : '';
     var html = '';
     if (ui.supportEdit === 'new') html += '<li class="support support--editing">' + supportFormHtml(null) + '</li>';
-    if (!state.supports.length && ui.supportEdit !== 'new') {
-      html += '<li class="datecard-empty">아직 항목이 없습니다. ‘항목 추가’로 첫만남이용권, 부모급여, 출산휴가 같은 지원을 하나씩 정리해 보세요.<br><small>각 항목에 대상·지원 내용·신청 방법·기한·공식 링크·상태(확인 전→신청함→받음)를 적을 수 있습니다.</small></li>';
+    if (!all.length && ui.supportEdit !== 'new') {
+      html += '<li class="datecard-empty">아직 항목이 없습니다. ‘항목 추가’로 첫만남이용권, 부모급여, 산후조리경비 같은 지원을 하나씩 정리해 보세요.</li>';
     }
-    var order = { todo: 0, applied: 1, received: 2, na: 3 };
-    state.supports.slice().sort(function (a, b) { return order[a.status] - order[b.status]; }).forEach(function (sp) {
-      if (ui.supportEdit === sp.id) { html += '<li class="support support--editing" data-support-id="' + escapeHtml(sp.id) + '">' + supportFormHtml(sp) + '</li>'; return; }
-      var href = safeHref(sp.link);
-      html += '<li class="support support--' + sp.status + '" data-support-id="' + escapeHtml(sp.id) + '">';
-      html += '<div class="support__head"><div class="support__meta"><span class="support__title">' + escapeHtml(sp.title) + '</span><span class="sp-stat sp-stat--' + sp.status + '">' + SUPPORT_STATUS_LABEL[sp.status] + '</span>';
-      if (sp.deadline) html += '<span class="badge badge--label">기한 ' + escapeHtml(formatNoteDate(sp.deadline)) + '</span>';
-      html += '</div><div class="support__actions"><button type="button" class="btn btn--small" data-action="edit-support" data-focus-key="sp-edit:' + escapeHtml(sp.id) + '">수정</button><button type="button" class="btn btn--small btn--danger" data-action="delete-support">삭제</button></div></div>';
-      if (sp.target) html += '<p class="support__row"><b>대상</b>' + escapeHtml(sp.target) + '</p>';
-      if (sp.benefit) html += '<p class="support__row"><b>내용</b>' + escapeHtml(sp.benefit) + '</p>';
-      if (sp.howto) html += '<p class="support__row"><b>신청</b>' + escapeHtml(sp.howto) + '</p>';
-      if (sp.memo) html += '<p class="support__row"><b>메모</b>' + escapeHtml(sp.memo) + '</p>';
-      if (href) html += '<p class="support__row"><a class="support__link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">공식 안내 열기 ↗</a></p>';
-      html += '<div class="support__status"><label class="visually-hidden" for="sp-quick-' + escapeHtml(sp.id) + '">상태 바꾸기</label><select id="sp-quick-' + escapeHtml(sp.id) + '" data-action="quick-status">' + SUPPORT_STATUS.map(function (k) { return '<option value="' + k + '"' + (sp.status === k ? ' selected' : '') + '>' + SUPPORT_STATUS_LABEL[k] + '</option>'; }).join('') + '</select></div>';
-      html += '</li>';
+    var byStatus = function (x) { return ui.supportFilter === 'all' || x.status === ui.supportFilter; };
+    SUPPORT_STAGES.forEach(function (st) {
+      var items = all.filter(function (x) { return x.stage === st && byStatus(x); });
+      if (!items.length) return;
+      items.sort(function (a, b) {
+        var da = supportDueDate(a), db = supportDueDate(b);
+        var oa = a.status === 'na' ? 1 : 0, ob = b.status === 'na' ? 1 : 0;
+        if (oa !== ob) return oa - ob;
+        if (da && db && da !== db) return da < db ? -1 : 1;
+        if (!!da !== !!db) return da ? -1 : 1;
+        return all.indexOf(a) - all.indexOf(b);
+      });
+      var stageSoon = items.filter(function (x) { var iso = supportDueDate(x); return iso && (x.status === 'todo' || x.status === 'applied') && daysFromToday(iso) <= 30; }).length;
+      html += '<li class="sp-stage" id="sp-stage-' + st + '"><span class="sp-stage__name">' + SUPPORT_STAGE_LABEL[st] + '</span><span class="sp-stage__meta">' + items.length + '건' + (stageSoon ? ' · 기한 주의 ' + stageSoon : '') + '</span></li>';
+      items.forEach(function (sp) {
+        if (ui.supportEdit === sp.id) html += '<li class="support support--editing" data-support-id="' + escapeHtml(sp.id) + '">' + supportFormHtml(sp) + '</li>';
+        else html += supportCardHtml(sp);
+      });
     });
+    if (all.length && !html.replace(/<li class="support support--editing">[\s\S]*?<\/li>/, '')) html += '<li class="datecard-empty">이 상태에 해당하는 항목이 없습니다.</li>';
     list.innerHTML = html;
     var addBtn = $('#add-support-btn'); if (addBtn) addBtn.hidden = ui.supportEdit === 'new';
   }
+  function formatWonShort(n) {
+    if (n >= 100000000) return (n / 100000000).toFixed(n % 100000000 ? 1 : 0) + '억원';
+    if (n >= 10000) return formatNumber(Math.round(n / 10000)) + '만원';
+    return formatNumber(n) + '원';
+  }
   function readSupportForm(form) {
-    var g = function (n, max) { return (form.elements[n].value || '').replace(/\r\n?/g, '\n').trim().slice(0, max); };
+    var g = function (n, max) { return (form.elements[n] && form.elements[n].value || '').replace(/\r\n?/g, '\n').trim().slice(0, max); };
     var dl = form.elements.deadline.value; if (dl && !/^\d{4}-\d{2}-\d{2}$/.test(dl)) dl = '';
     var st = form.elements.status.value; if (SUPPORT_STATUS.indexOf(st) === -1) st = 'todo';
-    return { title: g('title', 60), target: g('target', 300), benefit: g('benefit', 500), howto: g('howto', 500), deadline: dl, link: g('link', 300), status: st, memo: g('memo', 500) };
+    var stage = form.elements.stage.value; if (SUPPORT_STAGES.indexOf(stage) === -1) stage = 'birth';
+    var wonRaw = g('amountWon', 20).replace(/[^\d]/g, ''); var won = wonRaw ? parseInt(wonRaw, 10) : null;
+    var base = form.elements.dueBase.value; if (SUPPORT_DUE_BASE.indexOf(base) === -1) base = '';
+    var daysRaw = g('dueDays', 8).replace(/[^\d-]/g, ''); var days = daysRaw && /^-?\d+$/.test(daysRaw) ? parseInt(daysRaw, 10) : null;
+    return { title: g('title', 60), stage: stage, amount: g('amount', 40), amountWon: won, target: g('target', 300), benefit: g('benefit', 500), howto: g('howto', 500), where: g('where', 120), dueBase: base, dueDays: days, dueText: g('dueText', 60), deadline: dl, link: g('link', 300), status: st, memo: g('memo', 500) };
   }
   function submitSupportForm(form) {
     var v = readSupportForm(form);
@@ -2795,13 +2884,18 @@ datesSorted().forEach(function (d) {
     if (!v.title) { err.textContent = '지원 이름을 입력하세요.'; err.hidden = false; form.elements.title.focus(); return; }
     var key = form.dataset.supportForm;
     if (key === 'new') {
-      state.supports.push({ id: uid(), title: v.title, target: v.target, benefit: v.benefit, howto: v.howto, deadline: v.deadline, link: v.link, status: v.status, memo: v.memo });
-      ui.supportEdit = null; commit(); act('support', '지원 항목 ‘' + v.title + '’ 추가'); showToast('지원 항목을 저장했습니다.');
+      var created = { id: uid() }; Object.keys(v).forEach(function (k) { created[k] = v[k]; });
+      state.supports.push(created);
+      ui.supportEdit = null; ui.supportOpen[created.id] = true; commit(); act('support', '지원 항목 ‘' + v.title + '’ 추가'); showToast('지원 항목을 저장했습니다.');
     } else {
       var sp = findSupport(key); if (!sp) { ui.supportEdit = null; render(); return; }
       Object.keys(v).forEach(function (k) { sp[k] = v[k]; });
       ui.supportEdit = null; commit(); act('support', '지원 항목 ‘' + v.title + '’ 수정'); showToast('지원 항목을 수정했습니다.');
     }
+  }
+  function setSupportStatus(id, status) {
+    var sp = findSupport(id); if (!sp || SUPPORT_STATUS.indexOf(status) === -1 || sp.status === status) return;
+    sp.status = status; commit(); act('support', '지원 항목 ‘' + sp.title + '’ 상태 → ' + SUPPORT_STATUS_LABEL[status]);
   }
   function deleteSupport(id) {
     var idx = -1; for (var i = 0; i < state.supports.length; i++) if (state.supports[i].id === id) idx = i;
@@ -2811,6 +2905,35 @@ datesSorted().forEach(function (d) {
     state.supports.splice(idx, 1); if (ui.supportEdit === id) ui.supportEdit = null;
     commit(); act('support', '지원 항목 ‘' + sp.title + '’ 삭제');
     showToast('지원 항목을 삭제했습니다.', function () { state.supports.splice(Math.min(idx, state.supports.length), 0, sp); commit(); showToast('삭제를 취소했습니다.'); });
+  }
+  // 처음 한 번: 2026년 기준 국가·서울시·마포구 지원 항목을 채운다(이미 항목이 있으면 건드리지 않음). 되돌리기 가능.
+  var SUPPORT_SEED = [
+    { stage: 'now', title: '임신·출산 진료비 바우처', amount: '100만원', amountWon: 1000000, where: '국민건강보험공단, 산부인과', dueText: '임신 중 발급 · 출산 후 2년까지 사용', target: '임신 확인된 산모', benefit: '국민행복카드로 진료비 지원(금액은 공단 안내로 확인). 분만 예정일 이후 2년까지 사용.', howto: '산부인과에서 임신확인서(건강보험 임신·출산 진료비 지급 신청서) 발급 → 카드사·공단 홈페이지·공단 지사에서 신청', link: 'https://www.nhis.or.kr' },
+    { stage: 'now', title: '서울시 임산부 교통비', amount: '70만원', amountWon: 700000, where: '서울맘케어, 주민센터', dueBase: 'birth', dueDays: 90, dueText: '출산 후 3개월까지 신청', target: '신청일 기준 서울 6개월 이상 거주한 임산부 (첫째 70만원 · 둘째 80만원 · 셋째 이상 100만원)', benefit: '교통비 70만원 포인트. 버스·지하철·택시·기차·유류비 등 교통 가맹점에서 사용.', howto: '임신 12주부터 출산 후 3개월까지 서울맘케어(seoulmomcare.com) 또는 주민센터에서 신청. 국민행복카드(신한·삼성·KB·우리·롯데·BC) 필요.', link: 'https://www.seoulmomcare.com' },
+    { stage: 'now', title: '마포구 보건소 산전 검사 · 엽산·철분제', amount: '무료', amountWon: 0, where: '마포구 보건소', dueText: '임신 중 (철분제는 16주부터)', target: '마포구 거주 임산부', benefit: '엽산제(임신 전~12주)·철분제(16주~분만) 지급, 산전 기본검사, 임산부 등록 관리.', howto: '보건소 모자보건실 방문. 신분증·임신확인서(또는 산모수첩) 지참. 운영 시간과 제공 항목은 보건소에 확인.', link: 'https://www.mapo.go.kr/site/health/home' },
+    { stage: 'birth', title: '출생신고', amount: '', amountWon: null, where: '주민센터, 정부24', dueBase: 'birth', dueDays: 30, dueText: '출생 후 1개월 안', target: '모든 출생아', benefit: '출생신고를 하면서 ‘행복출산 원스톱 서비스’로 첫만남이용권·부모급여·아동수당·전기요금 감면 등을 한 번에 신청할 수 있음.', howto: '주민센터 방문(출생증명서·신분증) 또는 병원이 출생증명서를 전산 제출한 경우 정부24 온라인 신고. 1개월이 지나면 과태료.', link: 'https://www.gov.kr' },
+    { stage: 'birth', title: '첫만남이용권', amount: '200만원', amountWon: 2000000, where: '복지로, 정부24, 주민센터', dueBase: 'birth', dueDays: 30, dueText: '출생신고와 함께 신청 · 출생일부터 1년 사용', target: '출생아 (첫째 200만원, 둘째부터 300만원)', benefit: '국민행복카드 바우처 200만원. 출생일로부터 1년 안에 사용(유흥·사행 업종 제외).', howto: '출생신고 시 행복출산 원스톱으로 함께 신청하거나 복지로·정부24에서 신청.', link: 'https://www.bokjiro.go.kr' },
+    { stage: 'birth', title: '서울형 산후조리경비', amount: '100만원', amountWon: 1000000, where: '서울맘케어, 주민센터', dueBase: 'birth', dueDays: 60, dueText: '출산 후 60일 안 신청', target: '신청일 기준 서울 6개월 이상 거주 산모 (첫째 100만원 · 둘째 120만원 · 셋째 이상 150만원)', benefit: '산모·신생아 건강관리 서비스, 의약품·건강식품, 한약, 산후 운동·심리상담 등에 사용하는 바우처.', howto: '출산 후 60일 안에 서울맘케어 또는 주민센터에서 신청. 사용 기한은 안내 확인.', link: 'https://www.seoulmomcare.com' },
+    { stage: 'birth', title: '산모·신생아 건강관리사(산후도우미) 정부지원', amount: '본인부담 일부 지원', amountWon: null, where: '마포구 보건소, 복지로', dueBase: 'birth', dueDays: 60, dueText: '예정일 40일 전 ~ 출산 후 60일 안 신청', target: '기준 중위소득 150% 이하 가구(서울시는 소득 기준 완화 사례 있음 → 보건소 확인)', benefit: '건강관리사 서비스 비용의 본인부담금 지원. 서비스는 출산 후 90일 안에 이용.', howto: '보건소 방문 또는 복지로 신청. 건강보험료 납부확인서·주민등록등본 등 준비. 업체 선택 후 바우처로 결제.', link: 'https://www.bokjiro.go.kr' },
+    { stage: 'birth', title: '출산가구 전기요금 감면', amount: '월 최대 1만6천원', amountWon: null, where: '한전 123, 한전ON', dueBase: 'birth', dueDays: 30, dueText: '출생 후 바로 (신청월부터 적용)', target: '출생 후 3년 미만 영아가 있는 가구', benefit: '전기요금 30% 감면(월 최대 16,000원), 출생일부터 3년.', howto: '한전 고객센터 123 또는 한전ON에서 신청. 주민등록등본. 신청 전 기간은 소급되지 않으니 출생신고 직후 신청.', link: 'https://online.kepco.co.kr' },
+    { stage: 'monthly', title: '부모급여', amount: '월 100만원 (0세) · 월 50만원 (1세)', amountWon: 18000000, where: '복지로, 주민센터', dueBase: 'birth', dueDays: 60, dueText: '출생 후 60일 안 신청하면 출생월부터 소급', target: '만 0~1세 아동', benefit: '0세(0~11개월) 월 100만원, 1세(12~23개월) 월 50만원 현금 지급(어린이집 이용 시 보육료 차감).', howto: '출생신고 시 행복출산 원스톱으로 신청 또는 복지로. 60일이 지나면 신청한 달부터 지급.', link: 'https://www.bokjiro.go.kr' },
+    { stage: 'monthly', title: '아동수당', amount: '월 10만원', amountWon: 10800000, where: '복지로, 주민센터', dueBase: 'birth', dueDays: 60, dueText: '부모급여와 함께 신청', target: '만 9세 미만 아동 (2026년부터 확대)', benefit: '매월 10만원, 만 9세 생일 전달까지.', howto: '출생신고 시 행복출산 원스톱 또는 복지로에서 부모급여와 함께 신청.', link: 'https://www.bokjiro.go.kr' },
+    { stage: 'local', title: '마포구 자체 출산 지원', amount: '일반 현금 지원 없음', amountWon: null, where: '마포구청, 주민센터', dueText: '출생신고 때 확인', target: '마포구 거주 출산 가정', benefit: '마포구는 일반 출산장려금이 없고 장애인 가정 신생아 지원금(150만원) 등 조건부 지원만 있음(2026년 확인). 대신 서울시 산후조리경비·임산부 교통비는 마포구 거주자도 모두 해당.', howto: '출생신고 때 주민센터에서 마포구 추가 지원(출산용품·축하선물 등) 여부를 한 번 더 확인.', link: 'https://www.mapo.go.kr' },
+    { stage: 'local', title: '서울 엄마아빠택시 (영아 택시 포인트)', amount: '연 10만원 포인트', amountWon: 100000, where: '서울맘케어, 주민센터', dueText: '출생 후 24개월까지', target: '서울 거주 24개월 이하 영아 가정 (운영 조건은 해마다 바뀜 → 신청 전 확인)', benefit: '병원 방문 등 외출 시 택시 이용료 포인트 지원.', howto: '서울맘케어 또는 주민센터에서 신청. 지원 금액·조건은 2026년 공고로 확인.', link: 'https://www.seoulmomcare.com' }
+  ];
+  function seedSupportsOnce() {
+    if (ui.supportsSeeded) return;
+    ui.supportsSeeded = true; saveUiPrefs();
+    if (state.supports.length) return;
+    var added = SUPPORT_SEED.map(function (d) {
+      return { id: uid(), title: d.title, stage: d.stage, amount: d.amount || '', amountWon: typeof d.amountWon === 'number' ? d.amountWon : null, target: d.target || '', benefit: d.benefit || '', howto: d.howto || '', where: d.where || '', dueBase: d.dueBase || '', dueDays: typeof d.dueDays === 'number' ? d.dueDays : null, dueText: d.dueText || '', deadline: '', link: d.link || '', status: 'todo', memo: '' };
+    });
+    state.supports = added;
+    commit(); act('support', '정부 지원 기본 항목 ' + added.length + '개 채움');
+    showToast('2026년 기준 정부·서울시·마포구 지원 ' + added.length + '개를 채웠습니다. 금액·조건은 공식 안내로 한 번 더 확인하세요.', function () {
+      state.supports = state.supports.filter(function (x) { return !added.some(function (a) { return a.id === x.id; }); });
+      commit(); showToast('기본 항목을 되돌렸습니다.');
+    });
   }
 
   function renderHighlightsStrip() {
@@ -3446,10 +3569,10 @@ datesSorted().forEach(function (d) {
 
   var migrationsQueued = false;
   function scheduleOneTimeMigrations() {
-    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded)) return;
+    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.supportsSeeded)) return;
     migrationsQueued = true;
     // 방 참여 직후에는 구독(attach)이 applyRemote 뒤에 붙으므로 한 틱 뒤에 실행한다.
-    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); }, 0);
+    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedSupportsOnce(); }, 0);
   }
   function applyRemote(remoteState) {
     var result = normalizeState(remoteState);
@@ -3969,21 +4092,22 @@ datesSorted().forEach(function (d) {
         if (add) { ui.supportEdit = 'new'; renderSupports(); var f = document.querySelector('[data-focus-key="sp-title:new"]'); if (f) f.focus(); return; }
         var btn = e.target.closest('button[data-action]'); if (!btn) return;
         var li = btn.closest('[data-support-id]');
+        var sid = li ? li.dataset.supportId : null;
         switch (btn.dataset.action) {
-          case 'edit-support': ui.supportEdit = li.dataset.supportId; renderSupports(); var ff = document.querySelector('[data-focus-key="sp-title:' + li.dataset.supportId + '"]'); if (ff) ff.focus(); break;
-          case 'cancel-support': ui.supportEdit = null; renderSupports(); var back = li ? document.querySelector('[data-focus-key="sp-edit:' + li.dataset.supportId + '"]') : $('#add-support-btn'); if (back) back.focus(); break;
-          case 'delete-support': deleteSupport(li.dataset.supportId); break;
+          case 'sp-filter': ui.supportFilter = btn.dataset.filter; renderSupports(); break;
+          case 'toggle-support': { if (ui.supportOpen[sid]) delete ui.supportOpen[sid]; else ui.supportOpen[sid] = true; renderSupports(); var hb = document.querySelector('[data-focus-key="sp-head:' + sid + '"]'); if (hb) hb.focus(); break; }
+          case 'sp-status': setSupportStatus(sid, btn.dataset.status); break;
+          case 'edit-support': ui.supportEdit = sid; renderSupports(); var ff = document.querySelector('[data-focus-key="sp-title:' + sid + '"]'); if (ff) ff.focus(); break;
+          case 'cancel-support': ui.supportEdit = null; renderSupports(); var back = li ? document.querySelector('[data-focus-key="sp-head:' + sid + '"]') : $('#add-support-btn'); if (back) back.focus(); break;
+          case 'delete-support': deleteSupport(sid); break;
         }
       });
       supView.addEventListener('submit', function (e) {
         var form = e.target.closest('form[data-support-form]'); if (!form) return;
         e.preventDefault(); submitSupportForm(form);
       });
-      supView.addEventListener('change', function (e) {
-        var sel = e.target.closest('select[data-action="quick-status"]'); if (!sel) return;
-        var li = sel.closest('[data-support-id]'); var sp = findSupport(li.dataset.supportId); if (!sp) return;
-        if (SUPPORT_STATUS.indexOf(sel.value) === -1) return;
-        sp.status = sel.value; commit(); act('support', '지원 항목 ‘' + sp.title + '’ 상태 → ' + SUPPORT_STATUS_LABEL[sp.status]);
+      supView.addEventListener('input', function (e) {
+        if (e.target.name === 'amountWon') { var d = e.target.value.replace(/[^\d]/g, '').slice(0, 11); e.target.value = d ? formatNumber(d) : ''; }
       });
     }
     var searchInput = $('#item-search');
@@ -4477,7 +4601,7 @@ datesSorted().forEach(function (d) {
     render();
     var storedRoom = null;
     try { storedRoom = window.localStorage.getItem('birth-bag-checklist:room'); } catch (e) { /* ignore */ }
-    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); }
+    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); seedSupportsOnce(); }
     try { window.history.replaceState({ view: ui.view }, ''); } catch (e) { /* ignore */ }
     window.addEventListener('popstate', function (e) {
       if (sheetPopSilently) { sheetPopSilently = false; return; }
