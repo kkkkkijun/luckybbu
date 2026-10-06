@@ -21,7 +21,7 @@
   var SUPPORT_STAGE_LABEL = { now: '지금 · 임신 중', birth: '출산 직후 · 60일 안', monthly: '매달 받는 것', local: '우리 지역 (서울 마포구)' };
   var SUPPORT_DUE_BASE = ['', 'due', 'birth'];
   // 화면: portal(luckybbu 첫 화면) · ledger(가계부) · 나머지는 마미백 공간
-  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos'];
+  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday'];
   // 마미백 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
   var GROUPS = ['birth', 'baby'];
   function defaultGroupFor(name) { var n = String(name || ''); if (/맞이|의류|출산|병원|조리원/.test(n)) return 'birth'; return /육아|이유식|예방접종|성장/i.test(n) ? 'baby' : 'birth'; }
@@ -283,13 +283,22 @@
   // 예전 버전이 채워 둔 '손대지 않은 예시 준비물'을 알아보고 한 번 비우는 데만 쓴다.
   var TEMPLATE_NAMES = {};
   DEFAULT_TEMPLATE.forEach(function (cat) { cat.items.forEach(function (n) { TEMPLATE_NAMES[n] = true; }); });
+  /* ---------- 출산 당일 할 일: 단계 ---------- */
+  var BT_STAGES = [
+    { key: 'prep', label: '미리 준비' }, { key: 'depart', label: '병원 출발 전' }, { key: 'arrive', label: '병원 도착 후' },
+    { key: 'after', label: '출산 직후' }, { key: 'room', label: '병실 이동 후' }, { key: 'stay', label: '입원 중' }, { key: 'discharge', label: '퇴원하는 날' }
+  ];
+  var BT_STAGE_KEYS = BT_STAGES.map(function (s) { return s.key; });
+  var BT_LINKS = ['', 'bag', 'memo', 'supports'];
+  var BT_TEXT_MAX = 60, BT_NOTE_MAX = 200;
+  var BT_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
   function createDefaultState() {
     var categories = [];
     var items = [];
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0 };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [] };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -481,7 +490,22 @@
           dueDays: (typeof sp.dueDays === 'number' && isFinite(sp.dueDays)) ? Math.round(sp.dueDays) : null });
       }
     }
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget } };
+    // 출산 당일 할 일 (올바르지 않은 항목은 건너뛴다)
+    var birthTasks = [];
+    var seenBt = {};
+    if (Array.isArray(raw.birthTasks)) {
+      raw.birthTasks.forEach(function (t) {
+        if (!t || typeof t !== 'object') return;
+        var tid = typeof t.id === 'string' ? t.id.trim() : '';
+        var ttext = typeof t.text === 'string' ? t.text.replace(/\s+/g, ' ').trim().slice(0, BT_TEXT_MAX) : '';
+        if (!tid || !ttext || seenBt[tid]) return;
+        seenBt[tid] = true;
+        birthTasks.push({ id: tid, stage: BT_STAGE_KEYS.indexOf(t.stage) !== -1 ? t.stage : 'prep', text: ttext,
+          note: typeof t.note === 'string' ? t.note.replace(/\r\n?/g, '\n').trim().slice(0, BT_NOTE_MAX) : '',
+          done: t.done === true, link: BT_LINKS.indexOf(t.link) !== -1 ? t.link : '', csec: t.csec === true });
+      });
+    }
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks } };
   }
 
   /* ---------- storage ---------- */
@@ -563,7 +587,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -606,6 +630,9 @@
         ui.tagsMigrated = parsed.tagsMigrated === true;
         ui.subsMigrated = parsed.subsMigrated === true;
         ui.supportsSeeded = parsed.supportsSeeded === true;
+        ui.birthSeeded = parsed.birthSeeded === true;
+        if (parsed.birthFilter === 'all' || parsed.birthFilter === 'remain') ui.birthFilter = parsed.birthFilter;
+        ui.birthHideCsec = parsed.birthHideCsec === true;
         if (parsed.draft && typeof parsed.draft === 'object') ui.pendingDraft = parsed.draft;
         if (parsed.addSub && typeof parsed.addSub === 'object') ui.addSub = parsed.addSub;
         if (parsed.archiveTab === 'fav' || parsed.archiveTab === 'like') ui.archiveTab = parsed.archiveTab;
@@ -664,6 +691,9 @@
         tagsMigrated: ui.tagsMigrated,
         subsMigrated: ui.subsMigrated,
         supportsSeeded: ui.supportsSeeded,
+        birthSeeded: ui.birthSeeded,
+        birthFilter: ui.birthFilter,
+        birthHideCsec: ui.birthHideCsec,
         draft: draftSnapshot(),
         recordTab: ui.recordTab,
         archiveTab: ui.archiveTab,
@@ -811,6 +841,7 @@
     if (ui.view === 'notes' && ui.noteOpen && view !== 'notes') closeNote();
     if (view !== 'notes' && view !== 'memos') ui.detailFrom = null;
     if (ui.view === 'supports' && ui.supportModal) { ui.supportModal = null; document.body.classList.remove('has-modal'); }
+    if (ui.view === 'birthday') { ui.birthEdit = false; ui.birthForm = null; }
     ui.view = view;
     if (view === 'notes' || view === 'memos') ui.recordTab = view;
     if (view === 'picks' || view === 'names') ui.planTab = view;
@@ -867,6 +898,7 @@
     if (vh) vh.hidden = ui.view !== 'home';
     var vs = $('#view-settings'); if (vs) vs.hidden = ui.view !== 'settings';
     var vsp = $('#view-supports'); if (vsp) vsp.hidden = ui.view !== 'supports';
+    var vbd = $('#view-birthday'); if (vbd) vbd.hidden = ui.view !== 'birthday';
     var vmm = $('#view-memos'); if (vmm) vmm.hidden = ui.view !== 'memos';
     var vc = $('#view-checklist'), vn = $('#view-notes'), vp = $('#view-picks'), vm = $('#view-names');
     if (vc) vc.hidden = ui.view !== 'checklist';
@@ -921,6 +953,7 @@
     renderMemo();
     renderSettings();
     renderSupports();
+    renderBirthday();
     var searchBox = $('#search-wrap');
     if (searchBox) searchBox.hidden = !ui.searchOpen || ui.editMode || ui.view !== 'checklist';
     var st = $('#search-toggle');
@@ -2024,6 +2057,7 @@ datesSorted().forEach(function (d) {
     growth: '<path d="M3 20h18M5 16l4-5 4 3 6-8"/>',
     book: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    checklist: '<rect x="4" y="4" width="16" height="17" rx="3"/><path d="M9 2.5v3M15 2.5v3M8.5 12.5l2.5 2.5 4.5-4.5"/>',
     suitcase: '<rect x="5" y="7" width="14" height="12" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9 11v4M15 11v4M8 19v1.5M16 19v1.5"/>',
     bed: '<path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="2"/>',
     bottle: '<path d="M10 3h4v3h-4z"/><path d="M8.5 9a2.5 2.5 0 0 1 2-3h3a2.5 2.5 0 0 1 2 3v10a2 2 0 0 1-2 2h-3a2 2 0 0 1-2-2z"/><path d="M8.5 13h3M8.5 16h3"/>',
@@ -2098,6 +2132,7 @@ datesSorted().forEach(function (d) {
           '<span class="mb-tile__label">' + escapeHtml(f.label) + '</span>' +
           '<span class="mb-tile__meta">' + escapeHtml(meta) + '</span></button>';
       }).join('');
+      if (g === 'birth') html = birthTileHtml() + html;
       grid.innerHTML = html;
     });
   }
@@ -3015,6 +3050,226 @@ datesSorted().forEach(function (d) {
     });
   }
 
+  /* ---------- 출산 당일 할 일 ---------- */
+  var BT_SEED = [
+    ['prep', '제대혈 보관 여부 결정', '당일엔 설명이 머리에 잘 안 들어와요. 미리 상의해서 정해 두기.'],
+    ['prep', '카시트 설치 · 세차', '설치 위치, 안전벨트 고정, 신생아 각도까지 미리 숙지. 차 안 청소까지.'],
+    ['prep', '출산가방 최종 확인', '만삭·출산 후엔 산모가 움직이기 힘드니 남편이 챙기기.', 'bag'],
+    ['prep', '배우자 출산휴가 조율', '회사에 예정일 공유하고 신청 방법 확인.'],
+    ['depart', '산모수첩 · 신분증 · 국민행복카드 챙기기', '병원 접수할 때 바로 필요해요.'],
+    ['depart', '출산가방 챙기기', '바로 안 가져가도 어디 있는지는 꼭 알고 있기.', 'bag'],
+    ['depart', '호흡법 같이 확인', '유튜브로 기본 호흡법을 미리 봐 두면 도움돼요.'],
+    ['arrive', '원무과 접수 · 입원 수속', '산모는 진통 중이라 남편이 진행.'],
+    ['arrive', '비급여 항목 신청', '무통주사, 페인버스터, 흉터연고, 유착방지제.'],
+    ['arrive', '수술 전 압박스타킹 신겨 주기', '', '', true],
+    ['after', '아기 사진 · 영상 많이 남기기', '산모는 바로 아기를 못 봐요. 아빠가 최대한 많이.'],
+    ['after', '의료진 설명 메모하기', '아기 상태 · 주의사항. 정신없으면 바로 잊어요.', 'memo'],
+    ['room', '양가 부모님께 연락', ''],
+    ['room', '출산가방 가져오기', '', 'bag'],
+    ['room', '조리원 · 산후도우미 업체 연락', '출장 마사지는 제왕절개면 3주 후부터 권장.'],
+    ['room', '입술 적셔 주기', '금식 중이면 거즈 손수건에 물만 묻혀서. 물 · 음식은 간호사 확인 후.', '', true],
+    ['stay', '출생증명서 발급', '신고 전엔 1장, 이름 정한 뒤 3~4장 더.'],
+    ['stay', '출생신고 + 출산 지원 한 번에 신청', '출생 후 1개월 안. 주민센터에 가면 주민번호가 당일 나와요. 준비물은 센터에 먼저 전화로 확인.', 'supports'],
+    ['stay', '건강보험 피부양자 등록', '가족관계증명서 필요. 건강보험 앱 · 홈페이지 · 지사.'],
+    ['stay', '보험사 태아 등재 · 자동차보험 자녀할인', '할인율은 보험사마다 달라요.'],
+    ['stay', '1차 영유아검진 · BCG 예약', '검진은 생후 14~35일, BCG는 4주 안. 1차 검진을 안 하는 병원도 있어요.'],
+    ['discharge', '집 정리 · 아기용품 설치', '아기침대, 기저귀갈이대, 홈캠, 젖병 소독.'],
+    ['discharge', '분유물 · 옷 · 손수건 준비', '옷 · 손수건은 미리 세탁. 분유 타는 법도 익혀 두기.'],
+    ['discharge', '조리원 연말정산 서류 받기', '출산 1회 200만원 한도 공제. 퇴소 전에 영수증 · 증빙.'],
+    ['discharge', '천천히 안전운전', '신생아 첫 탑승. 급정거 · 급출발 없이.']
+  ];
+  function seedBirthTasksOnce() {
+    if (ui.birthSeeded) return;
+    ui.birthSeeded = true; saveUiPrefs();
+    if (state.birthTasks.length) return;
+    var added = BT_SEED.map(function (d) { return { id: uid(), stage: d[0], text: d[1], note: d[2] || '', done: false, link: d[3] || '', csec: d[4] === true }; });
+    state.birthTasks = added;
+    commit(); act('birth', '출산 당일 할 일 기본 항목 ' + added.length + '개 채움');
+  }
+  function findBirthTask(id) { for (var i = 0; i < state.birthTasks.length; i++) if (state.birthTasks[i].id === id) return state.birthTasks[i]; return null; }
+  function btVisible(t) { return !(ui.birthHideCsec && t.csec); }
+  function btStats() {
+    var per = {}, done = 0, total = 0, current = null;
+    BT_STAGES.forEach(function (s) { per[s.key] = { done: 0, total: 0, items: [] }; });
+    state.birthTasks.forEach(function (t) {
+      if (!btVisible(t) || !per[t.stage]) return;
+      per[t.stage].items.push(t); per[t.stage].total++; total++;
+      if (t.done) { per[t.stage].done++; done++; }
+    });
+    for (var i = 0; i < BT_STAGES.length; i++) { var p = per[BT_STAGES[i].key]; if (p.done < p.total) { current = BT_STAGES[i].key; break; } }
+    return { per: per, done: done, total: total, current: current };
+  }
+  function btStageLabel(key) { for (var i = 0; i < BT_STAGES.length; i++) if (BT_STAGES[i].key === key) return BT_STAGES[i].label; return ''; }
+  function bagCategory() {
+    var cats = state.categories.filter(function (c) { return /병원|캐리어|출산\s*가방/.test(c.name); });
+    return cats[0] || null;
+  }
+  function dueBadgeText(d) { return d > 0 ? 'D-' + d : d === 0 ? 'D-day' : 'D+' + (-d); }
+  function birthTileHtml() {
+    var s = btStats();
+    var meta = s.total ? s.done + '/' + s.total : '비어 있음';
+    var badge = '', hot = false;
+    if (s.total && s.done === s.total) badge = '<span class="mb-tile__badge is-done" aria-hidden="true">✓</span>';
+    else if (state.dueDate) {
+      var d = daysFromToday(state.dueDate);
+      if (d <= 14 && d >= -7) { hot = true; badge = '<span class="mb-tile__badge">' + dueBadgeText(d) + '</span>'; }
+    }
+    return '<button type="button" class="mb-tile mb-tile--birthday' + (hot ? ' is-hot' : '') + '" data-action="mb-open" data-target="birthday" data-label="출산 당일">' + badge +
+      '<span class="mb-tile__icon">' + svgIcon('checklist', 28) + '</span>' +
+      '<span class="mb-tile__label">출산 당일</span>' +
+      '<span class="mb-tile__meta">' + meta + '</span></button>';
+  }
+  function btLinkHtml(t) {
+    if (t.link === 'bag') {
+      var c = bagCategory(); if (!c) return '';
+      var p = computeProgress(itemsOf(c.id));
+      return '<button type="button" class="bt-link bt-link--sky" data-action="bt-go" data-go="bag">→ ' + escapeHtml(c.name) + (p.total ? ' ' + p.done + '/' + p.total : '') + '</button>';
+    }
+    if (t.link === 'supports') {
+      var m = fixedTileMeta('supports');
+      return '<button type="button" class="bt-link bt-link--sky" data-action="bt-go" data-go="supports">→ 정부 지원' + (m ? ' ' + m : '') + '</button>';
+    }
+    if (t.link === 'memo') return '<button type="button" class="bt-link bt-link--mint" data-action="bt-go" data-go="memo">→ 메모에 바로 적기</button>';
+    return '';
+  }
+  function btFormHtml(key, stage, t) {
+    var isNew = !t;
+    var fk = escapeHtml(key);
+    var h = '<form class="bt-form" data-bt-form="' + fk + '" data-stage="' + stage + '">';
+    h += '<label class="visually-hidden" for="bt-text-' + fk + '">할 일</label>';
+    h += '<input type="text" id="bt-text-' + fk + '" name="text" maxlength="' + BT_TEXT_MAX + '" placeholder="할 일 (예: 산후조리원에 입실 날짜 알리기)" data-focus-key="bt-text:' + fk + '" value="' + escapeHtml(isNew ? '' : t.text) + '" autocomplete="off">';
+    h += '<label class="visually-hidden" for="bt-note-' + fk + '">설명</label>';
+    h += '<input type="text" id="bt-note-' + fk + '" name="note" maxlength="' + BT_NOTE_MAX + '" placeholder="설명 (선택)" data-focus-key="bt-note:' + fk + '" value="' + escapeHtml(isNew ? '' : t.note) + '" autocomplete="off">';
+    h += '<div class="bt-form__row">';
+    if (!isNew) {
+      h += '<label class="visually-hidden" for="bt-stage-' + fk + '">단계</label><select id="bt-stage-' + fk + '" name="stage">' + BT_STAGES.map(function (s, i) { return '<option value="' + s.key + '"' + (s.key === t.stage ? ' selected' : '') + '>' + BT_NUM[i] + ' ' + s.label + '</option>'; }).join('') + '</select>';
+    }
+    h += '<label class="bt-form__check"><input type="checkbox" name="csec"' + (!isNew && t.csec ? ' checked' : '') + '> 제왕절개일 때만</label></div>';
+    h += '<div class="bt-form__actions"><button type="button" class="btn btn--small" data-action="bt-cancel">취소</button><button type="submit" class="btn btn--primary btn--small">' + (isNew ? '추가' : '저장') + '</button></div>';
+    return h + '</form>';
+  }
+  function btItemHtml(t, first, last) {
+    if (ui.birthForm === t.id) return '<li class="bt-item is-editing" data-bt-id="' + escapeHtml(t.id) + '">' + btFormHtml(t.id, t.stage, t) + '</li>';
+    var id = escapeHtml(t.id);
+    var h = '<li class="bt-item' + (t.done ? ' is-done' : '') + '" data-bt-id="' + id + '">';
+    h += '<button type="button" class="bt-toggle" role="checkbox" aria-checked="' + (t.done ? 'true' : 'false') + '" data-action="bt-toggle" data-focus-key="bt-check:' + id + '">' +
+      '<span class="bt-box" aria-hidden="true"></span><span class="bt-item__main"><span class="bt-item__text">' + escapeHtml(t.text) + '</span>' +
+      (t.note && !t.done ? '<span class="bt-item__note">' + escapeHtml(t.note) + '</span>' : '') + '</span></button>';
+    var extra = (t.csec ? '<span class="bt-tag">제왕절개</span>' : '') + (t.done ? '' : btLinkHtml(t));
+    if (extra) h += '<div class="bt-item__extra">' + extra + '</div>';
+    if (ui.birthEdit) {
+      h += '<div class="bt-item__tools">' +
+        '<button type="button" class="bt-tool" data-action="bt-up"' + (first ? ' disabled' : '') + ' aria-label="위로">↑</button>' +
+        '<button type="button" class="bt-tool" data-action="bt-down"' + (last ? ' disabled' : '') + ' aria-label="아래로">↓</button>' +
+        '<button type="button" class="bt-tool" data-action="bt-edit-item" data-focus-key="bt-edit:' + id + '">수정</button>' +
+        '<button type="button" class="bt-tool bt-tool--danger" data-action="bt-del">삭제</button></div>';
+    }
+    return h + '</li>';
+  }
+  function renderBirthday() {
+    var view = $('#view-birthday'); if (!view || ui.view !== 'birthday') return;
+    var s = btStats();
+    var cnt = $('#birthday-count'); if (cnt) cnt.textContent = s.total ? s.total + '개' : '';
+    var eb = $('#bt-edit-btn'); if (eb) { eb.textContent = ui.birthEdit ? '편집 완료' : '편집'; eb.setAttribute('aria-pressed', ui.birthEdit ? 'true' : 'false'); eb.classList.toggle('btn--primary', ui.birthEdit); }
+    // 왼쪽(모바일은 위): 진행 · 단계 목록 · 필터
+    var pct = s.total ? Math.round(s.done / s.total * 100) : 0;
+    var due = state.dueDate ? '예정일 ' + shortDate(state.dueDate).replace(/ \(.\)$/, '') + ' · ' + dueBadgeText(daysFromToday(state.dueDate)) : '<button type="button" class="bt-duelink" data-action="open-settings">예정일 입력하기</button>';
+    var side = '<div class="bt-hero"><div class="bt-hero__row"><b>' + s.done + ' / ' + s.total + ' 완료</b><span>' + due + '</span></div>' +
+      '<div class="bt-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '" aria-label="진행률"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="bt-hero__now">' + (s.total === 0 ? '아래에서 할 일을 추가해 보세요.' : s.current ? '지금 단계 <b>' + BT_NUM[BT_STAGE_KEYS.indexOf(s.current)] + ' ' + btStageLabel(s.current) + '</b> · 남은 ' + (s.per[s.current].total - s.per[s.current].done) + '개' : '<b>모두 마쳤어요!</b> 수고 많으셨어요.') + '</div></div>';
+    side += '<nav class="bt-nav" aria-label="단계로 이동">' + BT_STAGES.map(function (st, i) {
+      var p = s.per[st.key], isDone = p.total && p.done === p.total, isCur = st.key === s.current;
+      return '<button type="button" class="bt-nav__btn' + (isDone ? ' is-done' : '') + (isCur ? ' is-cur' : '') + '" data-action="bt-jump" data-stage="' + st.key + '"><span class="bt-nav__n">' + (isDone ? '✓' : (i + 1)) + '</span>' + st.label + '<small>' + p.done + '/' + p.total + '</small></button>';
+    }).join('') + '</nav>';
+    side += '<div class="bt-chips" role="group" aria-label="보기">' +
+      '<button type="button" class="bt-chip' + (ui.birthFilter === 'all' ? ' is-active' : '') + '" data-action="bt-filter" data-filter="all" aria-pressed="' + (ui.birthFilter === 'all') + '">전체</button>' +
+      '<button type="button" class="bt-chip' + (ui.birthFilter === 'remain' ? ' is-active' : '') + '" data-action="bt-filter" data-filter="remain" aria-pressed="' + (ui.birthFilter === 'remain') + '">남은 것만</button>' +
+      '<button type="button" class="bt-chip' + (ui.birthHideCsec ? ' is-active' : '') + '" data-action="bt-csec" aria-pressed="' + ui.birthHideCsec + '">제왕절개 항목 숨기기</button></div>';
+    $('#bt-side').innerHTML = side;
+    // 단계별 카드
+    var html = '';
+    BT_STAGES.forEach(function (st, i) {
+      var p = s.per[st.key];
+      var isDone = p.total > 0 && p.done === p.total, isCur = st.key === s.current;
+      var items = ui.birthFilter === 'remain' ? p.items.filter(function (t) { return !t.done || ui.birthForm === t.id; }) : p.items;
+      var formHere = ui.birthForm === 'new:' + st.key;
+      if (ui.birthFilter === 'remain' && !items.length && !formHere && !ui.birthEdit) return;
+      var collapsed = isDone && ui.birthFilter === 'all' && !ui.birthEdit && !ui.birthExpand[st.key] && !formHere;
+      html += '<section class="bt-stage' + (isDone ? ' is-done' : '') + (isCur ? ' is-cur' : '') + '" id="bt-stage-' + st.key + '" data-stage="' + st.key + '">';
+      html += '<span class="bt-dot" aria-hidden="true">' + (isDone ? '✓' : (i + 1)) + '</span>';
+      html += '<div class="bt-stage__head"><h3 class="bt-stage__title"><span class="bt-stage__no">' + BT_NUM[i] + ' </span>' + st.label + (isCur ? ' <em class="bt-now">지금</em>' : '') + '</h3>' +
+        '<span class="bt-stage__count">' + (isDone ? p.done + '/' + p.total + ' 완료' : p.done + '/' + p.total) +
+        (isDone && !collapsed && ui.birthFilter === 'all' && !ui.birthEdit ? ' <button type="button" class="bt-fold" data-action="bt-collapse" data-stage="' + st.key + '">접기 ▴</button>' : '') + '</span></div>';
+      if (collapsed) {
+        html += '<button type="button" class="bt-collapsed" data-action="bt-expand" data-stage="' + st.key + '"><span>' + escapeHtml(p.items.map(function (t) { return t.text; }).join(' · ')) + '</span><b>펼치기 ▾</b></button>';
+      } else {
+        html += '<div class="bt-card">';
+        if (items.length) html += '<ul class="bt-list">' + items.map(function (t, k) { return btItemHtml(t, k === 0, k === items.length - 1); }).join('') + '</ul>';
+        html += formHere ? btFormHtml('new', st.key, null) : '<button type="button" class="bt-add" data-action="bt-add" data-stage="' + st.key + '" data-focus-key="bt-add:' + st.key + '">＋ 이 단계에 할 일 추가</button>';
+        html += '</div>';
+      }
+      html += '</section>';
+    });
+    if (!html) html = '<p class="bt-empty">남은 할 일이 없어요. ‘전체’를 누르면 다시 볼 수 있어요.</p>';
+    $('#bt-stages').innerHTML = html;
+  }
+  function btToggle(id) {
+    var t = findBirthTask(id); if (!t) return;
+    t.done = !t.done;
+    commit(); act('birth', (t.done ? '완료: ' : '완료 취소: ') + t.text);
+    var s = btStats();
+    if (t.done && s.total && s.done === s.total) showToast('출산 당일 할 일을 모두 마쳤어요! 수고 많으셨어요.');
+  }
+  function btMove(id, dir) {
+    var t = findBirthTask(id); if (!t) return;
+    var idx = state.birthTasks.indexOf(t), j = idx + dir;
+    while (j >= 0 && j < state.birthTasks.length && state.birthTasks[j].stage !== t.stage) j += dir;
+    if (j < 0 || j >= state.birthTasks.length) return;
+    state.birthTasks[idx] = state.birthTasks[j]; state.birthTasks[j] = t;
+    commit();
+    var b = document.querySelector('[data-bt-id="' + id + '"] [data-action="' + (dir < 0 ? 'bt-up' : 'bt-down') + '"]');
+    if (b && !b.disabled) b.focus(); else { var e = document.querySelector('[data-focus-key="bt-edit:' + id + '"]'); if (e) e.focus(); }
+  }
+  function btDelete(id) {
+    var idx = -1; for (var i = 0; i < state.birthTasks.length; i++) if (state.birthTasks[i].id === id) idx = i;
+    if (idx === -1) return;
+    var t = state.birthTasks[idx];
+    state.birthTasks.splice(idx, 1);
+    if (ui.birthForm === id) ui.birthForm = null;
+    commit(); act('birth', '할 일 삭제: ' + t.text);
+    showToast('‘' + t.text + '’을(를) 삭제했습니다.', function () { state.birthTasks.splice(Math.min(idx, state.birthTasks.length), 0, t); commit(); showToast('삭제를 취소했습니다.'); });
+  }
+  function btSubmit(form) {
+    var text = form.elements.text.value.replace(/\s+/g, ' ').trim().slice(0, BT_TEXT_MAX);
+    if (!text) { showToast('할 일을 입력해 주세요.'); form.elements.text.focus(); return; }
+    var note = form.elements.note.value.trim().slice(0, BT_NOTE_MAX);
+    var csec = form.elements.csec.checked;
+    var key = form.dataset.btForm, stage = form.dataset.stage;
+    if (key === 'new') {
+      var created = { id: uid(), stage: stage, text: text, note: note, done: false, link: '', csec: csec };
+      // 같은 단계의 마지막 항목 뒤에 넣는다
+      var at = -1; for (var i = 0; i < state.birthTasks.length; i++) if (state.birthTasks[i].stage === stage) at = i;
+      if (at === -1) state.birthTasks.push(created); else state.birthTasks.splice(at + 1, 0, created);
+      commit(); act('birth', '할 일 추가: ' + text);
+      // 이어서 하나 더 적을 수 있게 폼을 열어 둔다
+      var nf = document.querySelector('[data-focus-key="bt-text:new"]'); if (nf) nf.focus();
+      return;
+    }
+    var t = findBirthTask(key); if (!t) { ui.birthForm = null; render(); return; }
+    var ns = form.elements.stage ? form.elements.stage.value : t.stage;
+    t.text = text; t.note = note; t.csec = csec;
+    if (ns !== t.stage && BT_STAGE_KEYS.indexOf(ns) !== -1) {
+      // 단계를 바꾸면 새 단계의 맨 뒤로
+      state.birthTasks.splice(state.birthTasks.indexOf(t), 1);
+      t.stage = ns;
+      var last = -1; for (var k = 0; k < state.birthTasks.length; k++) if (state.birthTasks[k].stage === ns) last = k;
+      if (last === -1) state.birthTasks.push(t); else state.birthTasks.splice(last + 1, 0, t);
+    }
+    ui.birthForm = null;
+    commit(); act('birth', '할 일 수정: ' + text);
+    var back = document.querySelector('[data-focus-key="bt-edit:' + key + '"]'); if (back) back.focus();
+  }
+
   function renderHighlightsStrip() {
     var strip = $('#highlights-strip'), body = $('#highlights-strip-body');
     if (!strip) return;
@@ -3541,6 +3796,7 @@ datesSorted().forEach(function (d) {
       memo: state.memo,
       memos: state.memos,
       supports: state.supports,
+      birthTasks: state.birthTasks,
       ledger: state.ledger,
       budget: state.budget
     }, null, pretty ? 2 : 0);
@@ -3643,15 +3899,15 @@ datesSorted().forEach(function (d) {
     if (el.readOnly || el.disabled) return false; // readonly share-link etc. must not block sync
     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'button') return false;
     // Only editable fields inside an item/note/highlights editor should defer a remote update.
-    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
+    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
   }
 
   var migrationsQueued = false;
   function scheduleOneTimeMigrations() {
-    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.supportsSeeded)) return;
+    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.supportsSeeded && ui.birthSeeded)) return;
     migrationsQueued = true;
     // 방 참여 직후에는 구독(attach)이 applyRemote 뒤에 붙으므로 한 틱 뒤에 실행한다.
-    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedSupportsOnce(); }, 0);
+    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedSupportsOnce(); seedBirthTasksOnce(); }, 0);
   }
   function applyRemote(remoteState) {
     var result = normalizeState(remoteState);
@@ -4164,6 +4420,61 @@ datesSorted().forEach(function (d) {
     var trInput = $('#toast-remote');
     if (trInput) trInput.addEventListener('change', function () { ui.toastRemote = trInput.checked; saveUiPrefs(); });
 
+    // 출산 당일 할 일
+    var bdView = $('#view-birthday');
+    if (bdView) {
+      bdView.addEventListener('click', function (e) {
+        if (e.target.closest('#bt-edit-btn')) { ui.birthEdit = !ui.birthEdit; ui.birthForm = null; renderBirthday(); return; }
+        var btn = e.target.closest('button[data-action]'); if (!btn) return;
+        var li = btn.closest('[data-bt-id]'), id = li ? li.dataset.btId : null, st = btn.dataset.stage;
+        switch (btn.dataset.action) {
+          case 'bt-toggle': btToggle(id); break;
+          case 'bt-filter': ui.birthFilter = btn.dataset.filter; saveUiPrefs(); renderBirthday(); break;
+          case 'bt-csec': ui.birthHideCsec = !ui.birthHideCsec; saveUiPrefs(); render(); break;
+          case 'bt-expand': ui.birthExpand[st] = true; renderBirthday(); break;
+          case 'bt-collapse': ui.birthExpand[st] = false; renderBirthday(); break;
+          case 'bt-jump': {
+            ui.birthExpand[st] = true;
+            if (ui.birthFilter === 'remain' && !btStats().per[st].items.some(function (t) { return !t.done; })) ui.birthFilter = 'all';
+            renderBirthday();
+            var sec = document.getElementById('bt-stage-' + st); if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            break;
+          }
+          case 'bt-add': ui.birthForm = 'new:' + st; renderBirthday(); var f = document.querySelector('[data-focus-key="bt-text:new"]'); if (f) f.focus(); break;
+          case 'bt-edit-item': ui.birthForm = id; renderBirthday(); var ef = document.querySelector('[data-focus-key="bt-text:' + id + '"]'); if (ef) ef.focus(); break;
+          case 'bt-cancel': {
+            var wasNew = String(ui.birthForm || '').indexOf('new:') === 0 ? ui.birthForm.slice(4) : null;
+            var prevId = ui.birthForm;
+            ui.birthForm = null; renderBirthday();
+            var bk = document.querySelector(wasNew ? '[data-focus-key="bt-add:' + wasNew + '"]' : '[data-focus-key="bt-edit:' + prevId + '"]'); if (bk) bk.focus();
+            break;
+          }
+          case 'bt-up': btMove(id, -1); break;
+          case 'bt-down': btMove(id, 1); break;
+          case 'bt-del': btDelete(id); break;
+          case 'bt-go': {
+            var go = btn.dataset.go;
+            if (go === 'supports') setView('supports');
+            else if (go === 'bag') { var c = bagCategory(); if (c) { ui.activeCategory = c.id; delete ui.collapsed[c.id]; setView('checklist'); } }
+            else if (go === 'memo') {
+              newMemo();
+              var now = new Date();
+              ui.memoDraft = '의료진 설명 (' + (now.getMonth() + 1) + '/' + now.getDate() + ' ' + timeStampOf(now) + ')\n';
+              renderMemo();
+              var ta = $('#memo-edit-input'); if (ta) { ta.focus(); try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (er) { /* ignore */ } }
+            }
+            break;
+          }
+        }
+      });
+      bdView.addEventListener('submit', function (e) {
+        var form = e.target.closest('form[data-bt-form]'); if (!form) return;
+        e.preventDefault(); btSubmit(form);
+      });
+      bdView.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && e.target.closest('.bt-form')) { e.preventDefault(); var c = e.target.closest('.bt-form').querySelector('[data-action="bt-cancel"]'); if (c) c.click(); }
+      });
+    }
     // 정부 지원
     var supView = $('#view-supports');
     if (supView) {
@@ -4697,7 +5008,7 @@ datesSorted().forEach(function (d) {
     }
     var storedRoom = null;
     try { storedRoom = window.localStorage.getItem('birth-bag-checklist:room'); } catch (e) { /* ignore */ }
-    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); seedSupportsOnce(); }
+    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); seedSupportsOnce(); seedBirthTasksOnce(); }
     try { window.history.replaceState({ view: ui.view }, ''); } catch (e) { /* ignore */ }
     window.addEventListener('popstate', function (e) {
       if (sheetPopSilently) { sheetPopSilently = false; return; }

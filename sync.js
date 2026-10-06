@@ -138,6 +138,8 @@
     (s.memos || []).forEach(function (m, i) { doc.memos[m.id] = { text: m.text || '', updated: m.updated || 0, who: m.who || '', fav: !!m.fav, likes: (m.likes && m.likes.length) ? m.likes.slice() : null, comments: (m.comments && m.comments.length) ? m.comments.map(function (c) { return { id: c.id, who: c.who || '', text: c.text || '', t: c.t || 0 }; }) : null, tables: (m.tables && m.tables.length) ? m.tables.map(function (t) { return { id: t.id, cols: t.cols.slice(), rowH: t.rowH.slice(), rows: t.rows.map(function (r) { return r.slice(); }) }; }) : null, order: i }; });
     doc.supports = {};
     (s.supports || []).forEach(function (x, i) { doc.supports[x.id] = { title: x.title || '', target: x.target || '', benefit: x.benefit || '', howto: x.howto || '', deadline: x.deadline || '', link: x.link || '', status: x.status || 'todo', memo: x.memo || '', stage: x.stage || 'birth', amount: x.amount || '', amountWon: typeof x.amountWon === 'number' ? x.amountWon : null, where: x.where || '', dueText: x.dueText || '', dueBase: x.dueBase || '', dueDays: typeof x.dueDays === 'number' ? x.dueDays : null, order: i }; });
+    doc.birthTasks = {};
+    (s.birthTasks || []).forEach(function (t, i) { doc.birthTasks[t.id] = { stage: t.stage || 'prep', text: t.text || '', note: t.note || '', done: !!t.done, link: t.link || '', csec: !!t.csec, order: i }; });
     doc.names = {};
     (s.names || []).forEach(function (n, i) { doc.names[n.id] = { name: n.name || '', favorite: !!n.favorite, memo: n.memo || '', hanja: (n.hanja || []).map(function (h) { return { id: h.id || '', chars: h.chars || '', meaning: h.meaning || '' }; }), dateIds: (n.dateIds || []).slice(), likes: (n.likes && n.likes.length) ? n.likes.slice() : null, comments: (n.comments && n.comments.length) ? n.comments.map(function (c) { return { id: c.id, who: c.who || '', text: c.text || '', t: c.t || 0 }; }) : null, order: i }; });
     return doc;
@@ -172,19 +174,20 @@
       memo: typeof doc.memo === 'string' ? doc.memo : '',
       memos: sortedEntries(doc.memos).map(function (m) { return { id: m.id, text: m.text || '', updated: typeof m.updated === 'number' ? m.updated : 0, who: m.who || '', fav: m.fav === true, likes: m.likes || [], comments: m.comments || [], tables: m.tables || [] }; }),
       supports: sortedEntries(doc.supports).map(function (x) { return { id: x.id, title: x.title || '', target: x.target || '', benefit: x.benefit || '', howto: x.howto || '', deadline: x.deadline || '', link: x.link || '', status: x.status || 'todo', memo: x.memo || '', stage: x.stage || 'birth', amount: x.amount || '', amountWon: typeof x.amountWon === 'number' ? x.amountWon : null, where: x.where || '', dueText: x.dueText || '', dueBase: x.dueBase || '', dueDays: typeof x.dueDays === 'number' ? x.dueDays : null }; }),
+      birthTasks: sortedEntries(doc.birthTasks).map(function (t) { return { id: t.id, stage: t.stage || 'prep', text: t.text || '', note: t.note || '', done: t.done === true, link: t.link || '', csec: t.csec === true }; }),
       picks: { gpt: (doc.picks && typeof doc.picks.gpt === 'string') ? doc.picks.gpt : '', claude: (doc.picks && typeof doc.picks.claude === 'string') ? doc.picks.claude : '' }
     };
   }
 
   function isEmptyDoc(doc) {
-    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
+    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
   }
 
   // Multi-path update: only entities that changed, null for removed ones.
   function diff(prev, next) {
     var updates = {};
     prev = prev || { categories: {}, items: {}, notes: {}, highlights: '' };
-    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger'].forEach(function (group) {
+    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'birthTasks'].forEach(function (group) {
       var a = prev[group] || {}, b = next[group] || {};
       Object.keys(b).forEach(function (id) {
         if (!a[id] || JSON.stringify(a[id]) !== JSON.stringify(b[id])) updates[group + '/' + id] = b[id];

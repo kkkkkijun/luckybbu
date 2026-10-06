@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261006i">
+  <link rel="stylesheet" href="./style.css?v=20261006j">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
@@ -236,6 +236,21 @@
     <div class="modal" id="support-modal" hidden></div>
   </section>
 
+  <!-- ===== 출산 당일 할 일 ===== -->
+  <section id="view-birthday" class="view birthday" role="region" aria-labelledby="birthday-title" hidden>
+    <div class="notes__head">
+      <div class="view-back">
+        <button type="button" class="btn btn--small" data-action="go-home" aria-label="홈으로">←</button>
+        <h2 id="birthday-title" class="notes__title">✅ 출산 당일 할 일 <span class="notes__count" id="birthday-count"></span></h2>
+      </div>
+      <button type="button" class="btn btn--small" id="bt-edit-btn" aria-pressed="false">편집</button>
+    </div>
+    <div class="bt-layout">
+      <div class="bt-side" id="bt-side"></div>
+      <div class="bt-stages" id="bt-stages"></div>
+    </div>
+  </section>
+
   <!-- ===== 설정 ===== -->
   <section id="view-settings" class="view settings" role="tabpanel" aria-labelledby="ptab-settings" hidden>
     <h2 class="settings__title" id="settings-title">⚙️ 설정</h2>
@@ -337,9 +352,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261006i"></script>
-  <script src="./app.js?v=20261006i"></script>
-  <script src="./sync.js?v=20261006i"></script>
+  <script src="./firebase-config.js?v=20261006j"></script>
+  <script src="./app.js?v=20261006j"></script>
+  <script src="./sync.js?v=20261006j"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
