@@ -563,7 +563,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -606,6 +606,7 @@
         ui.tagsMigrated = parsed.tagsMigrated === true;
         ui.subsMigrated = parsed.subsMigrated === true;
         ui.supportsSeeded = parsed.supportsSeeded === true;
+        if (parsed.draft && typeof parsed.draft === 'object') ui.pendingDraft = parsed.draft;
         if (parsed.addSub && typeof parsed.addSub === 'object') ui.addSub = parsed.addSub;
         if (parsed.archiveTab === 'fav' || parsed.archiveTab === 'like') ui.archiveTab = parsed.archiveTab;
         if (parsed.recordTab === 'notes' || parsed.recordTab === 'memos') ui.recordTab = parsed.recordTab;
@@ -619,6 +620,33 @@
     } catch (e) { /* UI preferences are optional */ }
   }
 
+  // 작성 중인 메모/일지: 앱을 잠깐 벗어나거나 홈 화면 웹앱이 다시 켜져도 그대로 이어서 쓸 수 있게 남겨 둔다
+  function draftSnapshot() {
+    var d = {};
+    if (ui.memoEdit && ui.memoOpen) d.memo = { open: ui.memoOpen, text: String(ui.memoDraft || '') };
+    if (ui.noteForm && ui.noteDraft && ui.noteDraft.form === ui.noteForm) d.note = { form: ui.noteForm, open: ui.noteOpen || null, date: ui.noteDraft.date || '', title: ui.noteDraft.title || '', body: ui.noteDraft.body || '' };
+    return d;
+  }
+  var draftSaveTimer = null;
+  function persistDraftSoon() { clearTimeout(draftSaveTimer); draftSaveTimer = setTimeout(saveUiPrefs, 400); }
+  function syncNoteDraftFromDom() {
+    var nf = document.querySelector('#view-notes form[data-note-form]');
+    if (nf) ui.noteDraft = { form: nf.dataset.noteForm, date: nf.elements.date.value, title: nf.elements.title.value, body: nf.elements.body.value };
+  }
+  function restoreDrafts() {
+    var d = ui.pendingDraft; ui.pendingDraft = null;
+    if (!d) return false;
+    var restored = false;
+    if (d.memo && d.memo.open && (d.memo.open === 'new' || findMemo(d.memo.open))) {
+      if (d.memo.open === 'new' && !String(d.memo.text || '').trim()) { /* 빈 새 메모는 복원하지 않음 */ }
+      else { ui.view = 'memos'; ui.recordTab = 'memos'; ui.memoOpen = d.memo.open; ui.memoEdit = true; ui.memoDraft = String(d.memo.text || ''); restored = true; }
+    } else if (d.note && d.note.form && (d.note.form === 'new' || findNote(d.note.form))) {
+      if (d.note.form === 'new' && !String(d.note.title || '').trim() && !String(d.note.body || '').trim()) { /* 빈 새 일지는 복원하지 않음 */ }
+      else { ui.view = 'notes'; ui.recordTab = 'notes'; ui.noteForm = d.note.form; ui.noteOpen = d.note.form !== 'new' ? d.note.form : null; ui.noteDraft = { form: d.note.form, date: d.note.date || '', title: d.note.title || '', body: d.note.body || '' }; restored = true; }
+    }
+    if (restored) { try { window.sessionStorage.setItem(SESSION_VIEW_KEY, ui.view); } catch (e) { /* ignore */ } }
+    return restored;
+  }
   function saveUiPrefs() {
     try {
       var keep = {};
@@ -636,6 +664,7 @@
         tagsMigrated: ui.tagsMigrated,
         subsMigrated: ui.subsMigrated,
         supportsSeeded: ui.supportsSeeded,
+        draft: draftSnapshot(),
         recordTab: ui.recordTab,
         archiveTab: ui.archiveTab,
         addSub: ui.addSub,
@@ -1342,11 +1371,12 @@
     var id = isNew ? 'new' : escapeHtml(note.id);
     var html = '<form class="note-form" data-note-form="' + id + '">';
     html += '<div class="field-row"><div class="field"><label for="note-date-' + id + '">진료 날짜</label>';
-    html += '<input type="date" id="note-date-' + id + '" name="date" data-focus-key="note-date:' + id + '" value="' + escapeHtml(isNew ? todayStamp() : note.date) + '"></div>';
+    var dr = ui.noteDraft && ui.noteDraft.form === id ? ui.noteDraft : null;
+    html += '<input type="date" id="note-date-' + id + '" name="date" data-focus-key="note-date:' + id + '" value="' + escapeHtml(dr ? dr.date : (isNew ? todayStamp() : note.date)) + '"></div>';
     html += '<div class="field"><label for="note-title-' + id + '">제목 (선택)</label>';
-    html += '<input type="text" id="note-title-' + id + '" name="title" data-focus-key="note-title:' + id + '" value="' + escapeHtml(isNew ? '' : note.title) + '" maxlength="60" placeholder="예: 32주 정기검진"></div></div>';
+    html += '<input type="text" id="note-title-' + id + '" name="title" data-focus-key="note-title:' + id + '" value="' + escapeHtml(dr ? dr.title : (isNew ? '' : note.title)) + '" maxlength="60" placeholder="예: 32주 정기검진"></div></div>';
     html += '<div class="field"><label for="note-body-' + id + '">내용</label>';
-    html += '<textarea id="note-body-' + id + '" name="body" data-focus-key="note-body:' + id + '" rows="6" maxlength="' + NOTE_MAX + '" placeholder="선생님 말씀, 검사 결과, 다음 진료 일정 등을 한 줄씩 적어 두세요.">' + escapeHtml(isNew ? '' : note.body) + '</textarea></div>';
+    html += '<textarea id="note-body-' + id + '" name="body" data-focus-key="note-body:' + id + '" rows="6" maxlength="' + NOTE_MAX + '" placeholder="선생님 말씀, 검사 결과, 다음 진료 일정 등을 한 줄씩 적어 두세요.">' + escapeHtml(dr ? dr.body : (isNew ? '' : note.body)) + '</textarea></div>';
     html += '<p class="field-error" data-error hidden></p>';
     html += '<div class="note-form__actions"><button type="submit" class="btn btn--primary">' + (isNew ? '메모 저장' : '수정 저장') + '</button>';
     html += '<button type="button" class="btn" data-action="cancel-note">취소</button></div>';
@@ -1533,7 +1563,7 @@
     var key = form.dataset.noteForm;
     if (key === 'new') {
       state.notes.push({ id: uid(), date: v.date, title: v.title, body: v.body, fav: false, likes: [], comments: [] });
-      ui.noteForm = null;
+      ui.noteForm = null; ui.noteDraft = null; saveUiPrefs();
       commit();
       act('note', '일지 ‘' + (v.title || formatNoteDate(v.date)) + '’ 작성');
       showToast('일지를 저장했습니다.');
@@ -1544,7 +1574,7 @@
       for (var i = 0; i < state.notes.length; i++) if (state.notes[i].id === key) note = state.notes[i];
       if (!note) { ui.noteForm = null; render(); return; }
       note.date = v.date; note.title = v.title; note.body = v.body;
-      ui.noteForm = null;
+      ui.noteForm = null; ui.noteDraft = null; saveUiPrefs();
       commit();
       act('note', '일지 ‘' + (v.title || formatNoteDate(v.date)) + '’ 수정');
       showToast('일지를 수정했습니다.');
@@ -2616,24 +2646,32 @@ datesSorted().forEach(function (d) {
     var ta = $('#memo-edit-input'); if (ta) ta.focus();
   }
   // 편집 중인 내용을 저장한다. 바뀐 게 없으면 아무 일도 하지 않는다. (quiet: 안내 없이)
-  function saveMemoEdit(quiet) {
+  // keep: 내용은 저장하되 편집 화면은 그대로 둔다(앱 전환·화면 끔 등 자동 저장용)
+  function saveMemoEdit(quiet, keep) {
     if (!ui.memoOpen || !ui.memoEdit) return false;
     var v = String(ui.memoDraft).replace(/\r\n?/g, '\n').slice(0, MEMO_MAX);
     if (ui.memoOpen === 'new') {
       if (!v.trim()) return false;
       var m = { id: uid(), text: v, updated: Date.now(), who: myName(), fav: false, likes: [], comments: [], tables: [] };
       state.memos.unshift(m);
-      ui.memoOpen = m.id; ui.memoEdit = false; ui.memoDraft = '';
-      commit(); act('memo', '메모 추가: ' + (memoLines(m)[0] || '').slice(0, 30));
+      ui.memoOpen = m.id;
+      if (keep) { saveState(); saveUiPrefs(); } else { ui.memoEdit = false; ui.memoDraft = ''; commit(); }
+      act('memo', '메모 추가: ' + (memoLines(m)[0] || '').slice(0, 30));
       if (!quiet) showToast('메모를 저장했습니다.');
       return true;
     }
     var cur = findMemo(ui.memoOpen); if (!cur) return false;
+    if (keep) {
+      if (v === cur.text || (!v.trim() && !cur.tables.length)) { saveUiPrefs(); return false; }
+      cur.text = v; cur.updated = Date.now();
+      saveState(); saveUiPrefs(); return true;
+    }
     ui.memoEdit = false;
-    if (v === cur.text || (!v.trim() && !cur.tables.length)) { ui.memoDraft = ''; renderMemo(); return false; }
+    if (v === cur.text || (!v.trim() && !cur.tables.length)) { ui.memoDraft = ''; renderMemo(); saveUiPrefs(); return false; }
     cur.text = v; cur.updated = Date.now(); ui.memoDraft = '';
     commit(); act('memo', '메모 수정: ' + (memoLines(cur)[0] || '').slice(0, 30));
     if (!quiet) showToast('메모를 저장했습니다.');
+    saveUiPrefs();
     return true;
   }
   function closeMemo() {
@@ -2645,6 +2683,7 @@ datesSorted().forEach(function (d) {
     if (ui.memoEdit) saveMemoEdit(true); // 목록으로 나가면 적던 내용은 저장
     var leaving = ui.memoOpen && ui.memoOpen !== 'new' ? findMemo(ui.memoOpen) : null;
     ui.memoOpen = null; ui.memoEdit = false; ui.memoDraft = ''; ui.commentDraft = '';
+    saveUiPrefs();
     if (leaving && !leaving.text.trim() && !memoHasTableContent(leaving) && !leaving.comments.length) {
       state.memos = state.memos.filter(function (x) { return x !== leaving; });
       saveState();
@@ -3983,7 +4022,7 @@ datesSorted().forEach(function (d) {
     var memosView = $('#view-memos');
     if (memosView) {
       memosView.addEventListener('input', function (e) {
-        if (e.target.id === 'memo-edit-input') ui.memoDraft = e.target.value;
+        if (e.target.id === 'memo-edit-input') { ui.memoDraft = e.target.value; persistDraftSoon(); }
         else if (e.target.id === 'memo-comment-input') ui.commentDraft = e.target.value;
       });
       memosView.addEventListener('submit', function (e) {
@@ -4014,7 +4053,7 @@ datesSorted().forEach(function (d) {
           }
           case 'memo-cancel': {
             if (ui.memoOpen === 'new') { ui.memoOpen = null; }
-            ui.memoEdit = false; ui.memoDraft = ''; renderMemo();
+            ui.memoEdit = false; ui.memoDraft = ''; renderMemo(); saveUiPrefs();
             break;
           }
           case 'memo-delete': deleteMemo(id); break;
@@ -4091,10 +4130,11 @@ datesSorted().forEach(function (d) {
       var flushMemoDraft = function () {
         var ae = document.activeElement;
         if (ae && ae.classList && ae.classList.contains('mtable__cell') && ui.memoOpen) { var fi = cellInfo(ae); saveTableCell(ui.memoOpen, fi.tid, fi.r, fi.c, ae.innerText); }
-        if (ui.memoEdit && String(ui.memoDraft).trim()) saveMemoEdit(true);
+        if (ui.memoEdit && String(ui.memoDraft).trim()) saveMemoEdit(true, true); // 저장은 하되 편집 화면은 유지
+        saveUiPrefs();
       };
-      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flushMemoDraft(); });
-      window.addEventListener('pagehide', flushMemoDraft);
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { flushMemoDraft(); syncNoteDraftFromDom(); saveUiPrefs(); } });
+      window.addEventListener('pagehide', function () { flushMemoDraft(); syncNoteDraftFromDom(); saveUiPrefs(); });
     }
     document.addEventListener('click', function (e) {
       var t = e.target.closest('[data-action="open-memos"], [data-action="new-memo-home"], [data-action="open-memo"]');
@@ -4262,7 +4302,7 @@ datesSorted().forEach(function (d) {
 
     var notesRoot = $('#view-notes');
     $('#add-note-btn').addEventListener('click', function () {
-      ui.noteForm = 'new';
+      ui.noteForm = 'new'; ui.noteDraft = null;
       renderNotes();
       var ta = document.querySelector('[data-focus-key="note-body:new"]');
       if (ta) ta.focus();
@@ -4281,6 +4321,12 @@ datesSorted().forEach(function (d) {
       submitNoteForm(form);
     });
     notesRoot.addEventListener('input', function (e) {
+      var nf = e.target.closest('form[data-note-form]');
+      if (nf) {
+        ui.noteDraft = { form: nf.dataset.noteForm, date: nf.elements.date.value, title: nf.elements.title.value, body: nf.elements.body.value };
+        persistDraftSoon();
+        return;
+      }
       if (e.target.dataset.role !== 'note-comment-input') return;
       ui.noteCommentDraft[e.target.closest('[data-note-id]').dataset.noteId] = e.target.value;
     });
@@ -4290,12 +4336,12 @@ datesSorted().forEach(function (d) {
       var li = btn.closest('[data-note-id]');
       switch (btn.dataset.action) {
         case 'cancel-note':
-          ui.noteForm = null;
+          ui.noteForm = null; ui.noteDraft = null; saveUiPrefs();
           renderNotes();
           var back = li ? document.querySelector('[data-focus-key="note-edit:' + li.dataset.noteId + '"]') : $('#add-note-btn');
           if (back) back.focus();
           break;
-        case 'edit-note': ui.noteForm = li.dataset.noteId; renderNotes(); var ta = document.querySelector('[data-focus-key="note-body:' + li.dataset.noteId + '"]'); if (ta) ta.focus(); break;
+        case 'edit-note': ui.noteForm = li.dataset.noteId; ui.noteDraft = null; renderNotes(); var ta = document.querySelector('[data-focus-key="note-body:' + li.dataset.noteId + '"]'); if (ta) ta.focus(); break;
         case 'delete-note': deleteNote(li.dataset.noteId); break;
         case 'note-open': openNote(li.dataset.noteId); break;
         case 'note-back': {
@@ -4636,6 +4682,7 @@ datesSorted().forEach(function (d) {
     try { sessionView = window.sessionStorage.getItem(SESSION_VIEW_KEY); } catch (e) { /* ignore */ }
     ui.view = VIEWS.indexOf(sessionView) !== -1 ? sessionView : 'portal';
     if (ui.view === 'settings') ui.settingsFrom = 'portal';
+    var restoredDraft = restoreDrafts();
     bindEvents();
     if (loaded.fresh && storageOk) {
       saveState({ initial: true });
@@ -4644,6 +4691,10 @@ datesSorted().forEach(function (d) {
       $('#save-status').textContent = '저장된 기록을 불러왔습니다';
     }
     render();
+    if (restoredDraft) {
+      showToast('작성 중이던 글을 이어서 보여 드립니다.');
+      var rf = document.querySelector('#memo-edit-input, #view-notes form[data-note-form] textarea'); if (rf) { rf.focus(); try { rf.setSelectionRange(rf.value.length, rf.value.length); } catch (e) { /* ignore */ } }
+    }
     var storedRoom = null;
     try { storedRoom = window.localStorage.getItem('birth-bag-checklist:room'); } catch (e) { /* ignore */ }
     if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); seedSupportsOnce(); }
