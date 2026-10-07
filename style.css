@@ -1396,3 +1396,9 @@ body:not([data-space="ledger"]) .ledger-fab { display: none; }
 .fair-viewer__hint { margin: 0; padding: 8px 12px; font-size: 0.8rem; color: var(--muted); text-align: center; border-top: 1px solid var(--border); background: #fff; }
 .bottom-nav { transition: opacity 0.15s; }
 body.is-zoomed .bottom-nav { opacity: 0; pointer-events: none; }
+
+/* iOS: 키보드가 닫힌 뒤 화면이 밀려 있으면 하단 고정 요소를 보정, 키보드가 떠 있는 동안엔 탭바 숨김 */
+.bottom-nav, .toast, .ledger-fab { translate: 0 var(--vv-shift, 0px); }
+body.kb-open .bottom-nav { opacity: 0; pointer-events: none; }
+.fair-memo__add { min-height: 36px; padding: 0 12px; border: 1px dashed #E2DCD7; border-radius: 10px; background: #fffdfb; font: inherit; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+.fair-memo__add:hover { color: var(--peach-strong); border-color: #FFB39F; }

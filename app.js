@@ -3369,7 +3369,7 @@ datesSorted().forEach(function (d) {
     });
     return '<svg viewBox="40 270 1930 1165" role="img" aria-label="전시장 배치도와 동선: 금·일 입구로 들어가 왼쪽 끝 A-18부터 오른쪽으로 한 바퀴 돌아 다이치(K-01)를 거쳐 입구로 나옵니다">' + h + '</svg>';
   }
-  var fairZoom = 2;
+  var fairZoom = 2, fairMemoOpen = null;
   function renderFairViewer() {
     var v = $('#fair-viewer'); if (!v || v.hidden) return;
     var canvas = v.querySelector('.fair-viewer__canvas');
@@ -3429,8 +3429,10 @@ datesSorted().forEach(function (d) {
         (s.note && !s.done ? '<span class="fair-note">' + escapeHtml(s.note) + '</span>' : '') + '</span>' +
         '<span class="bt-box" aria-hidden="true"></span></button>' +
         (rel.length ? '<div class="fair-rel"><span class="fair-rel__label">내 준비물</span>' + rel.map(function (it) { return '<span class="fair-chip' + (it.done ? ' is-done' : '') + '">' + (it.done ? '✓ ' : '') + escapeHtml(it.name) + (typeof it.price === 'number' ? ' · ' + formatNumber(it.price) + '원' : '') + '</span>'; }).join('') + '</div>' : '') +
-        '<div class="fair-memo"><label class="visually-hidden" for="fair-memo-' + id + '">' + escapeHtml(s.name) + ' 메모</label>' +
-        '<input type="text" id="fair-memo-' + id + '" data-fair-memo="' + id + '" data-focus-key="fair-memo:' + id + '" maxlength="' + FAIR_MEMO_MAX + '" placeholder="가격·혜택 메모 (가족과 공유)" value="' + escapeHtml(s.memo || '') + '" autocomplete="off"></div>' +
+        (s.memo || fairMemoOpen === s.id ?
+          '<div class="fair-memo"><label class="visually-hidden" for="fair-memo-' + id + '">' + escapeHtml(s.name) + ' 메모</label>' +
+          '<input type="text" id="fair-memo-' + id + '" data-fair-memo="' + id + '" data-focus-key="fair-memo:' + id + '" maxlength="' + FAIR_MEMO_MAX + '" placeholder="가격·혜택 메모 (가족과 공유)" value="' + escapeHtml(s.memo || '') + '" autocomplete="off" enterkeyhint="done"></div>'
+          : '<div class="fair-memo"><button type="button" class="fair-memo__add" data-action="fair-memo-open" data-focus-key="fair-memo-add:' + id + '">＋ 가격·혜택 메모</button></div>') +
         '</li>';
     }).join('');
   }
@@ -4430,16 +4432,35 @@ datesSorted().forEach(function (d) {
       });
       // 화면 키보드가 올라오면 그 높이만큼 시트를 올린다(iOS는 화면 크기가 줄지 않음)
       if (window.visualViewport) {
-        var lastKb = -1, lastZoomed = false;
+        var lastKb = -1, lastZoomed = false, lastShift = -1, lastKbOpen = false;
+        var isEditable = function (el) { return !!el && !el.readOnly && !el.disabled && (el.tagName === 'TEXTAREA' || el.isContentEditable || (el.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|range|file|color)$/.test(el.type))); };
         var setKb = function () {
           var vv = window.visualViewport;
           var zoomed = vv.scale > 1.05;
           if (zoomed !== lastZoomed) { lastZoomed = zoomed; document.body.classList.toggle('is-zoomed', zoomed); }
           var kb = zoomed ? 0 : Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
           if (kb !== lastKb) { lastKb = kb; document.documentElement.style.setProperty('--kb', kb + 'px'); }
+          // 화면 키보드가 떠 있는 동안엔 하단 탭바를 숨긴다(iOS는 탭바를 키보드 위 화면 중간에 띄움)
+          var kbOpen = !zoomed && isEditable(document.activeElement) && window.innerHeight - vv.height > 120;
+          if (kbOpen !== lastKbOpen) { lastKbOpen = kbOpen; document.body.classList.toggle('kb-open', kbOpen); }
+          // 키보드가 닫혔는데 보이는 화면이 아래로 밀려 있으면(iOS 버그) 그만큼 고정 요소를 내린다
+          // 안전장치: 보정은 밀린 양(offsetTop)을 넘지 않고, 화면 높이의 절반을 넘지 않는다 → 값이 이상해도 탭바가 화면 밖으로 사라지지 않음
+          var shift = (zoomed || kbOpen) ? 0 : Math.round(vv.offsetTop + Math.min(vv.height, window.innerHeight) - window.innerHeight);
+          shift = Math.min(shift, Math.round(vv.offsetTop), Math.round(window.innerHeight * 0.5));
+          if (!(shift >= 2)) shift = 0;
+          if (shift !== lastShift) { lastShift = shift; document.documentElement.style.setProperty('--vv-shift', shift + 'px'); }
         };
         window.visualViewport.addEventListener('resize', setKb);
         window.visualViewport.addEventListener('scroll', setKb);
+        var kbRaf = 0;
+        window.addEventListener('scroll', function () { if (!kbRaf) kbRaf = requestAnimationFrame(function () { kbRaf = 0; setKb(); }); }, { passive: true });
+        document.addEventListener('focusin', function () { setTimeout(setKb, 0); });
+        document.addEventListener('focusout', function () {
+          setTimeout(setKb, 0);
+          // 키보드가 내려간 뒤 한 번 더 확인하고, 밀려 있으면 제자리 스크롤로 iOS에 위치를 다시 계산하게 한다
+          setTimeout(function () { setKb(); if (lastShift > 0) { window.scrollTo(window.scrollX, window.scrollY); setKb(); } }, 450);
+        });
+        setKb();
       }
     }
 
@@ -4594,6 +4615,12 @@ datesSorted().forEach(function (d) {
     if (faView) {
       faView.addEventListener('click', function (e) {
         if (e.target.closest('[data-action="fair-viewer-open"]')) { openFairViewer(); return; }
+        var mo = e.target.closest('[data-action="fair-memo-open"]');
+        if (mo) {
+          fairMemoOpen = mo.closest('[data-fair-id]').dataset.fairId; renderFair();
+          var mi = document.querySelector('[data-fair-memo="' + fairMemoOpen + '"]'); if (mi) mi.focus();
+          return;
+        }
         if (e.target.closest('[data-action="fair-viewer-close"]')) { closeFairViewer(); return; }
         var zb = e.target.closest('[data-zoom]');
         if (zb) {
