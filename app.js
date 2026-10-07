@@ -2142,7 +2142,19 @@ datesSorted().forEach(function (d) {
       var p = computeProgress(state.items.filter(function (it) { return ids[it.categoryId]; }));
       var sum = $('#mb-' + g + '-sum');
       if (sum) sum.textContent = p.total ? '준비물 ' + p.done + '/' + p.total : '';
+      // 출산 그룹의 분류들은 타일 하나 '출산 준비물'로 묶는다 (안에서는 분류 탭이 그대로 보인다)
+      var bundle = g === 'birth' && cats.length > 0;
+      if (bundle) {
+        var last = cats.filter(function (c) { return c.id === ui.activeCategory; })[0] || cats[0];
+        cats = [{ id: last.id, name: '출산 준비물', icon: '', bundle: true, count: cats.length }];
+      }
       var html = cats.map(function (cat) {
+        if (cat.bundle) {
+          return '<button type="button" class="mb-tile mb-tile--bundle" data-action="go-category" data-category-id="' + escapeHtml(cat.id) + '" aria-label="출산 준비물, 분류 ' + cat.count + '개, ' + p.done + '/' + p.total + ' 완료">' +
+            '<span class="mb-tile__icon mb-tile__icon--solid">' + svgIcon('suitcase', 28) + '</span>' +
+            '<span class="mb-tile__label">출산 준비물</span>' +
+            '<span class="mb-tile__meta">' + (p.total ? p.done + '/' + p.total : '비어 있음') + '</span></button>';
+        }
         var cp = computeProgress(itemsOf(cat.id));
         return '<button type="button" class="mb-tile" data-action="go-category" data-category-id="' + escapeHtml(cat.id) + '">' +
           '<span class="mb-tile__icon mb-tile__icon--solid">' + svgIcon(categoryIcon(cat), 28) + '</span>' +
