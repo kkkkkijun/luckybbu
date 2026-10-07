@@ -863,6 +863,7 @@
     if (view !== 'notes' && view !== 'memos') ui.detailFrom = null;
     if (ui.view === 'supports' && ui.supportModal) { ui.supportModal = null; document.body.classList.remove('has-modal'); }
     if (ui.view === 'birthday') { ui.birthEdit = false; ui.birthForm = null; }
+    if (ui.view === 'fair') closeFairViewer();
     ui.view = view;
     if (view === 'notes' || view === 'memos') ui.recordTab = view;
     if (view === 'picks' || view === 'names') ui.planTab = view;
@@ -3368,6 +3369,39 @@ datesSorted().forEach(function (d) {
     });
     return '<svg viewBox="40 270 1930 1165" role="img" aria-label="전시장 배치도와 동선: 금·일 입구로 들어가 왼쪽 끝 A-18부터 오른쪽으로 한 바퀴 돌아 다이치(K-01)를 거쳐 입구로 나옵니다">' + h + '</svg>';
   }
+  var fairZoom = 2;
+  function renderFairViewer() {
+    var v = $('#fair-viewer'); if (!v || v.hidden) return;
+    var canvas = v.querySelector('.fair-viewer__canvas');
+    // 1: 화면 너비에 맞춤 · 2: 화면 높이를 꽉 채움 · 3: 그보다 1.6배
+    var sc = v.querySelector('.fair-viewer__scroll');
+    var fitH = Math.round((sc.clientHeight - 24) * 1930 / 1165 + 24);
+    canvas.style.width = fairZoom === 1 ? '100%' : Math.max(sc.clientWidth, Math.round(fitH * (fairZoom === 3 ? 1.6 : 1))) + 'px';
+    canvas.innerHTML = fairMapSvg();
+    Array.prototype.forEach.call(v.querySelectorAll('[data-zoom]'), function (b) { var on = Number(b.dataset.zoom) === fairZoom; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  }
+  // 다음에 갈 곳(없으면 지도 가운데)이 화면 가운데 오도록
+  function centerFairViewer() {
+    var v = $('#fair-viewer'); if (!v) return;
+    var sc = v.querySelector('.fair-viewer__scroll'), canvas = v.querySelector('.fair-viewer__canvas');
+    var next = state.fairStops.filter(function (s) { return !s.done; })[0];
+    var p = next && FAIR_POS[next.code] ? FAIR_POS[next.code] : [1000, 820];
+    var fx = (p[0] - 40) / 1930, fy = (p[1] - 270) / 1165;
+    sc.scrollLeft = Math.max(0, fx * canvas.offsetWidth - sc.clientWidth / 2);
+    sc.scrollTop = Math.max(0, fy * canvas.offsetHeight - sc.clientHeight / 2);
+  }
+  function openFairViewer() {
+    var v = $('#fair-viewer'); if (!v) return;
+    v.hidden = false; document.body.classList.add('has-sheet');
+    renderFairViewer();
+    requestAnimationFrame(centerFairViewer);
+    var c = v.querySelector('[data-action="fair-viewer-close"]'); if (c) c.focus();
+  }
+  function closeFairViewer() {
+    var v = $('#fair-viewer'); if (!v || v.hidden) return;
+    v.hidden = true; document.body.classList.remove('has-sheet');
+    var o = document.querySelector('[data-action="fair-viewer-open"]'); if (o) o.focus();
+  }
   function renderFair() {
     var view = $('#view-fair'); if (!view || ui.view !== 'fair') return;
     var stops = state.fairStops;
@@ -3381,9 +3415,10 @@ datesSorted().forEach(function (d) {
       '<p>' + shortDate(FAIR.visit) + ' 방문 · <b>' + FAIR.gate + '</b>로 입장 · 한 바퀴에 ' + total + '곳</p>' +
       '<div class="bt-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '" aria-label="들른 곳"><i style="width:' + pct + '%"></i></div>' +
       '<p class="fair-hero__now">' + (total === 0 ? '' : next === null ? '<b>모두 들렀어요!</b> 수고 많으셨어요.' : '들른 곳 ' + done + '/' + total + ' · 다음 <b>' + (next + 1) + '번 ' + escapeHtml(stops[next].name) + '</b>') + '</p></div>';
-    side += '<div class="fair-map">' + fairMapSvg() + '<div class="fair-legend"><span><i style="background:#FF8A70"></i>들를 곳</span><span><i style="background:#1F7A57"></i>들른 곳</span><span><i style="background:#3E7BD6"></i>입구·출구</span></div></div>';
+    side += '<div class="fair-map"><button type="button" class="fair-map__open" data-action="fair-viewer-open" aria-label="배치도 크게 보기">' + fairMapSvg() + '<span class="fair-map__hint">🔍 눌러서 크게 보기</span></button><div class="fair-legend"><span><i style="background:#FF8A70"></i>들를 곳</span><span><i style="background:#1F7A57"></i>들른 곳</span><span><i style="background:#3E7BD6"></i>입구·출구</span></div></div>';
     side += '<div class="fair-tips"><b>동선 원칙</b><br>· 입장하면 아래쪽 통로로 왼쪽 끝까지 먼저 가요.<br>· 위쪽 통로를 따라 오른쪽으로 한 번에 지나가요. 되돌아가지 않아요.<br>· 오른쪽 끝에서 내려와 다이치를 마지막에 들르고, 바로 옆 입구로 나와요.</div>';
     $('#fair-side').innerHTML = side;
+    renderFairViewer();
     $('#fair-list').innerHTML = stops.map(function (s, i) {
       var rel = fairRelatedItems(s);
       var id = escapeHtml(s.id);
@@ -4395,10 +4430,13 @@ datesSorted().forEach(function (d) {
       });
       // 화면 키보드가 올라오면 그 높이만큼 시트를 올린다(iOS는 화면 크기가 줄지 않음)
       if (window.visualViewport) {
+        var lastKb = -1, lastZoomed = false;
         var setKb = function () {
           var vv = window.visualViewport;
-          var kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-          document.documentElement.style.setProperty('--kb', kb + 'px');
+          var zoomed = vv.scale > 1.05;
+          if (zoomed !== lastZoomed) { lastZoomed = zoomed; document.body.classList.toggle('is-zoomed', zoomed); }
+          var kb = zoomed ? 0 : Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+          if (kb !== lastKb) { lastKb = kb; document.documentElement.style.setProperty('--kb', kb + 'px'); }
         };
         window.visualViewport.addEventListener('resize', setKb);
         window.visualViewport.addEventListener('scroll', setKb);
@@ -4555,6 +4593,16 @@ datesSorted().forEach(function (d) {
     var faView = $('#view-fair');
     if (faView) {
       faView.addEventListener('click', function (e) {
+        if (e.target.closest('[data-action="fair-viewer-open"]')) { openFairViewer(); return; }
+        if (e.target.closest('[data-action="fair-viewer-close"]')) { closeFairViewer(); return; }
+        var zb = e.target.closest('[data-zoom]');
+        if (zb) {
+          var sc = $('#fair-viewer .fair-viewer__scroll');
+          var cx = (sc.scrollLeft + sc.clientWidth / 2) / sc.scrollWidth, cy = (sc.scrollTop + sc.clientHeight / 2) / sc.scrollHeight;
+          fairZoom = Number(zb.dataset.zoom) || 2; renderFairViewer();
+          sc.scrollLeft = cx * sc.scrollWidth - sc.clientWidth / 2; sc.scrollTop = cy * sc.scrollHeight - sc.clientHeight / 2;
+          return;
+        }
         var btn = e.target.closest('button[data-action="fair-toggle"]'); if (!btn) return;
         var s = findFairStop(btn.closest('[data-fair-id]').dataset.fairId); if (!s) return;
         s.done = !s.done;
@@ -4569,6 +4617,7 @@ datesSorted().forEach(function (d) {
       };
       faView.addEventListener('change', function (e) { if (e.target.dataset.fairMemo) saveFairMemo(e.target); });
       faView.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.dataset.fairMemo) { e.preventDefault(); e.target.blur(); } });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#fair-viewer').hidden) { e.preventDefault(); closeFairViewer(); } });
     }
     // 출산 당일 할 일
     var bdView = $('#view-birthday');

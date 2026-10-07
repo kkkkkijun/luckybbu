@@ -1378,3 +1378,21 @@ body:not([data-space="ledger"]) .ledger-fab { display: none; }
   .fair-layout { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
   .fair-side { position: sticky; top: 80px; }
 }
+
+/* 베이비페어: 지도 크게 보기 · 확대 중 탭바 숨김 */
+.fair-map__open { display: block; position: relative; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 10px; }
+.fair-map__hint { position: absolute; right: 8px; top: 8px; font-size: 0.74rem; font-weight: 700; color: var(--sky-ink); background: rgba(255,255,255,0.92); border: 1px solid var(--sky-fill); border-radius: 999px; padding: 3px 9px; }
+.fair-viewer { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; background: var(--bg); padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
+.fair-viewer[hidden] { display: none !important; }
+.fair-viewer__bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); background: #fff; }
+.fair-viewer__bar b { font-size: 1rem; }
+.fair-viewer__zoom { display: flex; gap: 4px; padding: 3px; background: #f1e9e2; border-radius: 10px; margin-left: auto; }
+.fair-viewer__zoom button { padding: 0 10px; white-space: nowrap; min-width: 44px; min-height: 36px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 0.84rem; font-weight: 700; color: var(--muted); cursor: pointer; }
+.fair-viewer__zoom button.is-active { background: #fff; color: var(--sky-ink); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.fair-viewer__close { width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 12px; background: #fff; font-size: 1.1rem; cursor: pointer; }
+.fair-viewer__scroll { flex: 1 1 auto; overflow: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-x pan-y; }
+.fair-viewer__canvas { min-width: 100%; padding: 12px; }
+.fair-viewer__canvas svg { display: block; width: 100%; height: auto; }
+.fair-viewer__hint { margin: 0; padding: 8px 12px; font-size: 0.8rem; color: var(--muted); text-align: center; border-top: 1px solid var(--border); background: #fff; }
+.bottom-nav { transition: opacity 0.15s; }
+body.is-zoomed .bottom-nav { opacity: 0; pointer-events: none; }
