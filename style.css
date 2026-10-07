@@ -1332,3 +1332,49 @@ body:not([data-space="ledger"]) .ledger-fab { display: none; }
   .bt-stage__no { display: inline; }
 }
 @media (max-width: 480px) { #view-birthday .notes__head { flex-wrap: nowrap; } #view-birthday .notes__head > #bt-edit-btn { width: auto; flex: 0 0 auto; } }
+
+/* ===== 베이비페어 동선 ===== */
+.mb-tile__badge.is-sky { background: #3E7BD6; }
+.mb-tile--fair .mb-tile__icon { background: linear-gradient(135deg, #C9E0FF, #E2D8FF); color: var(--sky-ink); }
+.mb-tile--fair.is-hot .mb-tile__icon { box-shadow: 0 0 0 3px #fff, 0 0 0 5px #8DB6F0; }
+.fair-layout { display: grid; gap: 12px; }
+.fair-hero { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+.fair-hero__row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fair-hero__row b { font-size: 1rem; }
+.fair-dday { flex: none; font-size: 0.78rem; font-weight: 800; color: #fff; background: #3E7BD6; border-radius: 999px; padding: 3px 9px; }
+.fair-hero p { margin: 6px 0 0; font-size: 0.84rem; color: var(--muted); }
+.fair-hero p b { color: var(--sky-ink); }
+.fair-hero .fair-hero__now b { color: var(--peach-ink); }
+.fair-map { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 8px; margin-top: 12px; }
+.fair-map svg { display: block; width: 100%; height: auto; }
+.fair-pin circle { fill: #FF8A70; }
+.fair-pin.is-done circle { fill: var(--mint-ink); }
+.fair-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.76rem; color: var(--muted); padding: 6px 4px 2px; }
+.fair-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+.fair-tips { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; margin-top: 12px; font-size: 0.82rem; line-height: 1.65; color: #5a5560; }
+.fair-tips b { color: var(--text); }
+.fair-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; align-content: start; }
+.fair-stop { background: #fff; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.fair-stop.is-next { border-color: #FFB39F; box-shadow: 0 0 0 2px #FFE1D8; }
+.fair-stop__main { display: flex; gap: 10px; align-items: flex-start; width: 100%; padding: 12px 12px 8px; border: 0; background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.fair-num { width: 28px; height: 28px; flex: none; border-radius: 50%; background: #FF8A70; color: #fff; font-weight: 800; font-size: 0.85rem; display: grid; place-items: center; }
+.fair-stop.is-done .fair-num { background: var(--mint-ink); }
+.fair-stop.is-done .bt-box { background: var(--mint-ink); border-color: var(--mint-ink); }
+.fair-stop.is-done .bt-box::after { content: ""; width: 6px; height: 11px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg) translate(-1px, -1px); }
+.fair-stop__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.fair-stop__head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fair-code { font-size: 0.72rem; font-weight: 800; color: var(--sky-ink); background: var(--sky-soft); border-radius: 5px; padding: 2px 6px; }
+.fair-name { font-size: 0.98rem; font-weight: 700; }
+.fair-stop.is-done .fair-name { color: #A9A4AE; text-decoration: line-through; font-weight: 500; }
+.fair-note { font-size: 0.83rem; color: var(--muted); line-height: 1.45; }
+.fair-rel { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; padding: 0 12px 8px 50px; }
+.fair-rel__label { font-size: 0.72rem; font-weight: 700; color: var(--muted); margin-right: 2px; }
+.fair-chip { font-size: 0.76rem; border-radius: 6px; padding: 3px 7px; background: var(--peach-soft); color: var(--peach-ink); font-weight: 600; }
+.fair-chip.is-done { background: var(--mint-soft); color: var(--mint-ink); }
+.fair-memo { padding: 0 12px 12px 50px; }
+.fair-memo input { width: 100%; min-height: 40px; padding: 0 10px; border: 1px dashed #E2DCD7; border-radius: 10px; background: #fffdfb; font: inherit; font-size: 16px; color: var(--text); }
+.fair-memo input:focus { border-style: solid; border-color: #FFB39F; background: #fff; outline: none; }
+@media (min-width: 960px) {
+  .fair-layout { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .fair-side { position: sticky; top: 80px; }
+}

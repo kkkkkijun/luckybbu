@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261006j">
+  <link rel="stylesheet" href="./style.css?v=20261007a">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
@@ -236,6 +236,20 @@
     <div class="modal" id="support-modal" hidden></div>
   </section>
 
+  <!-- ===== 베이비페어 동선 ===== -->
+  <section id="view-fair" class="view fair" role="region" aria-labelledby="fair-title" hidden>
+    <div class="notes__head">
+      <div class="view-back">
+        <button type="button" class="btn btn--small" data-action="go-home" aria-label="홈으로">←</button>
+        <h2 id="fair-title" class="notes__title">🗺️ 베이비페어 동선 <span class="notes__count" id="fair-count"></span></h2>
+      </div>
+    </div>
+    <div class="fair-layout">
+      <div class="fair-side" id="fair-side"></div>
+      <ol class="fair-list" id="fair-list"></ol>
+    </div>
+  </section>
+
   <!-- ===== 출산 당일 할 일 ===== -->
   <section id="view-birthday" class="view birthday" role="region" aria-labelledby="birthday-title" hidden>
     <div class="notes__head">
@@ -352,9 +366,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261006j"></script>
-  <script src="./app.js?v=20261006j"></script>
-  <script src="./sync.js?v=20261006j"></script>
+  <script src="./firebase-config.js?v=20261007a"></script>
+  <script src="./app.js?v=20261007a"></script>
+  <script src="./sync.js?v=20261007a"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
