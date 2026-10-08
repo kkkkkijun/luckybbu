@@ -1526,3 +1526,21 @@ body.kb-open .bottom-nav { opacity: 0; pointer-events: none; }
 .vx-pick .vx-had { color: var(--mint-ink); }
 .vx-field { display: grid; gap: 4px; font-size: 0.8rem; color: var(--muted); }
 .vx-field input { min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: #fffdfb; font: inherit; font-size: 16px; color: var(--text); }
+
+/* 예방접종: 백신 설명 */
+.vx-name { display: inline-flex; align-items: center; gap: 3px; min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 0.8rem; font-weight: 600; color: var(--text); cursor: pointer; text-decoration: underline dotted #c9c1ba; text-underline-offset: 3px; }
+.vx-name i { font-style: normal; font-size: 0.68rem; color: var(--sky-ink); }
+.vx-info { display: grid; gap: 8px; margin-top: 6px; }
+.vx-info__what { margin: 0; font-size: 0.95rem; line-height: 1.6; }
+.vx-info__how { margin: 0; display: inline-block; justify-self: start; font-size: 0.8rem; font-weight: 700; color: var(--sky-ink); background: var(--sky-soft); border-radius: 8px; padding: 4px 10px; }
+.vx-info__h { margin: 6px 0 0; font-size: 0.8rem; font-weight: 800; color: var(--muted); }
+.vx-info__doses { list-style: none; margin: 0; padding: 0 12px; border: 1px solid var(--border); border-radius: 12px; }
+.vx-info__doses li { display: flex; align-items: center; gap: 10px; min-height: 42px; font-size: 0.88rem; }
+.vx-info__doses li + li { border-top: 1px solid var(--border); }
+.vx-info__doses b { min-width: 74px; font-weight: 700; }
+.vx-info__doses span { flex: 1 1 auto; color: var(--muted); font-size: 0.8rem; }
+.vx-info__doses em { font-style: normal; font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.vx-info__doses li.is-done em { color: var(--mint-ink); font-weight: 700; }
+.vx-info__notes { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.86rem; line-height: 1.55; color: #4a4650; }
+.vx-info__src { margin: 4px 0 0; font-size: 0.74rem; color: var(--muted); line-height: 1.5; }
+.vx-info__src a { color: var(--sky-ink); }

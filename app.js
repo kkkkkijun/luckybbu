@@ -306,6 +306,19 @@
   var BL_KIND_KEYS = Object.keys(BL_KINDS);
   /* ---------- 예방접종 일정 (질병관리청 국가예방접종 표준 일정, 만 6세까지) ---------- */
   var VX_NAMES = { hepb: ['B형간염', ''], bcg: ['BCG', '결핵 · 생후 4주 안'], dtap: ['DTaP', '디프테리아·파상풍·백일해'], ipv: ['폴리오', '소아마비'], hib: ['Hib', 'b형 헤모필루스'], pcv: ['폐렴구균', ''], rota: ['로타', '먹는 백신'], mmr: ['MMR', '홍역·볼거리·풍진'], vari: ['수두', ''], hepa: ['A형간염', ''], je: ['일본뇌염', ''] };
+  var VX_INFO = {
+    hepb: { full: 'B형간염', what: 'B형간염 바이러스가 일으키는 간염을 막아요. 엄마에게서 아기에게 옮을 수 있어서 태어나자마자 첫 접종을 해요.', how: '주사 · 3회', notes: ['엄마가 B형간염 보유자면 출생 직후 면역글로불린도 함께 맞아요.', '3차까지 맞으면 대부분 평생 면역이 생겨요.'] },
+    bcg: { full: 'BCG (결핵)', what: '아기에게 특히 위험한 결핵(결핵성 뇌수막염, 좁쌀결핵)을 막아요.', how: '주사 · 1회 · 생후 4주 안', notes: ['국가 지원은 피내용(주사 한 번)이 기본이고, 도장처럼 찍는 경피용은 보통 유료예요.', '몇 주 뒤 접종 부위에 작은 고름이나 딱지가 생겼다가 저절로 낫는 건 정상 반응이에요.'] },
+    dtap: { full: 'DTaP (디프테리아·파상풍·백일해)', what: '세 가지 병을 한 번에 막아요. 디프테리아는 목과 심장, 파상풍은 상처로 들어온 균, 백일해는 아기에게 위험한 심한 기침병이에요.', how: '주사 · 5회 (만 11~12세에 Tdap 한 번 더)', notes: ['폴리오·Hib과 합친 혼합백신(4가·5가·6가)으로 맞으면 주사 횟수가 줄어요.', '맞은 자리가 붓거나 하루 이틀 열이 날 수 있어요.'] },
+    ipv: { full: '폴리오 (소아마비)', what: '팔다리 마비를 일으킬 수 있는 폴리오바이러스를 막아요.', how: '주사 · 4회', notes: ['DTaP와 합친 혼합백신으로 맞는 경우가 많아요.'] },
+    hib: { full: 'Hib (b형 헤모필루스 인플루엔자)', what: '이름과 달리 독감과는 상관없어요. 어린아이의 뇌수막염, 폐렴, 후두개염을 일으키는 세균을 막아요.', how: '주사 · 4회', notes: ['5가·6가 혼합백신에 들어 있으면 따로 맞지 않아도 돼요.'] },
+    pcv: { full: '폐렴구균', what: '폐렴구균이 일으키는 폐렴, 중이염, 뇌수막염, 패혈증을 막아요.', how: '주사 · 4회', notes: ['백신 종류(몇 가)는 소아과에서 안내해 줘요. 처음 맞은 종류로 끝까지 맞는 게 좋아요.'] },
+    rota: { full: '로타바이러스', what: '영유아에게 심한 설사와 구토(장염)를 일으키는 로타바이러스를 막아요.', how: '먹는 백신 · 로타릭스 2회 또는 로타텍 3회', notes: ['첫 번째는 생후 15주가 되기 전에 시작하고, 마지막은 생후 8개월 전에 끝내요.', '처음 먹은 제품으로 끝까지 맞아요. 로타텍만 6개월에 3차가 있어요.'] },
+    mmr: { full: 'MMR (홍역·유행성이하선염·풍진)', what: '홍역, 볼거리(유행성이하선염), 풍진 세 가지를 한 번에 막아요.', how: '주사 · 2회 · 생백신', notes: ['수두 백신과 같은 날 맞거나, 4주 이상 간격을 두고 맞아요.', '1~2주 뒤 열이나 가벼운 발진이 생길 수 있어요.'] },
+    vari: { full: '수두', what: '온몸에 물집이 생기는 수두를 막아요.', how: '주사 · 1회 · 생백신', notes: ['맞은 뒤에도 가볍게 걸릴 수 있지만 훨씬 약하게 지나가요.', 'MMR과 같은 날 맞거나 4주 이상 간격을 둬요.'] },
+    hepa: { full: 'A형간염', what: '음식이나 물로 옮는 A형간염을 막아요.', how: '주사 · 2회 (1차 후 6~12개월에 2차)', notes: [] },
+    je: { full: '일본뇌염', what: '모기가 옮기는 일본뇌염 바이러스를 막아요.', how: '주사 · 사백신 5회 또는 생백신 2회', notes: ['두 종류 중 하나를 골라 그 종류로 끝까지 맞아요. 첫 접종은 12~23개월이에요.', '사백신: 1·2차(7~30일 간격) → 2차 12개월 뒤 3차 → 만 6세·12세. 생백신: 1차 → 12개월 뒤 2차.'] }
+  };
   var VX_ROWS = ['hepb', 'bcg', 'dtap', 'ipv', 'hib', 'pcv', 'rota', 'mmr', 'vari', 'hepa', 'je'];
   // [백신, 차수, 시작 개월, 묶음, 시기 설명, 선택(로타텍만)]
   var VX_DOSES = [
@@ -659,7 +672,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, fairSeeded: false, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxPastOpen: false };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, fairSeeded: false, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -3535,7 +3548,7 @@ datesSorted().forEach(function (d) {
     }
     return null;
   }
-  function vxName(d) { var many = VX_DOSES.filter(function (x) { return x.vac === d.vac; }).length > 1; return VX_NAMES[d.vac][0] + (many ? ' ' + d.n + '차' : ''); }
+  function vxName(d) { var many = VX_DOSES.filter(function (x) { return x.vac === d.vac; }).length > 1 || d.vac === 'je'; return VX_NAMES[d.vac][0] + (many ? ' ' + d.n + '차' : ''); }
   function vxCellHtml(vac, col, cur) {
     var ds = VX_DOSES.filter(function (d) { return d.vac === vac && d.col === col; });
     if (!ds.length) return '<td' + (cur ? ' class="is-cur"' : '') + '></td>';
@@ -3567,15 +3580,35 @@ datesSorted().forEach(function (d) {
       '<button type="button" class="btn btn--small" data-action="vx-close">취소</button><button type="submit" class="btn btn--primary btn--small">저장</button></div></form>';
     return h;
   }
+  function vxInfoHtml(vac) {
+    var info = VX_INFO[vac]; if (!info) return '';
+    var ds = VX_DOSES.filter(function (d) { return d.vac === vac; });
+    var h = '<div class="modal__head"><h3 class="modal__title" id="vx-sheet-title">' + escapeHtml(info.full) + '</h3><button type="button" class="modal__close" data-action="vx-close" aria-label="닫기" data-focus-key="vx-close">×</button></div>';
+    h += '<div class="vx-info"><p class="vx-info__what">' + escapeHtml(info.what) + '</p><p class="vx-info__how">' + escapeHtml(info.how) + '</p>';
+    h += '<p class="vx-info__h">언제 맞나요</p><ul class="vx-info__doses">' + ds.map(function (d) {
+      var r = vxRec(d.id), when = state.birthDate && d.g < 48 ? mdText(vxGroupDate(d.g)) + '~' : '';
+      return '<li class="' + (r ? 'is-done' : '') + '"><b>' + escapeHtml(vxName(d)) + '</b><span>' + escapeHtml(d.when) + '</span><em>' + (r ? '✓ ' + mdText(r.date) : escapeHtml(when)) + '</em></li>';
+    }).join('') + '</ul>';
+    if (info.notes.length) h += '<p class="vx-info__h">알아 두면 좋아요</p><ul class="vx-info__notes">' + info.notes.map(function (n) { return '<li>' + escapeHtml(n) + '</li>'; }).join('') + '</ul>';
+    var next = ds.filter(function (d) { return !d.opt && !vxRec(d.id); })[0];
+    h += '<div class="bt-form__actions">' + (next ? '<button type="button" class="btn btn--primary btn--small" data-action="vx-cell" data-ids="' + next.id + '">' + escapeHtml(vxName(next)) + ' 기록하기</button>' : '') + '<button type="button" class="btn btn--small" data-action="vx-close">닫기</button></div>';
+    h += '<p class="vx-info__src">질병관리청 예방접종도우미 내용을 쉽게 줄였어요. 자세한 건 <a href="https://nip.kdca.go.kr" target="_blank" rel="noopener">nip.kdca.go.kr</a> 또는 소아과에서 확인하세요.</p></div>';
+    return h;
+  }
+  function openVxInfo(vac) {
+    ui.vxSheet = null; ui.vxInfo = vac;
+    var m = $('#vx-modal'); m.querySelector('.modal__box').innerHTML = vxInfoHtml(vac); m.hidden = false; document.body.classList.add('has-modal');
+    var c = m.querySelector('[data-focus-key="vx-close"]'); if (c) c.focus();
+  }
   function vxLastPlace() { var best = null; state.vaccines.forEach(function (v) { if (v.place && (!best || v.date > best.date)) best = v; }); return best ? best.place : ''; }
   function openVxSheet(ids) {
-    ui.vxSheet = ids.slice();
+    ui.vxInfo = null; ui.vxSheet = ids.slice();
     var m = $('#vx-modal'); m.querySelector('.modal__box').innerHTML = vxSheetHtml(); m.hidden = false; document.body.classList.add('has-modal');
     var c = m.querySelector('[data-focus-key="vx-close"]'); if (c) c.focus();
   }
   function closeVxSheet(silent) {
     var m = $('#vx-modal'); if (!m || m.hidden) { ui.vxSheet = null; return; }
-    m.hidden = true; ui.vxSheet = null; document.body.classList.remove('has-modal');
+    m.hidden = true; ui.vxSheet = null; ui.vxInfo = null; document.body.classList.remove('has-modal');
   }
   function saveVxSheet(form) {
     var date = form.elements.date.value;
@@ -3611,9 +3644,9 @@ datesSorted().forEach(function (d) {
     }
     // C: 한눈에 표
     var curCol = cur ? (cur.g >= 12 ? (cur.g >= 48 ? null : 12) : cur.g) : null;
-    html += '<div class="vx-sec"><b>한눈에 보기</b><span class="mut">칸을 누르면 기록</span></div>';
+    html += '<div class="vx-sec"><b>한눈에 보기</b><span class="mut">이름은 설명 · 칸은 기록</span></div>';
     html += '<div class="card vx-table-wrap"><table class="vx-table"><thead><tr><th scope="col">백신</th>' + VX_COLS.map(function (c) { return '<th scope="col"' + (c[0] === curCol ? ' class="is-cur"' : '') + '>' + c[1] + (c[0] === curCol ? '<small>개월</small>' : '') + '</th>'; }).join('') + '</tr></thead><tbody>' +
-      VX_ROWS.map(function (v) { return '<tr><th scope="row">' + VX_NAMES[v][0] + '</th>' + VX_COLS.map(function (c) { return vxCellHtml(v, c[0], c[0] === curCol); }).join('') + '</tr>'; }).join('') +
+      VX_ROWS.map(function (v) { return '<tr><th scope="row"><button type="button" class="vx-name" data-action="vx-info" data-vac="' + v + '" aria-label="' + VX_NAMES[v][0] + ' 설명 보기">' + VX_NAMES[v][0] + '<i aria-hidden="true">ⓘ</i></button></th>' + VX_COLS.map(function (c) { return vxCellHtml(v, c[0], c[0] === curCol); }).join('') + '</tr>'; }).join('') +
       '</tbody></table><div class="vx-leg"><span><i class="vx-c is-ok"></i>맞음</span><span><i class="vx-c is-now"></i>이번 차례</span><span><i class="vx-c is-plan"></i>예정</span></div></div>';
     // A: 월령별 목록
     if (cur) {
@@ -3640,7 +3673,7 @@ datesSorted().forEach(function (d) {
     }
     html += '<p class="gr-foot">질병관리청 국가예방접종 표준 일정으로 자동 계산했어요. 실제 접종 시기와 백신 종류는 소아과와 상의하세요.</p>';
     $('#vaccine-body').innerHTML = html;
-    var m = $('#vx-modal'); if (m && !m.hidden && ui.vxSheet && !isTyping()) m.querySelector('.modal__box').innerHTML = vxSheetHtml();
+    var m = $('#vx-modal'); if (m && !m.hidden && !isTyping()) { if (ui.vxSheet) m.querySelector('.modal__box').innerHTML = vxSheetHtml(); else if (ui.vxInfo) m.querySelector('.modal__box').innerHTML = vxInfoHtml(ui.vxInfo); }
   }
 
   /* ---------- 성장 기록 ---------- */
@@ -5059,6 +5092,7 @@ datesSorted().forEach(function (d) {
         var b = e.target.closest('button[data-action]'); if (!b) return;
         switch (b.dataset.action) {
           case 'vx-cell': openVxSheet(b.dataset.ids.split(',')); break;
+          case 'vx-info': openVxInfo(b.dataset.vac); break;
           case 'vx-group': openVxSheet(vxDosesIn(Number(b.dataset.g), true).filter(function (d) { return !vxRec(d.id); }).map(function (d) { return d.id; })); break;
           case 'vx-close': closeVxSheet(); break;
           case 'vx-past': ui.vxPastOpen = !ui.vxPastOpen; renderVaccine(); break;
@@ -5081,7 +5115,7 @@ datesSorted().forEach(function (d) {
         }
       });
       vxView.addEventListener('submit', function (e) { var f = e.target.closest('form[data-vx-form]'); if (!f) return; e.preventDefault(); saveVxSheet(f); });
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ui.vxSheet) { e.preventDefault(); closeVxSheet(); } });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && (ui.vxSheet || ui.vxInfo)) { e.preventDefault(); closeVxSheet(); } });
     }
     // 성장 기록
     var grView = $('#view-growth');
