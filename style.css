@@ -1476,3 +1476,53 @@ body.kb-open .bottom-nav { opacity: 0; pointer-events: none; }
 .bl-copy-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .bl-note { margin: 16px 0 0; font-size: 0.84rem; color: var(--muted); line-height: 1.6; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
 @media (max-width: 480px) { #view-growth .notes__head { flex-wrap: nowrap; } #view-growth .notes__head > #gr-add-btn { width: auto; flex: 0 0 auto; } }
+
+/* ===== 예방접종 ===== */
+.vx-hero { background: linear-gradient(135deg, #FFE3D8, #FFF0EB); border-radius: 16px; padding: 14px 16px; display: grid; gap: 6px; }
+.vx-hero__row { display: flex; justify-content: space-between; align-items: center; }
+.vx-hero__big { font-size: 1.2rem; font-weight: 800; }
+.vx-hero__chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.vx-hero__btn { margin-top: 4px; min-height: 46px; border: 0; border-radius: 12px; background: #fff; font: inherit; font-size: 0.95rem; font-weight: 800; color: var(--peach-ink); cursor: pointer; }
+.vx-dd { font-size: 0.76rem; font-weight: 800; color: #fff; background: #E2603F; border-radius: 999px; padding: 3px 9px; }
+.vx-dd.is-now { background: var(--mint-ink); }
+.vx-sec { display: flex; justify-content: space-between; align-items: baseline; margin: 6px 2px -4px; }
+.vx-sec b { font-size: 0.86rem; }
+.vx-table-wrap { padding: 10px 10px 8px !important; overflow-x: auto; }
+.vx-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.8rem; }
+.vx-table th { font-weight: 700; color: var(--muted); font-size: 0.7rem; padding: 0 0 6px; text-align: center; }
+.vx-table th small { font-size: 0.62rem; margin-left: 1px; }
+.vx-table tbody th { text-align: left; color: var(--text); font-size: 0.8rem; font-weight: 600; white-space: nowrap; padding: 0 4px 0 0; border-top: 1px solid var(--border); }
+.vx-table td { height: 34px; text-align: center; border-top: 1px solid var(--border); }
+.vx-table .is-cur { background: #FFF6F2; } .vx-table thead .is-cur { color: #E2603F; background: none; }
+.vx-c { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 0; padding: 0; font: inherit; font-size: 0.7rem; font-weight: 800; cursor: pointer; background: none; }
+.vx-c.is-ok { background: var(--mint-ink); color: #fff; }
+.vx-c.is-now { background: #FF8A70; color: #fff; box-shadow: 0 0 0 3px #FFE1D8; }
+.vx-c.is-plan { border: 2px solid #E2DCD7; width: 20px; height: 20px; }
+.vx-c.is-opt { border: 2px dashed #E2DCD7; width: 18px; height: 18px; }
+.vx-leg { display: flex; gap: 12px; justify-content: center; margin-top: 8px; font-size: 0.72rem; color: var(--muted); }
+.vx-leg span { display: inline-flex; align-items: center; gap: 4px; }
+.vx-leg .vx-c { width: 10px; height: 10px; box-shadow: none; cursor: default; }
+.vx-leg .vx-c.is-plan { width: 6px; height: 6px; }
+.vx-list { list-style: none; padding: 0 !important; overflow: hidden; }
+.vx-li { display: flex; align-items: center; gap: 4px; padding-left: 12px; }
+.vx-li + .vx-li { border-top: 1px solid var(--border); }
+.vx-ck { width: 26px; height: 26px; flex: none; border: 2px solid #D9D2CC; border-radius: 8px; background: #fff; cursor: pointer; position: relative; }
+.vx-li.is-done .vx-ck { background: var(--mint-ink); border-color: var(--mint-ink); }
+.vx-li.is-done .vx-ck::after { content: ""; position: absolute; left: 7px; top: 2px; width: 6px; height: 11px; border: solid #fff; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+.vx-li__main { flex: 1 1 auto; min-width: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 48px; padding: 6px 12px 6px 8px; border: 0; background: none; font: inherit; font-size: 0.92rem; color: var(--text); text-align: left; cursor: pointer; }
+.vx-li__main small { font-size: 0.74rem; color: var(--muted); text-align: right; }
+.vx-li.is-done .vx-li__main > span { color: #A9A4AE; text-decoration: line-through; }
+.vx-up { display: flex; justify-content: space-between; gap: 8px; width: 100%; padding: 10px 12px 10px 0; font-size: 0.86rem; }
+.vx-up small { flex: none; color: var(--muted); font-size: 0.76rem; }
+.vx-fold { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 46px; padding: 0 14px; border: 1px solid var(--border); border-radius: 14px; background: #fff; font: inherit; font-size: 0.86rem; color: var(--muted); cursor: pointer; }
+.vx-fold b { color: var(--mint-ink); }
+.vx-form { display: grid; gap: 10px; margin-top: 4px; }
+.vx-sub { margin: 0; font-size: 0.84rem; color: var(--muted); }
+.vx-pick { list-style: none; margin: 0; padding: 0 12px; border: 1px solid var(--border); border-radius: 12px; }
+.vx-pick li + li { border-top: 1px solid var(--border); }
+.vx-pick label { display: flex; align-items: center; gap: 10px; min-height: 46px; font-size: 0.95rem; cursor: pointer; }
+.vx-pick input { width: 22px; height: 22px; accent-color: var(--mint-ink); }
+.vx-pick small { font-size: 0.74rem; color: var(--muted); }
+.vx-pick .vx-had { color: var(--mint-ink); }
+.vx-field { display: grid; gap: 4px; font-size: 0.8rem; color: var(--muted); }
+.vx-field input { min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; background: #fffdfb; font: inherit; font-size: 16px; color: var(--text); }

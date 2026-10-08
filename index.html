@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261008b">
+  <link rel="stylesheet" href="./style.css?v=20261008c">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
@@ -236,6 +236,18 @@
     <div class="modal" id="support-modal" hidden></div>
   </section>
 
+  <!-- ===== 예방접종 ===== -->
+  <section id="view-vaccine" class="view vaccine" role="region" aria-labelledby="vaccine-title" hidden>
+    <div class="notes__head">
+      <div class="view-back">
+        <button type="button" class="btn btn--small" data-action="go-home" aria-label="홈으로">←</button>
+        <h2 id="vaccine-title" class="notes__title">💉 예방접종 <span class="notes__count" id="vx-age"></span></h2>
+      </div>
+    </div>
+    <div id="vaccine-body" class="baby-body"></div>
+    <div class="modal" id="vx-modal" role="dialog" aria-modal="true" aria-labelledby="vx-sheet-title" hidden><div class="modal__box"></div></div>
+  </section>
+
   <!-- ===== 성장 기록 ===== -->
   <section id="view-growth" class="view growth" role="region" aria-labelledby="growth-title" hidden>
     <div class="notes__head">
@@ -404,9 +416,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261008b"></script>
-  <script src="./app.js?v=20261008b"></script>
-  <script src="./sync.js?v=20261008b"></script>
+  <script src="./firebase-config.js?v=20261008c"></script>
+  <script src="./app.js?v=20261008c"></script>
+  <script src="./sync.js?v=20261008c"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {

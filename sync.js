@@ -132,6 +132,8 @@
     doc.birthDate = s.birthDate || '';
     doc.growth = {};
     (s.growth || []).forEach(function (g) { doc.growth[g.id] = { date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; });
+    doc.vaccines = {};
+    (s.vaccines || []).forEach(function (v) { doc.vaccines[v.id] = { date: v.date || '', place: v.place || '', who: v.who || '' }; });
     doc.babyLog = {};
     (s.babyLog || []).forEach(function (e) { doc.babyLog[e.id] = { kind: e.kind, t: e.t, who: e.who || '', detail: e.detail || '' }; });
     doc.anniversary = s.anniversary || '';
@@ -177,6 +179,7 @@
       dueDate: typeof doc.dueDate === 'string' ? doc.dueDate : '',
       birthDate: typeof doc.birthDate === 'string' ? doc.birthDate : '',
       growth: Object.keys(doc.growth || {}).map(function (id) { var g = doc.growth[id] || {}; return { id: id, date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; }),
+      vaccines: Object.keys(doc.vaccines || {}).map(function (id) { var v = doc.vaccines[id] || {}; return { id: id, date: v.date || '', place: v.place || '', who: v.who || '' }; }),
       babyLog: Object.keys(doc.babyLog || {}).map(function (id) { var e = doc.babyLog[id] || {}; return { id: id, kind: e.kind || '', t: typeof e.t === 'number' ? e.t : 0, who: e.who || '', detail: e.detail || '' }; }),
       anniversary: typeof doc.anniversary === 'string' ? doc.anniversary : '',
       budget: typeof doc.budget === 'number' ? doc.budget : 0,
@@ -191,14 +194,14 @@
   }
 
   function isEmptyDoc(doc) {
-    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.fairStops || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
+    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.fairStops || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !Object.keys(doc.vaccines || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
   }
 
   // Multi-path update: only entities that changed, null for removed ones.
   function diff(prev, next) {
     var updates = {};
     prev = prev || { categories: {}, items: {}, notes: {}, highlights: '' };
-    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'birthTasks', 'fairStops', 'growth', 'babyLog'].forEach(function (group) {
+    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'birthTasks', 'fairStops', 'growth', 'babyLog', 'vaccines'].forEach(function (group) {
       var a = prev[group] || {}, b = next[group] || {};
       Object.keys(b).forEach(function (id) {
         if (!a[id] || JSON.stringify(a[id]) !== JSON.stringify(b[id])) updates[group + '/' + id] = b[id];

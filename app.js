@@ -21,7 +21,7 @@
   var SUPPORT_STAGE_LABEL = { now: '지금 · 임신 중', birth: '출산 직후 · 60일 안', monthly: '매달 받는 것', local: '우리 지역 (서울 마포구)' };
   var SUPPORT_DUE_BASE = ['', 'due', 'birth'];
   // 화면: portal(luckybbu 첫 화면) · ledger(가계부) · 나머지는 마미백 공간
-  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'fair', 'growth', 'babylog'];
+  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'fair', 'growth', 'babylog', 'vaccine'];
   // 마미백 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
   var GROUPS = ['birth', 'baby'];
   function defaultGroupFor(name) { var n = String(name || ''); if (/맞이|의류|출산|병원|조리원/.test(n)) return 'birth'; return /육아|이유식|예방접종|성장/i.test(n) ? 'baby' : 'birth'; }
@@ -304,13 +304,31 @@
     memo: { label: '메모', icon: '📝', chip: 'sky', ph: '메모', quick: [] }
   };
   var BL_KIND_KEYS = Object.keys(BL_KINDS);
+  /* ---------- 예방접종 일정 (질병관리청 국가예방접종 표준 일정, 만 6세까지) ---------- */
+  var VX_NAMES = { hepb: ['B형간염', ''], bcg: ['BCG', '결핵 · 생후 4주 안'], dtap: ['DTaP', '디프테리아·파상풍·백일해'], ipv: ['폴리오', '소아마비'], hib: ['Hib', 'b형 헤모필루스'], pcv: ['폐렴구균', ''], rota: ['로타', '먹는 백신'], mmr: ['MMR', '홍역·볼거리·풍진'], vari: ['수두', ''], hepa: ['A형간염', ''], je: ['일본뇌염', ''] };
+  var VX_ROWS = ['hepb', 'bcg', 'dtap', 'ipv', 'hib', 'pcv', 'rota', 'mmr', 'vari', 'hepa', 'je'];
+  // [백신, 차수, 시작 개월, 묶음, 시기 설명, 선택(로타텍만)]
+  var VX_DOSES = [
+    ['hepb', 1, 0, 0, '출생 직후'], ['bcg', 1, 0, 0, '생후 4주 안'],
+    ['hepb', 2, 1, 1, '1개월'],
+    ['dtap', 1, 2, 2, '2개월'], ['ipv', 1, 2, 2, '2개월'], ['hib', 1, 2, 2, '2개월'], ['pcv', 1, 2, 2, '2개월'], ['rota', 1, 2, 2, '2개월'],
+    ['dtap', 2, 4, 4, '4개월'], ['ipv', 2, 4, 4, '4개월'], ['hib', 2, 4, 4, '4개월'], ['pcv', 2, 4, 4, '4개월'], ['rota', 2, 4, 4, '4개월'],
+    ['hepb', 3, 6, 6, '6개월'], ['dtap', 3, 6, 6, '6개월'], ['ipv', 3, 6, 6, '6~18개월'], ['hib', 3, 6, 6, '6개월'], ['pcv', 3, 6, 6, '6개월'], ['rota', 3, 6, 6, '6개월 · 로타텍만', true],
+    ['hib', 4, 12, 12, '12~15개월'], ['pcv', 4, 12, 12, '12~15개월'], ['mmr', 1, 12, 12, '12~15개월'], ['vari', 1, 12, 12, '12~15개월'], ['hepa', 1, 12, 12, '12~23개월'], ['je', 1, 12, 12, '12~23개월 · 백신 종류별로 이후 일정 다름'],
+    ['dtap', 4, 15, 15, '15~18개월'],
+    ['hepa', 2, 18, 18, '1차 후 6~12개월'],
+    ['dtap', 5, 48, 48, '만 4~6세'], ['ipv', 4, 48, 48, '만 4~6세'], ['mmr', 2, 48, 48, '만 4~6세']
+  ].map(function (d) { return { id: d[0] + '-' + d[1], vac: d[0], n: d[1], m: d[2], g: d[3], when: d[4], opt: d[5] === true, col: d[3] >= 12 ? (d[3] >= 48 ? null : 12) : d[3] }; });
+  var VX_DOSE_MAP = {}; VX_DOSES.forEach(function (d) { VX_DOSE_MAP[d.id] = d; });
+  var VX_GROUPS = [[0, '0개월'], [1, '1개월'], [2, '2개월'], [4, '4개월'], [6, '6개월'], [12, '12개월~'], [15, '15~18개월'], [18, '18개월~'], [48, '만 4~6세']];
+  var VX_COLS = [[0, '0'], [1, '1'], [2, '2'], [4, '4'], [6, '6'], [12, '12~']];
   function createDefaultState() {
     var categories = [];
     var items = [];
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], fairStops: [], birthDate: '', growth: [], babyLog: [] };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], fairStops: [], birthDate: '', growth: [], babyLog: [], vaccines: [] };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -536,6 +554,13 @@
       seenBl[e.id] = true;
       babyLog.push({ id: e.id, kind: e.kind, t: Math.round(e.t), who: typeof e.who === 'string' ? e.who.trim().slice(0, 12) : '', detail: typeof e.detail === 'string' ? e.detail.trim().slice(0, 100) : '' });
     });
+    var vaccines = [], seenVx = {};
+    (Array.isArray(raw.vaccines) ? raw.vaccines : []).forEach(function (v) {
+      if (!v || typeof v !== 'object' || typeof v.id !== 'string' || !VX_DOSE_MAP[v.id] || seenVx[v.id]) return;
+      if (typeof v.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v.date)) return;
+      seenVx[v.id] = true;
+      vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
+    });
     // 박람회 동선
     var fairStops = [];
     var seenFs = {};
@@ -552,7 +577,7 @@
           done: t.done === true, memo: typeof t.memo === 'string' ? t.memo.slice(0, FAIR_MEMO_MAX) : '' });
       });
     }
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, fairStops: fairStops, birthDate: birthDate, growth: growth, babyLog: babyLog } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, fairStops: fairStops, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines } };
   }
 
   /* ---------- storage ---------- */
@@ -634,7 +659,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, fairSeeded: false, grForm: null, blEdit: null, logDay: '' };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, fairSeeded: false, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxPastOpen: false };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -894,6 +919,7 @@
     if (ui.view === 'fair') closeFairViewer();
     if (ui.view === 'growth') ui.grForm = null;
     if (ui.view === 'babylog') { ui.blEdit = null; closeBlGuide(); }
+    if (ui.view === 'vaccine') closeVxSheet(true);
     ui.view = view;
     if (view === 'notes' || view === 'memos') ui.recordTab = view;
     if (view === 'picks' || view === 'names') ui.planTab = view;
@@ -954,6 +980,7 @@
     var vfa = $('#view-fair'); if (vfa) vfa.hidden = ui.view !== 'fair';
     var vgr = $('#view-growth'); if (vgr) vgr.hidden = ui.view !== 'growth';
     var vbl = $('#view-babylog'); if (vbl) vbl.hidden = ui.view !== 'babylog';
+    var vvx = $('#view-vaccine'); if (vvx) vvx.hidden = ui.view !== 'vaccine';
     var vmm = $('#view-memos'); if (vmm) vmm.hidden = ui.view !== 'memos';
     var vc = $('#view-checklist'), vn = $('#view-notes'), vp = $('#view-picks'), vm = $('#view-names');
     if (vc) vc.hidden = ui.view !== 'checklist';
@@ -1012,6 +1039,7 @@
     renderFair();
     renderGrowth();
     renderBabyLog();
+    renderVaccine();
     var searchBox = $('#search-wrap');
     if (searchBox) searchBox.hidden = !ui.searchOpen || ui.editMode || ui.view !== 'checklist';
     var st = $('#search-toggle');
@@ -2155,7 +2183,7 @@ datesSorted().forEach(function (d) {
       { label: '정부 지원', icon: 'gov', view: 'supports' }
     ],
     baby: [
-      { label: '예방접종', icon: 'syringe' },
+      { label: '예방접종', icon: 'syringe', view: 'vaccine' },
       { label: '성장 기록', icon: 'growth', view: 'growth' },
       { label: '육아 일지', icon: 'book', view: 'babylog' }
     ]
@@ -2167,6 +2195,7 @@ datesSorted().forEach(function (d) {
     if (view === 'supports') return state.supports.length ? state.supports.filter(function (x) { return x.status === 'applied' || x.status === 'received'; }).length + '/' + state.supports.length : '';
     if (view === 'names') return state.names.length ? '후보 ' + state.names.length : '';
     if (view === 'growth') { var lg = latestGrowth('weight'); return lg ? formatKg(lg.weight) : (state.growth.length ? state.growth.length + '번' : '시작하기'); }
+    if (view === 'vaccine') { var nx = vxCurrent(); if (!nx) return vxDoneCount() ? '모두 완료' : ''; if (!state.birthDate) return vxDoneCount() + '회'; var dd = daysFromToday(vxGroupDate(nx.g)); return dd > 0 ? '다음 D-' + dd : '지금 차례'; }
     if (view === 'babylog') { var lf = lastOf('feed'); return lf ? '수유 ' + agoText(lf.t) : '시작하기'; }
     return '';
   }
@@ -3492,6 +3521,128 @@ datesSorted().forEach(function (d) {
     showToast(v ? '태어난 날을 저장했어요.' : '태어난 날을 지웠어요.');
   }
 
+  /* ---------- 예방접종 ---------- */
+  function vxRec(id) { for (var i = 0; i < state.vaccines.length; i++) if (state.vaccines[i].id === id) return state.vaccines[i]; return null; }
+  function vxDoneCount() { return state.vaccines.filter(function (v) { return VX_DOSE_MAP[v.id] && !VX_DOSE_MAP[v.id].opt; }).length; }
+  function vxGroupDate(g) { return state.birthDate ? addMonthsIso(state.birthDate, g) : ''; }
+  function vxGroupLabel(g) { for (var i = 0; i < VX_GROUPS.length; i++) if (VX_GROUPS[i][0] === g) return VX_GROUPS[i][1]; return ''; }
+  function vxDosesIn(g, includeOpt) { return VX_DOSES.filter(function (d) { return d.g === g && (includeOpt || !d.opt); }); }
+  // 이번 차례 = 아직 다 안 맞은 가장 이른 묶음
+  function vxCurrent() {
+    for (var i = 0; i < VX_GROUPS.length; i++) {
+      var g = VX_GROUPS[i][0], left = vxDosesIn(g).filter(function (d) { return !vxRec(d.id); });
+      if (left.length) return { g: g, label: VX_GROUPS[i][1], left: left };
+    }
+    return null;
+  }
+  function vxName(d) { var many = VX_DOSES.filter(function (x) { return x.vac === d.vac; }).length > 1; return VX_NAMES[d.vac][0] + (many ? ' ' + d.n + '차' : ''); }
+  function vxCellHtml(vac, col, cur) {
+    var ds = VX_DOSES.filter(function (d) { return d.vac === vac && d.col === col; });
+    if (!ds.length) return '<td' + (cur ? ' class="is-cur"' : '') + '></td>';
+    var core = ds.filter(function (d) { return !d.opt; });
+    var allDone = core.length ? core.every(function (d) { return vxRec(d.id); }) : ds.every(function (d) { return vxRec(d.id); });
+    var isNow = cur && core.some(function (d) { return !vxRec(d.id); });
+    var cls = allDone ? 'is-ok' : isNow ? 'is-now' : (core.length ? 'is-plan' : 'is-opt');
+    var label = allDone ? '✓' : isNow ? String(core.filter(function (d) { return !vxRec(d.id); })[0].n) : '';
+    var names = ds.map(vxName).join(', ');
+    return '<td' + (cur ? ' class="is-cur"' : '') + '><button type="button" class="vx-c ' + cls + '" data-action="vx-cell" data-ids="' + ds.map(function (d) { return d.id; }).join(',') + '" aria-label="' + escapeHtml(names + (allDone ? ' 맞음' : isNow ? ' 이번 차례' : ' 예정')) + '">' + label + '</button></td>';
+  }
+  function vxSheetHtml() {
+    var ids = ui.vxSheet || [];
+    var ds = ids.map(function (id) { return VX_DOSE_MAP[id]; }).filter(Boolean);
+    if (!ds.length) return '';
+    var single = ds.length === 1, rec = single ? vxRec(ds[0].id) : null;
+    var title = single ? vxName(ds[0]) : vxGroupLabel(ds[0].g) + ' 접종 기록';
+    var h = '<div class="modal__head"><h3 class="modal__title" id="vx-sheet-title">' + escapeHtml(title) + '</h3><button type="button" class="modal__close" data-action="vx-close" aria-label="닫기" data-focus-key="vx-close">×</button></div>';
+    h += '<form class="vx-form" data-vx-form>';
+    if (single) h += '<p class="vx-sub">' + escapeHtml(ds[0].when) + (VX_NAMES[ds[0].vac][1] ? ' · ' + escapeHtml(VX_NAMES[ds[0].vac][1]) : '') + '</p>';
+    else h += '<p class="vx-sub">맞힌 백신을 고르세요. 다음에 맞힐 것은 체크를 빼면 돼요.</p>';
+    h += '<ul class="vx-pick">' + ds.map(function (d) {
+      var r = vxRec(d.id);
+      return '<li><label><input type="checkbox" name="dose" value="' + d.id + '"' + (single || !d.opt ? ' checked' : '') + '><span>' + escapeHtml(vxName(d)) + (d.opt ? ' <small>로타텍만</small>' : '') + (r ? ' <small class="vx-had">' + mdText(r.date) + ' 맞음</small>' : '') + '</span></label></li>';
+    }).join('') + '</ul>';
+    h += '<label class="vx-field"><span>맞힌 날</span><input type="date" name="date" value="' + escapeHtml(rec ? rec.date : todayStamp()) + '" max="' + todayStamp() + '"></label>';
+    h += '<label class="vx-field"><span>병원 (선택)</span><input type="text" name="place" maxlength="40" placeholder="예: 우리소아과" value="' + escapeHtml(rec ? rec.place : (vxLastPlace() || '')) + '" autocomplete="off"></label>';
+    h += '<div class="bt-form__actions">' + (rec ? '<button type="button" class="btn btn--small bt-tool--danger" data-action="vx-clear" style="margin-right:auto">기록 지우기</button>' : '') +
+      '<button type="button" class="btn btn--small" data-action="vx-close">취소</button><button type="submit" class="btn btn--primary btn--small">저장</button></div></form>';
+    return h;
+  }
+  function vxLastPlace() { var best = null; state.vaccines.forEach(function (v) { if (v.place && (!best || v.date > best.date)) best = v; }); return best ? best.place : ''; }
+  function openVxSheet(ids) {
+    ui.vxSheet = ids.slice();
+    var m = $('#vx-modal'); m.querySelector('.modal__box').innerHTML = vxSheetHtml(); m.hidden = false; document.body.classList.add('has-modal');
+    var c = m.querySelector('[data-focus-key="vx-close"]'); if (c) c.focus();
+  }
+  function closeVxSheet(silent) {
+    var m = $('#vx-modal'); if (!m || m.hidden) { ui.vxSheet = null; return; }
+    m.hidden = true; ui.vxSheet = null; document.body.classList.remove('has-modal');
+  }
+  function saveVxSheet(form) {
+    var date = form.elements.date.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { showToast('맞힌 날을 골라 주세요.'); return; }
+    var place = String(form.elements.place.value || '').trim().slice(0, 40);
+    var picked = Array.prototype.filter.call(form.querySelectorAll('input[name="dose"]'), function (c) { return c.checked; }).map(function (c) { return c.value; });
+    if (!picked.length) { showToast('맞힌 백신을 하나 이상 골라 주세요.'); return; }
+    picked.forEach(function (id) {
+      var r = vxRec(id);
+      if (r) { r.date = date; r.place = place; }
+      else state.vaccines.push({ id: id, date: date, place: place, who: myName() });
+    });
+    closeVxSheet(); commit();
+    act('vaccine', '예방접종 기록: ' + picked.map(function (id) { return vxName(VX_DOSE_MAP[id]); }).join(', '));
+    showToast('💉 ' + picked.length + '개 접종을 기록했어요.');
+  }
+  function renderVaccine() {
+    var view = $('#view-vaccine'); if (!view || ui.view !== 'vaccine') return;
+    var cur = vxCurrent(), html = '';
+    var age = state.birthDate ? ageText(todayStamp()) : '';
+    var ageEl = $('#vx-age'); if (ageEl) ageEl.textContent = age;
+    // A: 다음 접종
+    if (!state.birthDate) html += birthDateCardHtml('vx');
+    if (cur) {
+      var gd = vxGroupDate(cur.g), dd = gd ? daysFromToday(gd) : null;
+      var badge = dd === null ? '' : dd > 0 ? '<span class="vx-dd">D-' + dd + '</span>' : '<span class="vx-dd is-now">지금 차례</span>';
+      html += '<div class="vx-hero"><div class="vx-hero__row"><span class="mut">' + (dd !== null && dd <= 0 ? '이번 접종' : '다음 접종') + '</span>' + badge + '</div>' +
+        '<div class="vx-hero__big">' + (gd ? shortDate(gd) + ' · ' : '') + cur.label + '</div>' +
+        '<div class="vx-hero__chips">' + cur.left.map(function (d) { return '<span class="bchip c-sky">' + escapeHtml(VX_NAMES[d.vac][0]) + '</span>'; }).join('') + '</div>' +
+        '<button type="button" class="vx-hero__btn" data-action="vx-group" data-g="' + cur.g + '">✓ 맞혔어요 기록</button></div>';
+    } else {
+      html += '<div class="vx-hero"><div class="vx-hero__big">만 6세까지 예정된 접종을 모두 맞혔어요 🎉</div><p class="mut">인플루엔자는 매년 가을에 맞혀요.</p></div>';
+    }
+    // C: 한눈에 표
+    var curCol = cur ? (cur.g >= 12 ? (cur.g >= 48 ? null : 12) : cur.g) : null;
+    html += '<div class="vx-sec"><b>한눈에 보기</b><span class="mut">칸을 누르면 기록</span></div>';
+    html += '<div class="card vx-table-wrap"><table class="vx-table"><thead><tr><th scope="col">백신</th>' + VX_COLS.map(function (c) { return '<th scope="col"' + (c[0] === curCol ? ' class="is-cur"' : '') + '>' + c[1] + (c[0] === curCol ? '<small>개월</small>' : '') + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      VX_ROWS.map(function (v) { return '<tr><th scope="row">' + VX_NAMES[v][0] + '</th>' + VX_COLS.map(function (c) { return vxCellHtml(v, c[0], c[0] === curCol); }).join('') + '</tr>'; }).join('') +
+      '</tbody></table><div class="vx-leg"><span><i class="vx-c is-ok"></i>맞음</span><span><i class="vx-c is-now"></i>이번 차례</span><span><i class="vx-c is-plan"></i>예정</span></div></div>';
+    // A: 월령별 목록
+    if (cur) {
+      html += '<div class="vx-sec"><b>' + cur.label + ' · 이번 차례</b>' + (state.birthDate ? '<span class="mut">' + mdText(vxGroupDate(cur.g)) + '부터</span>' : '') + '</div>';
+      html += '<ul class="card vx-list">' + vxDosesIn(cur.g, true).map(function (d) {
+        var r = vxRec(d.id);
+        return '<li class="vx-li' + (r ? ' is-done' : '') + '"><button type="button" class="vx-ck" role="checkbox" aria-checked="' + (r ? 'true' : 'false') + '" data-action="vx-toggle" data-id="' + d.id + '" aria-label="' + escapeHtml(vxName(d)) + ' 오늘 맞힘"></button>' +
+          '<button type="button" class="vx-li__main" data-action="vx-cell" data-ids="' + d.id + '"><span>' + escapeHtml(vxName(d)) + (d.opt ? ' <small>로타텍만</small>' : '') + '</span><small>' + (r ? mdText(r.date) + (r.place ? ' · ' + escapeHtml(r.place) : '') : escapeHtml(VX_NAMES[d.vac][1] || '')) + '</small></button></li>';
+      }).join('') + '</ul>';
+    }
+    var past = VX_GROUPS.filter(function (g) { return (!cur || g[0] < cur.g) && vxDosesIn(g[0]).length; });
+    if (past.length) {
+      var pd = []; past.forEach(function (g) { vxDosesIn(g[0], true).forEach(function (d) { if (vxRec(d.id)) pd.push(d); }); });
+      html += '<div class="vx-sec"><b>지난 접종</b></div>';
+      html += '<button type="button" class="vx-fold" data-action="vx-past" aria-expanded="' + ui.vxPastOpen + '"><span>' + past[0][1] + (past.length > 1 ? '~' + past[past.length - 1][1] : '') + ' · ' + pd.length + '회</span><b>✓ ' + (ui.vxPastOpen ? '▴' : '▾') + '</b></button>';
+      if (ui.vxPastOpen) html += '<ul class="card vx-list">' + pd.map(function (d) { var r = vxRec(d.id); return '<li class="vx-li is-done"><button type="button" class="vx-li__main" data-action="vx-cell" data-ids="' + d.id + '"><span>' + escapeHtml(vxName(d)) + '</span><small>' + mdText(r.date) + (r.place ? ' · ' + escapeHtml(r.place) : '') + '</small></button></li>'; }).join('') + '</ul>';
+    }
+    var upcoming = VX_GROUPS.filter(function (g) { return cur && g[0] > cur.g; });
+    if (upcoming.length) {
+      html += '<div class="vx-sec"><b>다가오는 접종</b></div><ul class="card vx-list">' + upcoming.map(function (g) {
+        var names = vxDosesIn(g[0]).map(function (d) { return VX_NAMES[d.vac][0]; });
+        return '<li class="vx-li"><div class="vx-up"><span><b>' + g[1] + '</b> · ' + escapeHtml(names.join('·')) + '</span>' + (state.birthDate ? '<small>' + mdText(vxGroupDate(g[0])) + '~</small>' : '') + '</div></li>';
+      }).join('') + '<li class="vx-li"><div class="vx-up"><span><b>6개월~</b> · 인플루엔자 (매년, 첫해는 4주 간격 2회)</span><small>가을</small></div></li></ul>';
+    }
+    html += '<p class="gr-foot">질병관리청 국가예방접종 표준 일정으로 자동 계산했어요. 실제 접종 시기와 백신 종류는 소아과와 상의하세요.</p>';
+    $('#vaccine-body').innerHTML = html;
+    var m = $('#vx-modal'); if (m && !m.hidden && ui.vxSheet && !isTyping()) m.querySelector('.modal__box').innerHTML = vxSheetHtml();
+  }
+
   /* ---------- 성장 기록 ---------- */
   function formatKg(v) { return (Math.round(v * 100) / 100).toString() + 'kg'; }
   function fmtNum(v) { return (Math.round(v * 10) / 10).toString(); }
@@ -4247,6 +4398,7 @@ datesSorted().forEach(function (d) {
       birthDate: state.birthDate,
       growth: state.growth,
       babyLog: state.babyLog,
+      vaccines: state.vaccines,
       fairStops: state.fairStops,
       ledger: state.ledger,
       budget: state.budget
@@ -4350,7 +4502,7 @@ datesSorted().forEach(function (d) {
     if (el.readOnly || el.disabled) return false; // readonly share-link etc. must not block sync
     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'button') return false;
     // Only editable fields inside an item/note/highlights editor should defer a remote update.
-    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .fair-memo, .gr-form, .bl-form, .bl-birth, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
+    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .fair-memo, .gr-form, .bl-form, .bl-birth, .vx-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
   }
 
   var migrationsQueued = false;
@@ -4898,6 +5050,39 @@ datesSorted().forEach(function (d) {
       var bf = e.target.closest && e.target.closest('form[data-birth-form]'); if (!bf) return;
       e.preventDefault(); saveBirthDate(bf);
     });
+    // 예방접종
+    var vxView = $('#view-vaccine');
+    if (vxView) {
+      vxView.addEventListener('click', function (e) {
+        var mm = $('#vx-modal');
+        if (e.target === mm) { closeVxSheet(); return; }
+        var b = e.target.closest('button[data-action]'); if (!b) return;
+        switch (b.dataset.action) {
+          case 'vx-cell': openVxSheet(b.dataset.ids.split(',')); break;
+          case 'vx-group': openVxSheet(vxDosesIn(Number(b.dataset.g), true).filter(function (d) { return !vxRec(d.id); }).map(function (d) { return d.id; })); break;
+          case 'vx-close': closeVxSheet(); break;
+          case 'vx-past': ui.vxPastOpen = !ui.vxPastOpen; renderVaccine(); break;
+          case 'vx-toggle': {
+            var id = b.dataset.id, r = vxRec(id);
+            if (r) { openVxSheet([id]); break; }
+            state.vaccines.push({ id: id, date: todayStamp(), place: vxLastPlace(), who: myName() }); commit();
+            act('vaccine', '예방접종 기록: ' + vxName(VX_DOSE_MAP[id]));
+            showToast('💉 ' + vxName(VX_DOSE_MAP[id]) + ' 오늘 맞힘으로 기록 · 날짜는 눌러서 바꿀 수 있어요', function () { state.vaccines = state.vaccines.filter(function (x) { return x.id !== id; }); commit(); showToast('기록을 취소했어요.'); });
+            break;
+          }
+          case 'vx-clear': {
+            var ids = (ui.vxSheet || []).slice();
+            var removed = state.vaccines.filter(function (x) { return ids.indexOf(x.id) !== -1; });
+            state.vaccines = state.vaccines.filter(function (x) { return ids.indexOf(x.id) === -1; });
+            closeVxSheet(); commit();
+            showToast('접종 기록을 지웠어요.', function () { state.vaccines = state.vaccines.concat(removed); commit(); showToast('되돌렸어요.'); });
+            break;
+          }
+        }
+      });
+      vxView.addEventListener('submit', function (e) { var f = e.target.closest('form[data-vx-form]'); if (!f) return; e.preventDefault(); saveVxSheet(f); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ui.vxSheet) { e.preventDefault(); closeVxSheet(); } });
+    }
     // 성장 기록
     var grView = $('#view-growth');
     if (grView) {
