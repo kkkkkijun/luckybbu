@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261008a">
+  <link rel="stylesheet" href="./style.css?v=20261008b">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
@@ -236,6 +236,33 @@
     <div class="modal" id="support-modal" hidden></div>
   </section>
 
+  <!-- ===== 성장 기록 ===== -->
+  <section id="view-growth" class="view growth" role="region" aria-labelledby="growth-title" hidden>
+    <div class="notes__head">
+      <div class="view-back">
+        <button type="button" class="btn btn--small" data-action="go-home" aria-label="홈으로">←</button>
+        <h2 id="growth-title" class="notes__title">📈 성장 기록</h2>
+      </div>
+      <button type="button" class="btn btn--primary btn--small" id="gr-add-btn">+ 기록</button>
+    </div>
+    <div id="growth-body" class="baby-body"></div>
+  </section>
+
+  <!-- ===== 육아 일지 ===== -->
+  <section id="view-babylog" class="view babylog" role="region" aria-labelledby="babylog-title" hidden>
+    <div class="notes__head">
+      <div class="view-back">
+        <button type="button" class="btn btn--small" data-action="go-home" aria-label="홈으로">←</button>
+        <h2 id="babylog-title" class="notes__title">📒 육아 일지</h2>
+      </div>
+    </div>
+    <div id="babylog-body" class="baby-body"></div>
+    <div class="fair-viewer bl-guide" id="bl-guide" role="dialog" aria-modal="true" aria-labelledby="bl-guide-title" hidden>
+      <div class="fair-viewer__bar"><b id="bl-guide-title">📲 앱 안 열고 기록하기 (아이폰)</b><button type="button" class="fair-viewer__close" data-action="bl-guide-close" aria-label="닫기" style="margin-left:auto">✕</button></div>
+      <div class="bl-guide__body"></div>
+    </div>
+  </section>
+
   <!-- ===== 베이비페어 동선 ===== -->
   <section id="view-fair" class="view fair" role="region" aria-labelledby="fair-title" hidden>
     <div class="notes__head">
@@ -377,9 +404,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261008a"></script>
-  <script src="./app.js?v=20261008a"></script>
-  <script src="./sync.js?v=20261008a"></script>
+  <script src="./firebase-config.js?v=20261008b"></script>
+  <script src="./app.js?v=20261008b"></script>
+  <script src="./sync.js?v=20261008b"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {

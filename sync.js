@@ -129,6 +129,11 @@
     doc.dates = {};
     (s.dates || []).forEach(function (d, i) { doc.dates[d.id] = { date: d.date || '', time: d.time || '', label: d.label || '', memo: d.memo || '', fav: !!d.fav, likes: (d.likes && d.likes.length) ? d.likes.slice() : null, comments: (d.comments && d.comments.length) ? d.comments.map(function (c) { return { id: c.id, who: c.who || '', text: c.text || '', t: c.t || 0 }; }) : null, order: i }; });
     doc.dueDate = s.dueDate || '';
+    doc.birthDate = s.birthDate || '';
+    doc.growth = {};
+    (s.growth || []).forEach(function (g) { doc.growth[g.id] = { date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; });
+    doc.babyLog = {};
+    (s.babyLog || []).forEach(function (e) { doc.babyLog[e.id] = { kind: e.kind, t: e.t, who: e.who || '', detail: e.detail || '' }; });
     doc.anniversary = s.anniversary || '';
     doc.budget = typeof s.budget === 'number' ? s.budget : 0;
     doc.ledger = {};
@@ -170,6 +175,9 @@
       names: sortedEntries(doc.names).map(function (n) { return { id: n.id, name: n.name || '', favorite: n.favorite === true, likes: n.likes || [], comments: n.comments || [], memo: n.memo || '', hanja: asArr(n.hanja).map(function (h) { return { id: (h && h.id) || '', chars: (h && h.chars) || '', meaning: (h && h.meaning) || '' }; }), dateIds: asArr(n.dateIds).filter(function (x) { return typeof x === 'string'; }) }; }),
       highlights: typeof doc.highlights === 'string' ? doc.highlights : '',
       dueDate: typeof doc.dueDate === 'string' ? doc.dueDate : '',
+      birthDate: typeof doc.birthDate === 'string' ? doc.birthDate : '',
+      growth: Object.keys(doc.growth || {}).map(function (id) { var g = doc.growth[id] || {}; return { id: id, date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; }),
+      babyLog: Object.keys(doc.babyLog || {}).map(function (id) { var e = doc.babyLog[id] || {}; return { id: id, kind: e.kind || '', t: typeof e.t === 'number' ? e.t : 0, who: e.who || '', detail: e.detail || '' }; }),
       anniversary: typeof doc.anniversary === 'string' ? doc.anniversary : '',
       budget: typeof doc.budget === 'number' ? doc.budget : 0,
       ledger: Object.keys(doc.ledger || {}).map(function (id) { var e = doc.ledger[id] || {}; return { id: id, date: e.date, type: e.type, amount: e.amount, cat: e.cat, text: e.text || '', who: e.who || '', pay: e.pay || '', t: typeof e.t === 'number' ? e.t : 0 }; }),
@@ -183,14 +191,14 @@
   }
 
   function isEmptyDoc(doc) {
-    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.fairStops || {}).length && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
+    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.fairStops || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
   }
 
   // Multi-path update: only entities that changed, null for removed ones.
   function diff(prev, next) {
     var updates = {};
     prev = prev || { categories: {}, items: {}, notes: {}, highlights: '' };
-    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'birthTasks', 'fairStops'].forEach(function (group) {
+    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'birthTasks', 'fairStops', 'growth', 'babyLog'].forEach(function (group) {
       var a = prev[group] || {}, b = next[group] || {};
       Object.keys(b).forEach(function (id) {
         if (!a[id] || JSON.stringify(a[id]) !== JSON.stringify(b[id])) updates[group + '/' + id] = b[id];
@@ -199,6 +207,7 @@
     });
     if ((prev.highlights || '') !== (next.highlights || '')) updates.highlights = next.highlights || '';
     if ((prev.dueDate || '') !== (next.dueDate || '')) updates.dueDate = next.dueDate || '';
+    if ((prev.birthDate || '') !== (next.birthDate || '')) updates.birthDate = next.birthDate || '';
     if ((prev.anniversary || '') !== (next.anniversary || '')) updates.anniversary = next.anniversary || '';
     if ((prev.budget || 0) !== (next.budget || 0)) updates.budget = next.budget || 0;
     if ((prev.memo || '') !== (next.memo || '')) updates.memo = next.memo || '';

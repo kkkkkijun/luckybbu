@@ -21,7 +21,7 @@
   var SUPPORT_STAGE_LABEL = { now: '지금 · 임신 중', birth: '출산 직후 · 60일 안', monthly: '매달 받는 것', local: '우리 지역 (서울 마포구)' };
   var SUPPORT_DUE_BASE = ['', 'due', 'birth'];
   // 화면: portal(luckybbu 첫 화면) · ledger(가계부) · 나머지는 마미백 공간
-  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'fair'];
+  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'fair', 'growth', 'babylog'];
   // 마미백 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
   var GROUPS = ['birth', 'baby'];
   function defaultGroupFor(name) { var n = String(name || ''); if (/맞이|의류|출산|병원|조리원/.test(n)) return 'birth'; return /육아|이유식|예방접종|성장/i.test(n) ? 'baby' : 'birth'; }
@@ -295,13 +295,22 @@
   /* ---------- 베이비페어 동선 (코베 베이비페어 · 킨텍스) ---------- */
   var FAIR = { title: '코베 베이비페어 · 킨텍스(일산)', start: '2026-10-08', end: '2026-10-11', visit: '2026-10-09', gate: '금·일 입구', hideAfter: '2026-10-18' };
   var FAIR_MEMO_MAX = 200;
+  /* ---------- 육아 일지 종류 ---------- */
+  var BL_KINDS = {
+    feed: { label: '수유', icon: '🍼', chip: 'peach', ph: '분유 120ml · 모유 15분', quick: ['분유', '모유', '분유+모유'] },
+    diaper: { label: '기저귀', icon: '💧', chip: 'yel', ph: '소변 · 대변', quick: ['소변', '대변', '소변+대변'] },
+    sleep: { label: '잠', icon: '😴', chip: 'lav', ph: '', quick: [] },
+    wake: { label: '깸', icon: '🌤️', chip: 'lav', ph: '', quick: [] },
+    memo: { label: '메모', icon: '📝', chip: 'sky', ph: '메모', quick: [] }
+  };
+  var BL_KIND_KEYS = Object.keys(BL_KINDS);
   function createDefaultState() {
     var categories = [];
     var items = [];
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], fairStops: [] };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], fairStops: [], birthDate: '', growth: [], babyLog: [] };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -508,6 +517,25 @@
           done: t.done === true, link: BT_LINKS.indexOf(t.link) !== -1 ? t.link : '', csec: t.csec === true });
       });
     }
+    // 아기: 태어난 날 · 성장 기록 · 육아 일지 (올바르지 않은 항목은 건너뛴다)
+    var birthDate = typeof raw.birthDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.birthDate) ? raw.birthDate : '';
+    var numIn = function (v, lo, hi) { return typeof v === 'number' && isFinite(v) && v >= lo && v <= hi ? Math.round(v * 100) / 100 : null; };
+    var growth = [], seenGr = {};
+    (Array.isArray(raw.growth) ? raw.growth : []).forEach(function (g) {
+      if (!g || typeof g !== 'object' || typeof g.id !== 'string' || !g.id || seenGr[g.id]) return;
+      if (typeof g.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(g.date)) return;
+      var w = numIn(g.weight, 0.3, 60), ht = numIn(g.height, 20, 160), hd = numIn(g.head, 15, 70);
+      if (w === null && ht === null && hd === null) return;
+      seenGr[g.id] = true;
+      growth.push({ id: g.id, date: g.date, weight: w, height: ht, head: hd, memo: typeof g.memo === 'string' ? g.memo.trim().slice(0, 100) : '' });
+    });
+    var babyLog = [], seenBl = {};
+    (Array.isArray(raw.babyLog) ? raw.babyLog : []).forEach(function (e) {
+      if (!e || typeof e !== 'object' || typeof e.id !== 'string' || !e.id || seenBl[e.id]) return;
+      if (BL_KIND_KEYS.indexOf(e.kind) === -1 || typeof e.t !== 'number' || !isFinite(e.t) || e.t <= 0) return;
+      seenBl[e.id] = true;
+      babyLog.push({ id: e.id, kind: e.kind, t: Math.round(e.t), who: typeof e.who === 'string' ? e.who.trim().slice(0, 12) : '', detail: typeof e.detail === 'string' ? e.detail.trim().slice(0, 100) : '' });
+    });
     // 박람회 동선
     var fairStops = [];
     var seenFs = {};
@@ -524,7 +552,7 @@
           done: t.done === true, memo: typeof t.memo === 'string' ? t.memo.slice(0, FAIR_MEMO_MAX) : '' });
       });
     }
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, fairStops: fairStops } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, fairStops: fairStops, birthDate: birthDate, growth: growth, babyLog: babyLog } };
   }
 
   /* ---------- storage ---------- */
@@ -606,7 +634,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, fairSeeded: false };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, fairSeeded: false, grForm: null, blEdit: null, logDay: '' };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -864,6 +892,8 @@
     if (ui.view === 'supports' && ui.supportModal) { ui.supportModal = null; document.body.classList.remove('has-modal'); }
     if (ui.view === 'birthday') { ui.birthEdit = false; ui.birthForm = null; }
     if (ui.view === 'fair') closeFairViewer();
+    if (ui.view === 'growth') ui.grForm = null;
+    if (ui.view === 'babylog') { ui.blEdit = null; closeBlGuide(); }
     ui.view = view;
     if (view === 'notes' || view === 'memos') ui.recordTab = view;
     if (view === 'picks' || view === 'names') ui.planTab = view;
@@ -922,6 +952,8 @@
     var vsp = $('#view-supports'); if (vsp) vsp.hidden = ui.view !== 'supports';
     var vbd = $('#view-birthday'); if (vbd) vbd.hidden = ui.view !== 'birthday';
     var vfa = $('#view-fair'); if (vfa) vfa.hidden = ui.view !== 'fair';
+    var vgr = $('#view-growth'); if (vgr) vgr.hidden = ui.view !== 'growth';
+    var vbl = $('#view-babylog'); if (vbl) vbl.hidden = ui.view !== 'babylog';
     var vmm = $('#view-memos'); if (vmm) vmm.hidden = ui.view !== 'memos';
     var vc = $('#view-checklist'), vn = $('#view-notes'), vp = $('#view-picks'), vm = $('#view-names');
     if (vc) vc.hidden = ui.view !== 'checklist';
@@ -978,6 +1010,8 @@
     renderSupports();
     renderBirthday();
     renderFair();
+    renderGrowth();
+    renderBabyLog();
     var searchBox = $('#search-wrap');
     if (searchBox) searchBox.hidden = !ui.searchOpen || ui.editMode || ui.view !== 'checklist';
     var st = $('#search-toggle');
@@ -2122,8 +2156,8 @@ datesSorted().forEach(function (d) {
     ],
     baby: [
       { label: '예방접종', icon: 'syringe' },
-      { label: '성장 기록', icon: 'growth' },
-      { label: '육아 일지', icon: 'book' }
+      { label: '성장 기록', icon: 'growth', view: 'growth' },
+      { label: '육아 일지', icon: 'book', view: 'babylog' }
     ]
   };
   function fixedTileMeta(view) {
@@ -2132,6 +2166,8 @@ datesSorted().forEach(function (d) {
     if (view === 'plan') { var parts = []; if (state.dates.length) parts.push('택일 ' + state.dates.length); if (state.names.length) parts.push('이름 ' + state.names.length); return parts.join(' · '); }
     if (view === 'supports') return state.supports.length ? state.supports.filter(function (x) { return x.status === 'applied' || x.status === 'received'; }).length + '/' + state.supports.length : '';
     if (view === 'names') return state.names.length ? '후보 ' + state.names.length : '';
+    if (view === 'growth') { var lg = latestGrowth('weight'); return lg ? formatKg(lg.weight) : (state.growth.length ? state.growth.length + '번' : '시작하기'); }
+    if (view === 'babylog') { var lf = lastOf('feed'); return lf ? '수유 ' + agoText(lf.t) : '시작하기'; }
     return '';
   }
   function renderHome() {
@@ -3437,6 +3473,250 @@ datesSorted().forEach(function (d) {
     }).join('');
   }
 
+  /* ---------- 아기 공통 ---------- */
+  function isoOf(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+  function addMonthsIso(iso, m) { var d = dateOf(iso), t = new Date(d.getFullYear(), d.getMonth() + m, d.getDate()); if (t.getDate() !== d.getDate()) t = new Date(d.getFullYear(), d.getMonth() + m + 1, 0); return isoOf(t); }
+  // 태어난 날을 1일이 아닌 0일로 센다(생후 N일)
+  function ageDays(iso) { return state.birthDate ? Math.round((dateOf(iso) - dateOf(state.birthDate)) / 86400000) : null; }
+  function ageText(iso) { var n = ageDays(iso); if (n === null || n < 0) return ''; return n === 0 ? '출생' : '생후 ' + n + '일'; }
+  function mdText(iso) { var d = dateOf(iso); return (d.getMonth() + 1) + '/' + d.getDate(); }
+  function birthDateCardHtml(cls) {
+    return '<form class="bl-birth ' + (cls || '') + '" data-birth-form><div><b>축복이가 태어난 날</b><p class="mut">넣으면 생후 일수와 검진 시기를 알려 드려요. 가족과 공유돼요.</p></div>' +
+      '<div class="bl-birth__row"><label class="visually-hidden" for="birth-date-' + (cls || 'x') + '">태어난 날</label><input type="date" id="birth-date-' + (cls || 'x') + '" name="birth" value="' + escapeHtml(state.birthDate || '') + '" max="' + todayStamp() + '"><button type="submit" class="btn btn--primary btn--small">저장</button></div></form>';
+  }
+  function saveBirthDate(form) {
+    var v = form.elements.birth.value;
+    if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+    if (v === (state.birthDate || '')) return;
+    state.birthDate = v; commit(); act('baby', v ? '태어난 날을 ' + formatNoteDate(v) + '로 입력' : '태어난 날 지움');
+    showToast(v ? '태어난 날을 저장했어요.' : '태어난 날을 지웠어요.');
+  }
+
+  /* ---------- 성장 기록 ---------- */
+  function formatKg(v) { return (Math.round(v * 100) / 100).toString() + 'kg'; }
+  function fmtNum(v) { return (Math.round(v * 10) / 10).toString(); }
+  function growthSorted() { return state.growth.slice().sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; }); }
+  function latestGrowth(field) { var s = growthSorted(); for (var i = 0; i < s.length; i++) if (typeof s[i][field] === 'number') return s[i]; return null; }
+  function prevGrowth(field, before) { var s = growthSorted(); for (var i = 0; i < s.length; i++) if (s[i].date < before.date && typeof s[i][field] === 'number') return s[i]; return null; }
+  // 영유아 건강검진 (국민건강보험): 회차·시기. 끝은 대략값이라 '무렵'으로 안내
+  var CHECKUPS = [['1차', 0, 14, 0, 35, '생후 14~35일'], ['2차', 4, 0, 6, 0, '생후 4~6개월'], ['3차', 9, 0, 12, 0, '생후 9~12개월'], ['4차', 18, 0, 24, 0, '생후 18~24개월'],
+    ['5차', 30, 0, 36, 0, '생후 30~36개월'], ['6차', 42, 0, 48, 0, '생후 42~48개월'], ['7차', 54, 0, 60, 0, '생후 54~60개월'], ['8차', 66, 0, 71, 0, '생후 66~71개월']];
+  function checkupAt(c) {
+    var b = state.birthDate;
+    var start = c[1] ? addMonthsIso(b, c[1]) : isoOf(addDays(dateOf(b), c[2]));
+    var end = c[3] ? addMonthsIso(b, c[3]) : isoOf(addDays(dateOf(b), c[4]));
+    return { label: c[0], range: c[5], start: start, end: end };
+  }
+  function nextCheckup() {
+    if (!state.birthDate) return null;
+    var today = todayStamp();
+    for (var i = 0; i < CHECKUPS.length; i++) { var c = checkupAt(CHECKUPS[i]); if (c.end >= today) return c; }
+    return null;
+  }
+  function growthFormHtml(key, g) {
+    var isNew = !g, fk = escapeHtml(key);
+    var num = function (name, label, unit, v, ph) {
+      return '<label class="gr-field"><span>' + label + '</span><span class="gr-field__box"><input type="text" inputmode="decimal" name="' + name + '" data-focus-key="gr-' + name + ':' + fk + '" value="' + (typeof v === 'number' ? fmtNum(v) : '') + '" placeholder="' + ph + '" autocomplete="off"><em>' + unit + '</em></span></label>';
+    };
+    return '<form class="gr-form card" data-gr-form="' + fk + '">' +
+      '<label class="gr-date"><span>잰 날</span><input type="date" name="date" value="' + escapeHtml(isNew ? todayStamp() : g.date) + '" max="' + todayStamp() + '"></label>' +
+      '<div class="gr-fields">' + num('weight', '몸무게', 'kg', isNew ? null : g.weight, '5.4') + num('height', '키', 'cm', isNew ? null : g.height, '58') + num('head', '머리둘레', 'cm', isNew ? null : g.head, '39') + '</div>' +
+      '<input type="text" name="memo" class="gr-memo" maxlength="100" placeholder="메모 (선택) · 예: 소아과에서 잼" value="' + escapeHtml(isNew ? '' : (g.memo || '')) + '" autocomplete="off">' +
+      '<div class="bt-form__actions">' + (isNew ? '' : '<button type="button" class="btn btn--small bt-tool--danger" data-action="gr-del" style="margin-right:auto">삭제</button>') +
+      '<button type="button" class="btn btn--small" data-action="gr-cancel">취소</button><button type="submit" class="btn btn--primary btn--small">저장</button></div></form>';
+  }
+  function renderGrowth() {
+    var view = $('#view-growth'); if (!view || ui.view !== 'growth') return;
+    var html = '';
+    if (ui.grForm === 'new') html += growthFormHtml('new', null);
+    var lw = latestGrowth('weight'), lh = latestGrowth('height'), lc = latestGrowth('head');
+    var latest = growthSorted()[0];
+    if (latest) {
+      html += '<p class="gr-when">' + shortDate(latest.date) + (ageText(latest.date) ? ' · ' + ageText(latest.date) : '') + '</p>';
+      var stat = function (label, g, field, unit) {
+        if (!g) return '<div class="gr-stat"><small>' + label + '</small><b class="is-empty">—</b></div>';
+        var p = prevGrowth(field, g), dv = p ? g[field] - p[field] : null;
+        return '<div class="gr-stat"><small>' + label + '</small><b>' + fmtNum(g[field]) + '<small>' + unit + '</small></b>' +
+          (dv !== null ? '<em class="' + (dv < 0 ? 'is-down' : '') + '">' + (dv >= 0 ? '+' : '') + (field === 'weight' ? (Math.round(dv * 100) / 100) : fmtNum(dv)) + unit + '</em>' : '<em class="is-first">첫 기록</em>') + '</div>';
+      };
+      html += '<div class="gr-stats">' + stat('몸무게', lw, 'weight', 'kg') + stat('키', lh, 'height', 'cm') + stat('머리둘레', lc, 'head', 'cm') + '</div>';
+    } else if (ui.grForm !== 'new') {
+      html += '<div class="card gr-empty"><b>아직 기록이 없어요</b><p class="mut">키·몸무게·머리둘레를 재면 ‘+ 기록’으로 남겨 주세요. 지난번보다 얼마나 컸는지 보여 드려요.</p></div>';
+    }
+    if (!state.birthDate) html += birthDateCardHtml('gr');
+    else {
+      var nc = nextCheckup();
+      if (nc) {
+        var t = todayStamp(), inNow = nc.start <= t;
+        html += '<div class="card gr-checkup"><b>🩺 ' + nc.label + ' 영유아검진</b><p class="mut">' + nc.range + ' · ' + (inNow ? '<strong>지금 받을 시기예요</strong> (' + mdText(nc.end) + ' 무렵까지)' : shortDate(nc.start) + '부터 예약') + '</p></div>';
+      }
+    }
+    var list = growthSorted();
+    if (list.length) {
+      html += '<p class="gr-sec">기록</p><ul class="gr-list card">' + list.map(function (g) {
+        if (ui.grForm === g.id) return '<li class="gr-li is-editing">' + growthFormHtml(g.id, g) + '</li>';
+        var parts = [];
+        if (typeof g.weight === 'number') parts.push(fmtNum(g.weight) + 'kg');
+        if (typeof g.height === 'number') parts.push(fmtNum(g.height) + 'cm');
+        if (typeof g.head === 'number') parts.push('머리 ' + fmtNum(g.head));
+        return '<li class="gr-li"><button type="button" class="gr-row" data-action="gr-edit" data-id="' + escapeHtml(g.id) + '" data-focus-key="gr-row:' + escapeHtml(g.id) + '">' +
+          '<span class="gr-row__when"><b>' + mdText(g.date) + '</b>' + (ageText(g.date) ? '<small>' + ageText(g.date) + '</small>' : '') + '</span>' +
+          '<span class="gr-row__vals">' + parts.join(' · ') + (g.memo ? '<small>' + escapeHtml(g.memo) + '</small>' : '') + '</span></button></li>';
+      }).join('') + '</ul>';
+    }
+    if (state.birthDate) html += '<p class="gr-foot">태어난 날 ' + shortDate(state.birthDate) + ' · <button type="button" class="linkish" data-action="gr-birth-edit">바꾸기</button> · 검진 시기는 국민건강보험 안내 기준(대략)</p>';
+    $('#growth-body').innerHTML = html;
+    var addBtn = $('#gr-add-btn'); if (addBtn) addBtn.hidden = ui.grForm === 'new';
+  }
+  function submitGrowth(form) {
+    var key = form.dataset.grForm;
+    var date = form.elements.date.value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { showToast('잰 날을 골라 주세요.'); return; }
+    var parse = function (name, lo, hi, label) {
+      var raw = String(form.elements[name].value || '').replace(/,/g, '.').replace(/[^\d.]/g, '');
+      if (!raw) return { v: null };
+      var v = parseFloat(raw);
+      if (!isFinite(v) || v < lo || v > hi) return { err: label + ' 값을 확인해 주세요.' };
+      return { v: Math.round(v * 100) / 100 };
+    };
+    var w = parse('weight', 0.3, 60, '몸무게'), ht = parse('height', 20, 160, '키'), hd = parse('head', 15, 70, '머리둘레');
+    var bad = [w, ht, hd].filter(function (x) { return x.err; })[0];
+    if (bad) { showToast(bad.err); return; }
+    if (w.v === null && ht.v === null && hd.v === null) { showToast('몸무게·키·머리둘레 중 하나는 적어 주세요.'); return; }
+    var memo = String(form.elements.memo.value || '').trim().slice(0, 100);
+    if (key === 'new') {
+      state.growth.push({ id: uid(), date: date, weight: w.v, height: ht.v, head: hd.v, memo: memo });
+      act('growth', '성장 기록: ' + date + (w.v !== null ? ' ' + w.v + 'kg' : '') + (ht.v !== null ? ' ' + ht.v + 'cm' : ''));
+    } else {
+      var g = null; for (var i = 0; i < state.growth.length; i++) if (state.growth[i].id === key) g = state.growth[i];
+      if (!g) { ui.grForm = null; render(); return; }
+      g.date = date; g.weight = w.v; g.height = ht.v; g.head = hd.v; g.memo = memo;
+      act('growth', '성장 기록 수정: ' + date);
+    }
+    ui.grForm = null; commit(); showToast('성장 기록을 저장했어요.');
+  }
+
+  /* ---------- 육아 일지 ---------- */
+  function lastOf(kind) { var best = null; state.babyLog.forEach(function (e) { if (e.kind === kind && e.t <= Date.now() + 60000 && (!best || e.t > best.t)) best = e; }); return best; }
+  function agoText(t) {
+    var m = Math.max(0, Math.floor((Date.now() - t) / 60000));
+    if (m < 1) return '방금';
+    if (m < 60) return m + '분 전';
+    var hh = Math.floor(m / 60), mm = m % 60;
+    if (hh < 24) return hh + '시간' + (mm ? ' ' + mm + '분' : '') + ' 전';
+    return Math.floor(hh / 24) + '일 전';
+  }
+  function durText(ms) { var m = Math.max(0, Math.round(ms / 60000)); var hh = Math.floor(m / 60), mm = m % 60; return hh ? hh + '시간' + (mm ? ' ' + mm + '분' : '') : mm + '분'; }
+  // 잠/깸 짝 맞추기: 각 '잠' 다음에 오는 첫 '깸'(다음 '잠'보다 앞)을 끝으로 본다
+  function sleepPairs() {
+    var evs = state.babyLog.filter(function (e) { return e.kind === 'sleep' || e.kind === 'wake'; }).sort(function (a, b) { return a.t - b.t; });
+    var endOf = {}, pairedWake = {}, open = null;
+    evs.forEach(function (e) {
+      if (e.kind === 'sleep') open = e;
+      else if (open) { endOf[open.id] = e; pairedWake[e.id] = true; open = null; }
+    });
+    return { endOf: endOf, pairedWake: pairedWake, sleeping: open };
+  }
+  function dayKey(t) { return isoOf(new Date(t)); }
+  function logDay() { return ui.logDay || todayStamp(); }
+  function blEditFormHtml(e) {
+    var k = BL_KINDS[e.kind] || BL_KINDS.memo, d = new Date(e.t), id = escapeHtml(e.id);
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return '<form class="bl-form" data-bl-form="' + id + '">' +
+      '<div class="bl-form__row"><span class="bchip c-' + k.chip + '">' + k.icon + ' ' + k.label + '</span>' +
+      '<label class="visually-hidden" for="bl-time-' + id + '">시각</label><input type="time" id="bl-time-' + id + '" name="time" value="' + p(d.getHours()) + ':' + p(d.getMinutes()) + '"></div>' +
+      (k.quick.length ? '<div class="bl-quick">' + k.quick.map(function (q) { return '<button type="button" class="bt-chip" data-action="bl-quick" data-val="' + q + '">' + q + '</button>'; }).join('') + '</div>' : '') +
+      (e.kind === 'sleep' || e.kind === 'wake' ? '' : '<label class="visually-hidden" for="bl-detail-' + id + '">내용</label><input type="text" id="bl-detail-' + id + '" name="detail" maxlength="100" placeholder="' + escapeHtml(k.ph) + '" value="' + escapeHtml(e.detail || '') + '" data-focus-key="bl-detail:' + id + '" autocomplete="off" enterkeyhint="done">') +
+      '<div class="bt-form__actions"><button type="button" class="btn btn--small bt-tool--danger" data-action="bl-del" style="margin-right:auto">삭제</button><button type="button" class="btn btn--small" data-action="bl-cancel">닫기</button><button type="submit" class="btn btn--primary btn--small">저장</button></div></form>';
+  }
+  function renderBabyLog() {
+    var view = $('#view-babylog'); if (!view || ui.view !== 'babylog') return;
+    var sp = sleepPairs();
+    var lf = lastOf('feed');
+    var hero = '<div class="bl-hero"><div><p class="mut">마지막 수유</p><b>' + (lf ? agoText(lf.t) : '아직 기록이 없어요') + '</b>' +
+      (sp.sleeping ? '<p class="bl-sleeping">😴 ' + durText(Date.now() - sp.sleeping.t) + '째 자는 중</p>' : '') + '</div>' +
+      (lf ? '<span class="bchip c-peach">' + timeStampOf(new Date(lf.t)) + (lf.detail ? ' · ' + escapeHtml(lf.detail) : '') + '</span>' : '') + '</div>';
+    var btn = function (kind, label, icon, extra) { return '<button type="button" class="bl-btn' + (extra || '') + '" data-action="bl-log" data-kind="' + kind + '"><i aria-hidden="true">' + icon + '</i>' + label + '</button>'; };
+    var buttons = '<div class="bl-btns">' + btn('feed', '수유', '🍼') + btn('diaper', '기저귀', '💧') + (sp.sleeping ? btn('wake', '깼어요', '🌤️', ' is-on') : btn('sleep', '잠', '😴')) + btn('memo', '메모', '📝') + '</div>';
+    var day = logDay(), isToday = day === todayStamp();
+    var nav = '<div class="bl-day"><button type="button" class="bl-day__nav" data-action="bl-day" data-d="-1" aria-label="이전 날">‹</button><b>' + shortDate(day) + (isToday ? ' · 오늘' : '') + (ageText(day) ? ' <small>' + ageText(day) + '</small>' : '') + '</b>' +
+      '<button type="button" class="bl-day__nav" data-action="bl-day" data-d="1" aria-label="다음 날"' + (isToday ? ' disabled' : '') + '>›</button></div>';
+    var items = state.babyLog.filter(function (e) { return dayKey(e.t) === day && !(e.kind === 'wake' && sp.pairedWake[e.id]); }).sort(function (a, b) { return b.t - a.t; });
+    var list = items.length ? '<ul class="bl-list card">' + items.map(function (e) {
+      if (ui.blEdit === e.id) return '<li class="bl-li is-editing">' + blEditFormHtml(e) + '</li>';
+      var k = BL_KINDS[e.kind] || BL_KINDS.memo;
+      var detail = e.detail ? escapeHtml(e.detail) : '';
+      if (e.kind === 'sleep') { var end = sp.endOf[e.id]; detail = end ? '~ ' + timeStampOf(new Date(end.t)) + ' · ' + durText(end.t - e.t) : (sp.sleeping && sp.sleeping.id === e.id ? '자는 중' : ''); }
+      return '<li class="bl-li"><button type="button" class="bl-row" data-action="bl-edit" data-id="' + escapeHtml(e.id) + '" data-focus-key="bl-row:' + escapeHtml(e.id) + '">' +
+        '<span class="bl-row__t">' + timeStampOf(new Date(e.t)) + '</span><span class="bchip c-' + k.chip + '">' + k.label + '</span>' +
+        '<span class="bl-row__d">' + (detail || '<span class="mut">눌러서 내용 추가</span>') + '</span><span class="bl-row__who">' + escapeHtml(e.who || '') + '</span></button></li>';
+    }).join('') + '</ul>' : '<div class="card bl-empty mut">' + (isToday ? '위 버튼을 누르면 지금 시각으로 바로 기록돼요.' : '이날은 기록이 없어요.') + '</div>';
+    var guide = '<button type="button" class="bl-guide-btn" data-action="bl-guide-open"><b>📲 앱 안 열고 기록하기</b><span>아이폰 홈 화면·잠금 화면 위젯 설정</span></button>';
+    $('#babylog-body').innerHTML = hero + buttons + nav + list + guide;
+  }
+  function blLog(kind) {
+    var e = { id: uid(), kind: kind, t: Date.now(), who: myName(), detail: '' };
+    state.babyLog.push(e);
+    var k = BL_KINDS[kind];
+    if (ui.logDay && ui.logDay !== todayStamp()) ui.logDay = '';
+    if (kind === 'memo') ui.blEdit = e.id;
+    commit(); act('babylog', k.label + ' ' + timeStampOf(new Date(e.t)));
+    if (kind === 'memo') { var f = document.querySelector('[data-focus-key="bl-detail:' + e.id + '"]'); if (f) f.focus(); return; }
+    showToast(k.icon + ' ' + k.label + ' ' + timeStampOf(new Date(e.t)) + ' 기록' + (kind === 'feed' || kind === 'diaper' ? ' · 내용은 목록에서 눌러 추가' : ''), function () {
+      state.babyLog = state.babyLog.filter(function (x) { return x.id !== e.id; }); commit(); showToast('기록을 취소했어요.');
+    });
+  }
+  function submitBlForm(form) {
+    var id = form.dataset.blForm, e = null;
+    for (var i = 0; i < state.babyLog.length; i++) if (state.babyLog[i].id === id) e = state.babyLog[i];
+    if (!e) { ui.blEdit = null; render(); return; }
+    var tm = form.elements.time.value;
+    if (/^\d{2}:\d{2}$/.test(tm)) { var d = new Date(e.t); d.setHours(parseInt(tm.slice(0, 2), 10), parseInt(tm.slice(3), 10), 0, 0); e.t = d.getTime(); }
+    if (form.elements.detail) e.detail = String(form.elements.detail.value || '').trim().slice(0, 100);
+    ui.blEdit = null; commit();
+    var back = document.querySelector('[data-focus-key="bl-row:' + id + '"]'); if (back) back.focus();
+  }
+  // 단축어 위젯 안내
+  function blShortcutUrl() {
+    var S = window.ChecklistSync, room = S && S.getState().roomId, cfg = window.FIREBASE_CONFIG;
+    if (!room || !cfg || !cfg.databaseURL) return '';
+    return cfg.databaseURL.replace(/\/$/, '') + '/rooms/' + room + '/babyLog.json';
+  }
+  function copyText(text, label) {
+    var done = function () { showToast((label || '내용') + '을(를) 복사했어요. 단축어에 붙여 넣으세요.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { window.prompt('길게 눌러 복사하세요', text); });
+    else window.prompt('길게 눌러 복사하세요', text);
+  }
+  function openBlGuide() {
+    var g = $('#bl-guide'); if (!g) return;
+    var url = blShortcutUrl(), me = myName();
+    var kinds = [['feed', '🍼 수유'], ['diaper', '💧 기저귀'], ['sleep', '😴 잠'], ['wake', '🌤️ 깼어요']];
+    var body = url ? (
+      '<ol class="bl-steps">' +
+      '<li><b>단축어 앱</b>을 열고 오른쪽 위 <b>＋</b> → <b>동작 추가</b> → 검색에 ‘URL’ → <b>URL 콘텐츠 가져오기</b>를 고르세요.</li>' +
+      '<li>파란 ‘URL’ 자리에 아래 주소를 붙여 넣으세요.<div class="bl-copy"><code>' + escapeHtml(url) + '</code><button type="button" class="btn btn--small btn--primary" data-action="bl-copy" data-text="' + escapeHtml(url) + '" data-label="주소">주소 복사</button></div></li>' +
+      '<li>동작의 <b>›</b>를 눌러 펼치고 <b>방법: POST</b>, <b>요청 본문: JSON</b>으로 바꾸세요.</li>' +
+      '<li><b>새로운 필드 추가</b>로 3개를 넣으세요.<table class="bl-table"><tr><th>종류</th><th>키</th><th>값</th></tr>' +
+      '<tr><td>텍스트</td><td><code>kind</code></td><td><code>feed</code> <span class="mut">(수유)</span></td></tr>' +
+      '<tr><td>텍스트</td><td><code>who</code></td><td><code>' + escapeHtml(me) + '</code></td></tr>' +
+      '<tr><td>사전</td><td><code>t</code></td><td>안에 텍스트 <code>.sv</code> = <code>timestamp</code></td></tr></table>' +
+      '<div class="bl-copy-row"><button type="button" class="bt-chip" data-action="bl-copy" data-text="kind" data-label="kind">kind</button><button type="button" class="bt-chip" data-action="bl-copy" data-text="who" data-label="who">who</button><button type="button" class="bt-chip" data-action="bl-copy" data-text=".sv" data-label=".sv">.sv</button><button type="button" class="bt-chip" data-action="bl-copy" data-text="timestamp" data-label="timestamp">timestamp</button><button type="button" class="bt-chip" data-action="bl-copy" data-text="' + escapeHtml(me) + '" data-label="내 이름">' + escapeHtml(me) + '</button></div></li>' +
+      '<li>(선택) <b>알림 보기</b> 동작을 추가해 ‘🍼 수유 기록했어요’라고 적어 두면 눌렀을 때 확인돼요.</li>' +
+      '<li>맨 위 이름을 <b>🍼 수유</b>로 바꾸고 완료. 이 단축어를 길게 눌러 <b>복제</b>한 뒤 <code>kind</code> 값만 바꿔 나머지를 만드세요.<div class="bl-copy-row">' +
+        kinds.map(function (k) { return '<button type="button" class="bt-chip" data-action="bl-copy" data-text="' + k[0] + '" data-label="' + k[1] + ' 값">' + k[1] + ' <code>' + k[0] + '</code></button>'; }).join('') + '</div></li>' +
+      '<li><b>홈 화면</b> 빈 곳을 길게 누르기 → 왼쪽 위 <b>편집 → 위젯 추가</b> → <b>단축어</b> → 4칸 크기 추가 → 위젯을 길게 눌러 <b>위젯 편집</b>에서 만든 단축어를 고르세요. 잠금 화면 위젯, 동작 버튼(아이폰 15 Pro 이상), 뒷면 탭(설정 › 손쉬운 사용 › 터치 › 뒷면 탭)에도 연결할 수 있어요.</li>' +
+      '</ol><p class="bl-note">위젯으로 남긴 기록은 앱을 열면 바로 보이고 가족과 공유돼요. 분유 ml 같은 내용은 나중에 목록에서 눌러 추가하면 돼요.<br>이 주소는 우리 가족 방 주소라 다른 사람에게 보내지 마세요.</p>'
+    ) : '<p class="bl-note">가족 공유를 켜야 위젯을 쓸 수 있어요. 마미백 위쪽의 ‘가족 공유’를 먼저 켜 주세요.</p>';
+    hideToast();
+    g.querySelector('.bl-guide__body').innerHTML = body;
+    g.hidden = false; document.body.classList.add('has-sheet');
+    var c = g.querySelector('[data-action="bl-guide-close"]'); if (c) c.focus();
+  }
+  function closeBlGuide() {
+    var g = $('#bl-guide'); if (!g || g.hidden) return;
+    g.hidden = true; document.body.classList.remove('has-sheet');
+  }
+
   function renderHighlightsStrip() {
     var strip = $('#highlights-strip'), body = $('#highlights-strip-body');
     if (!strip) return;
@@ -3964,6 +4244,9 @@ datesSorted().forEach(function (d) {
       memos: state.memos,
       supports: state.supports,
       birthTasks: state.birthTasks,
+      birthDate: state.birthDate,
+      growth: state.growth,
+      babyLog: state.babyLog,
       fairStops: state.fairStops,
       ledger: state.ledger,
       budget: state.budget
@@ -4067,7 +4350,7 @@ datesSorted().forEach(function (d) {
     if (el.readOnly || el.disabled) return false; // readonly share-link etc. must not block sync
     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'button') return false;
     // Only editable fields inside an item/note/highlights editor should defer a remote update.
-    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .fair-memo, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
+    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .fair-memo, .gr-form, .bl-form, .bl-birth, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
   }
 
   var migrationsQueued = false;
@@ -4610,6 +4893,59 @@ datesSorted().forEach(function (d) {
     var trInput = $('#toast-remote');
     if (trInput) trInput.addEventListener('change', function () { ui.toastRemote = trInput.checked; saveUiPrefs(); });
 
+    // 태어난 날 (성장 기록·육아 일지 공통)
+    document.addEventListener('submit', function (e) {
+      var bf = e.target.closest && e.target.closest('form[data-birth-form]'); if (!bf) return;
+      e.preventDefault(); saveBirthDate(bf);
+    });
+    // 성장 기록
+    var grView = $('#view-growth');
+    if (grView) {
+      grView.addEventListener('click', function (e) {
+        if (e.target.closest('#gr-add-btn')) { ui.grForm = 'new'; renderGrowth(); var f = document.querySelector('[data-focus-key="gr-weight:new"]'); if (f) f.focus(); return; }
+        var b = e.target.closest('button[data-action]'); if (!b) return;
+        switch (b.dataset.action) {
+          case 'gr-edit': ui.grForm = b.dataset.id; renderGrowth(); var ef = document.querySelector('[data-focus-key="gr-weight:' + b.dataset.id + '"]'); if (ef) ef.focus(); break;
+          case 'gr-cancel': ui.grForm = null; renderGrowth(); break;
+          case 'gr-del': {
+            var id = ui.grForm, idx = -1; for (var i = 0; i < state.growth.length; i++) if (state.growth[i].id === id) idx = i;
+            if (idx === -1) break;
+            var g = state.growth.splice(idx, 1)[0]; ui.grForm = null; commit(); act('growth', '성장 기록 삭제: ' + g.date);
+            showToast('기록을 삭제했어요.', function () { state.growth.push(g); commit(); showToast('삭제를 취소했어요.'); });
+            break;
+          }
+          case 'gr-birth-edit': { var old = state.birthDate; var v = window.prompt('태어난 날 (예: 2026-11-20)', old || ''); if (v === null) break; v = v.trim(); if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) { showToast('2026-11-20처럼 적어 주세요.'); break; } state.birthDate = v; commit(); break; }
+        }
+      });
+      grView.addEventListener('submit', function (e) { var f = e.target.closest('form[data-gr-form]'); if (!f) return; e.preventDefault(); submitGrowth(f); });
+    }
+    // 육아 일지
+    var blView = $('#view-babylog');
+    if (blView) {
+      blView.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-action]'); if (!b) return;
+        switch (b.dataset.action) {
+          case 'bl-log': blLog(b.dataset.kind); break;
+          case 'bl-edit': ui.blEdit = b.dataset.id; renderBabyLog(); var df = document.querySelector('[data-focus-key="bl-detail:' + b.dataset.id + '"]'); if (df) df.focus(); break;
+          case 'bl-cancel': { var was = ui.blEdit; ui.blEdit = null; renderBabyLog(); var bk = document.querySelector('[data-focus-key="bl-row:' + was + '"]'); if (bk) bk.focus(); break; }
+          case 'bl-quick': { var inp = b.closest('form').elements.detail; if (inp) { var cur = inp.value.replace(/^(분유\+모유|소변\+대변|분유|모유|소변|대변)\s*/, ''); inp.value = b.dataset.val + (cur ? ' ' + cur : ' '); inp.focus(); } break; }
+          case 'bl-del': {
+            var id = ui.blEdit, ev = null; state.babyLog = state.babyLog.filter(function (x) { if (x.id === id) { ev = x; return false; } return true; });
+            if (!ev) break; ui.blEdit = null; commit();
+            showToast('기록을 삭제했어요.', function () { state.babyLog.push(ev); commit(); showToast('삭제를 취소했어요.'); });
+            break;
+          }
+          case 'bl-day': { var d = dateOf(logDay()); d.setDate(d.getDate() + Number(b.dataset.d)); var iso = isoOf(d); ui.logDay = iso >= todayStamp() ? '' : iso; ui.blEdit = null; renderBabyLog(); break; }
+          case 'bl-guide-open': openBlGuide(); break;
+          case 'bl-guide-close': closeBlGuide(); break;
+          case 'bl-copy': copyText(b.dataset.text, b.dataset.label); break;
+        }
+      });
+      blView.addEventListener('submit', function (e) { var f = e.target.closest('form[data-bl-form]'); if (!f) return; e.preventDefault(); submitBlForm(f); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#bl-guide').hidden) { e.preventDefault(); closeBlGuide(); } });
+      // '마지막 수유 n분 전'·'자는 중' 시간을 30초마다 갱신
+      setInterval(function () { if (ui.view === 'babylog' && !ui.blEdit && !isTyping() && document.visibilityState === 'visible') renderBabyLog(); }, 30000);
+    }
     // 베이비페어 동선
     var faView = $('#view-fair');
     if (faView) {
