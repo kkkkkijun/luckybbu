@@ -2282,7 +2282,7 @@ datesSorted().forEach(function (d) {
   }
 
   // 처음 한 번: 비어 있는 날짜에 우리 가족 날짜를 채운다(이미 적힌 값은 건드리지 않음)
-  var FAMILY_DUE = '2026-11-09', FAMILY_ANNIVERSARY = '2026-05-23';
+  var FAMILY_DUE = '2026-11-20' /* 금요일 = 새 주차 0일 (2026-10-09 금 = 34주 0일) */, FAMILY_ANNIVERSARY = '2026-05-23';
   function seedFamilyDatesOnce() {
     if (ui.portalSeeded) return;
     ui.portalSeeded = true;
