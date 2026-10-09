@@ -21,7 +21,7 @@
   var SUPPORT_STAGE_LABEL = { now: '지금 · 임신 중', birth: '출산 직후 · 60일 안', monthly: '매달 받는 것', local: '우리 지역 (서울 마포구)' };
   var SUPPORT_DUE_BASE = ['', 'due', 'birth'];
   // 화면: portal(luckybbu 첫 화면) · ledger(가계부) · 나머지는 마미백 공간
-  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'fair', 'growth', 'babylog', 'vaccine'];
+  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'growth', 'babylog', 'vaccine'];
   // 마미백 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
   var GROUPS = ['birth', 'baby'];
   function defaultGroupFor(name) { var n = String(name || ''); if (/맞이|의류|출산|병원|조리원/.test(n)) return 'birth'; return /육아|이유식|예방접종|성장/i.test(n) ? 'baby' : 'birth'; }
@@ -292,9 +292,6 @@
   var BT_LINKS = ['', 'bag', 'memo', 'supports'];
   var BT_TEXT_MAX = 60, BT_NOTE_MAX = 200;
   var BT_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
-  /* ---------- 베이비페어 동선 (코베 베이비페어 · 킨텍스) ---------- */
-  var FAIR = { title: '코베 베이비페어 · 킨텍스(일산)', start: '2026-10-08', end: '2026-10-11', visit: '2026-10-09', gate: '금·일 입구', hideAfter: '2026-10-18' };
-  var FAIR_MEMO_MAX = 200;
   /* ---------- 육아 일지 종류 ---------- */
   var BL_KINDS = {
     feed: { label: '수유', icon: '🍼', chip: 'peach', ph: '분유 120ml · 모유 15분', quick: ['분유', '모유', '분유+모유'] },
@@ -341,7 +338,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], fairStops: [], birthDate: '', growth: [], babyLog: [], vaccines: [] };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [] };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -574,23 +571,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    // 박람회 동선
-    var fairStops = [];
-    var seenFs = {};
-    if (Array.isArray(raw.fairStops)) {
-      raw.fairStops.forEach(function (t) {
-        if (!t || typeof t !== 'object') return;
-        var fid = typeof t.id === 'string' ? t.id.trim() : '';
-        var fname = typeof t.name === 'string' ? t.name.trim().slice(0, 60) : '';
-        if (!fid || !fname || seenFs[fid]) return;
-        seenFs[fid] = true;
-        fairStops.push({ id: fid, code: typeof t.code === 'string' ? t.code.trim().slice(0, 10) : '', name: fname,
-          note: typeof t.note === 'string' ? t.note.trim().slice(0, 200) : '',
-          keys: Array.isArray(t.keys) ? t.keys.filter(function (k) { return typeof k === 'string' && k.trim(); }).map(function (k) { return k.trim().slice(0, 20); }).slice(0, 6) : [],
-          done: t.done === true, memo: typeof t.memo === 'string' ? t.memo.slice(0, FAIR_MEMO_MAX) : '' });
-      });
-    }
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, fairStops: fairStops, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines } };
   }
 
   /* ---------- storage ---------- */
@@ -672,7 +653,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, fairSeeded: false, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -716,7 +697,6 @@
         ui.subsMigrated = parsed.subsMigrated === true;
         ui.supportsSeeded = parsed.supportsSeeded === true;
         ui.birthSeeded = parsed.birthSeeded === true;
-        ui.fairSeeded = parsed.fairSeeded === true;
         if (parsed.birthFilter === 'all' || parsed.birthFilter === 'remain') ui.birthFilter = parsed.birthFilter;
         ui.birthHideCsec = parsed.birthHideCsec === true;
         if (parsed.draft && typeof parsed.draft === 'object') ui.pendingDraft = parsed.draft;
@@ -778,7 +758,6 @@
         subsMigrated: ui.subsMigrated,
         supportsSeeded: ui.supportsSeeded,
         birthSeeded: ui.birthSeeded,
-        fairSeeded: ui.fairSeeded,
         birthFilter: ui.birthFilter,
         birthHideCsec: ui.birthHideCsec,
         draft: draftSnapshot(),
@@ -929,7 +908,6 @@
     if (view !== 'notes' && view !== 'memos') ui.detailFrom = null;
     if (ui.view === 'supports' && ui.supportModal) { ui.supportModal = null; document.body.classList.remove('has-modal'); }
     if (ui.view === 'birthday') { ui.birthEdit = false; ui.birthForm = null; }
-    if (ui.view === 'fair') closeFairViewer();
     if (ui.view === 'growth') ui.grForm = null;
     if (ui.view === 'babylog') { ui.blEdit = null; closeBlGuide(); }
     if (ui.view === 'vaccine') closeVxSheet(true);
@@ -990,7 +968,6 @@
     var vs = $('#view-settings'); if (vs) vs.hidden = ui.view !== 'settings';
     var vsp = $('#view-supports'); if (vsp) vsp.hidden = ui.view !== 'supports';
     var vbd = $('#view-birthday'); if (vbd) vbd.hidden = ui.view !== 'birthday';
-    var vfa = $('#view-fair'); if (vfa) vfa.hidden = ui.view !== 'fair';
     var vgr = $('#view-growth'); if (vgr) vgr.hidden = ui.view !== 'growth';
     var vbl = $('#view-babylog'); if (vbl) vbl.hidden = ui.view !== 'babylog';
     var vvx = $('#view-vaccine'); if (vvx) vvx.hidden = ui.view !== 'vaccine';
@@ -1049,7 +1026,6 @@
     renderSettings();
     renderSupports();
     renderBirthday();
-    renderFair();
     renderGrowth();
     renderBabyLog();
     renderVaccine();
@@ -2156,7 +2132,6 @@ datesSorted().forEach(function (d) {
     growth: '<path d="M3 20h18M5 16l4-5 4 3 6-8"/>',
     book: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
-    map: '<path d="M9 4L3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/>',
     checklist: '<rect x="4" y="4" width="16" height="17" rx="3"/><path d="M9 2.5v3M15 2.5v3M8.5 12.5l2.5 2.5 4.5-4.5"/>',
     suitcase: '<rect x="5" y="7" width="14" height="12" rx="2"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9 11v4M15 11v4M8 19v1.5M16 19v1.5"/>',
     bed: '<path d="M3 18V7M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="11" r="2"/>',
@@ -2247,7 +2222,7 @@ datesSorted().forEach(function (d) {
           '<span class="mb-tile__label">' + escapeHtml(f.label) + '</span>' +
           '<span class="mb-tile__meta">' + escapeHtml(meta) + '</span></button>';
       }).join('');
-      if (g === 'birth') html = birthTileHtml() + fairTileHtml() + html;
+      if (g === 'birth') html = birthTileHtml() + html;
       grid.innerHTML = html;
     });
   }
@@ -3388,135 +3363,6 @@ datesSorted().forEach(function (d) {
     var back = document.querySelector('[data-focus-key="bt-edit:' + key + '"]'); if (back) back.focus();
   }
 
-  var FAIR_SEED = [
-    ['A-18', '말랑하니 · 잼먹', '첫만남스토어 안. 부스 방문 이벤트가 하루 200명 선착순이라 맨 먼저.', ['말랑하니', '잼먹']],
-    ['E-27', '밤부베베 · 헤겐 · 타이니러브', '한 부스에 세 브랜드.', ['밤부베베', '헤겐', '타이니러브']],
-    ['H-27', '크림하우스', '', ['크림하우스']],
-    ['K-24', '픽셀 젖병소독기 · 폴레드', '바로 다음 5번 유팡도 젖병소독기. 가격·크기를 아래 메모에 적어 두고 비교.', ['픽셀', '폴레드']],
-    ['Q-09', '유팡', '4번 픽셀과 비교해서 젖병소독기 하나로 결정.', ['유팡']],
-    ['P-13', '드시모네', '유팡 바로 맞은편.', ['드시모네']],
-    ['K-01', '다이치', '부피 큰 카시트는 마지막에. 결제하면 택배 배송을 요청하고 바로 금·일 입구로.', ['다이치', '카시트']]
-  ];
-  function seedFairOnce() {
-    if (ui.fairSeeded) return;
-    ui.fairSeeded = true; saveUiPrefs();
-    if (state.fairStops.length) return;
-    state.fairStops = FAIR_SEED.map(function (d) { return { id: uid(), code: d[0], name: d[1], note: d[2], keys: d[3].slice(), done: false, memo: '' }; });
-    commit(); act('fair', '베이비페어 동선 ' + state.fairStops.length + '곳 채움');
-  }
-  function findFairStop(id) { for (var i = 0; i < state.fairStops.length; i++) if (state.fairStops[i].id === id) return state.fairStops[i]; return null; }
-  function fairRelatedItems(stop) {
-    var keys = (stop.keys || []).filter(Boolean);
-    if (!keys.length) return [];
-    return state.items.filter(function (it) { return keys.some(function (k) { return it.name.indexOf(k) !== -1; }); });
-  }
-  function fairTileHtml() {
-    if (!state.fairStops.length || daysFromToday(FAIR.hideAfter) < 0) return '';
-    var done = state.fairStops.filter(function (s) { return s.done; }).length, total = state.fairStops.length;
-    var d = daysFromToday(FAIR.visit), badge = '';
-    if (done === total) badge = '<span class="mb-tile__badge is-done" aria-hidden="true">✓</span>';
-    else if (d >= 0 && d <= 30) badge = '<span class="mb-tile__badge is-sky">' + (d === 0 ? '오늘' : 'D-' + d) + '</span>';
-    return '<button type="button" class="mb-tile mb-tile--fair' + (d >= 0 && d <= 3 && done < total ? ' is-hot' : '') + '" data-action="mb-open" data-target="fair" data-label="베이비페어">' + badge +
-      '<span class="mb-tile__icon">' + svgIcon('map', 28) + '</span>' +
-      '<span class="mb-tile__label">베이비페어</span>' +
-      '<span class="mb-tile__meta">' + done + '/' + total + '곳</span></button>';
-  }
-  // 배치도(2000x1414 원본) 위 좌표: 부스 위치와 금·일 입구 기준 한 바퀴 동선
-  var FAIR_POS = { 'A-18': [97, 480], 'E-27': [622, 480], 'H-27': [1115, 480], 'K-24': [1405, 515], 'Q-09': [1907, 905], 'P-13': [1780, 905], 'K-01': [1358, 1170] };
-  var FAIR_ROUTE = [[1155, 1325], [1155, 1290], [140, 1290], [140, 480], [140, 575], [1858, 575], [1858, 1050], [1300, 1050], [1300, 1290], [1155, 1290], [1155, 1325]];
-  function fairMapSvg() {
-    var h = '';
-    var r = function (x1, y1, x2, y2, f, st) { h += '<rect x="' + x1 + '" y="' + y1 + '" width="' + (x2 - x1) + '" height="' + (y2 - y1) + '" rx="8" fill="' + f + '"' + (st ? ' stroke="' + st + '" stroke-width="4"' : '') + '/>'; };
-    var g = '#EDE7E2';
-    r(50, 275, 1950, 1370, '#FFFBF8', '#E2DCD7');
-    r(180, 308, 1880, 355, g); r(75, 300, 120, 1340, g); r(1885, 355, 1930, 1340, g);
-    [[175, 270], [308, 403], [442, 537], [575, 670], [708, 803], [842, 1028], [1068, 1162], [1197, 1290], [1335, 1428], [1468, 1562], [1600, 1695], [1735, 1828]].forEach(function (c, i) {
-      r(c[0], 410, c[1], 550, g); r(c[0], 880, c[1], 1020, g); r(c[0], 1075, c[1], 1262, g);
-      if (i < 3 || i > 8) { r(c[0], 598, c[1], 690, g); r(c[0], 740, c[1], 835, g); }
-    });
-    r(575, 598, 1068, 880, '#DDEFD9'); r(1068, 598, 1430, 880, '#F8DCE3');
-    h += '<text x="820" y="755" font-size="46" text-anchor="middle" fill="#6E9468" font-weight="700">파티장·휴게</text>';
-    h += '<text x="1250" y="755" font-size="46" text-anchor="middle" fill="#B4687E" font-weight="700">카페·수유실</text>';
-    r(805, 1325, 895, 1370, '#D5DDEA'); r(1110, 1325, 1200, 1370, '#3E7BD6');
-    h += '<text x="1155" y="1418" font-size="40" text-anchor="middle" fill="#2A5FAF" font-weight="800">금·일 입구 (들어가고 나오는 곳)</text>';
-    h += '<polyline points="' + FAIR_ROUTE.map(function (p) { return p.join(','); }).join(' ') + '" fill="none" stroke="#FF8A70" stroke-width="14" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="1 26"/>';
-    // 방향 화살표 몇 개
-    [[700, 1290, 180], [140, 900, 270], [1000, 575, 0], [1858, 800, 90], [1580, 1050, 180]].forEach(function (a) {
-      h += '<path d="M-22,-18 L18,0 L-22,18" transform="translate(' + a[0] + ',' + a[1] + ') rotate(' + a[2] + ')" fill="none" stroke="#E2603F" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>';
-    });
-    state.fairStops.forEach(function (s, i) {
-      var p = FAIR_POS[s.code]; if (!p) return;
-      h += '<g class="fair-pin' + (s.done ? ' is-done' : '') + '"><circle cx="' + p[0] + '" cy="' + p[1] + '" r="40" stroke="#fff" stroke-width="7"/><text x="' + p[0] + '" y="' + (p[1] + 15) + '" font-size="44" font-weight="800" text-anchor="middle" fill="#fff">' + (s.done ? '✓' : (i + 1)) + '</text></g>';
-    });
-    return '<svg viewBox="40 270 1930 1165" role="img" aria-label="전시장 배치도와 동선: 금·일 입구로 들어가 왼쪽 끝 A-18부터 오른쪽으로 한 바퀴 돌아 다이치(K-01)를 거쳐 입구로 나옵니다">' + h + '</svg>';
-  }
-  var fairZoom = 2, fairMemoOpen = null;
-  function renderFairViewer() {
-    var v = $('#fair-viewer'); if (!v || v.hidden) return;
-    var canvas = v.querySelector('.fair-viewer__canvas');
-    // 1: 화면 너비에 맞춤 · 2: 화면 높이를 꽉 채움 · 3: 그보다 1.6배
-    var sc = v.querySelector('.fair-viewer__scroll');
-    var fitH = Math.round((sc.clientHeight - 24) * 1930 / 1165 + 24);
-    canvas.style.width = fairZoom === 1 ? '100%' : Math.max(sc.clientWidth, Math.round(fitH * (fairZoom === 3 ? 1.6 : 1))) + 'px';
-    canvas.innerHTML = fairMapSvg();
-    Array.prototype.forEach.call(v.querySelectorAll('[data-zoom]'), function (b) { var on = Number(b.dataset.zoom) === fairZoom; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
-  }
-  // 다음에 갈 곳(없으면 지도 가운데)이 화면 가운데 오도록
-  function centerFairViewer() {
-    var v = $('#fair-viewer'); if (!v) return;
-    var sc = v.querySelector('.fair-viewer__scroll'), canvas = v.querySelector('.fair-viewer__canvas');
-    var next = state.fairStops.filter(function (s) { return !s.done; })[0];
-    var p = next && FAIR_POS[next.code] ? FAIR_POS[next.code] : [1000, 820];
-    var fx = (p[0] - 40) / 1930, fy = (p[1] - 270) / 1165;
-    sc.scrollLeft = Math.max(0, fx * canvas.offsetWidth - sc.clientWidth / 2);
-    sc.scrollTop = Math.max(0, fy * canvas.offsetHeight - sc.clientHeight / 2);
-  }
-  function openFairViewer() {
-    var v = $('#fair-viewer'); if (!v) return;
-    v.hidden = false; document.body.classList.add('has-sheet');
-    renderFairViewer();
-    requestAnimationFrame(centerFairViewer);
-    var c = v.querySelector('[data-action="fair-viewer-close"]'); if (c) c.focus();
-  }
-  function closeFairViewer() {
-    var v = $('#fair-viewer'); if (!v || v.hidden) return;
-    v.hidden = true; document.body.classList.remove('has-sheet');
-    var o = document.querySelector('[data-action="fair-viewer-open"]'); if (o) o.focus();
-  }
-  function renderFair() {
-    var view = $('#view-fair'); if (!view || ui.view !== 'fair') return;
-    var stops = state.fairStops;
-    var done = stops.filter(function (s) { return s.done; }).length, total = stops.length;
-    var cnt = $('#fair-count'); if (cnt) cnt.textContent = total ? total + '곳' : '';
-    var d = daysFromToday(FAIR.visit);
-    var dtxt = d > 0 ? 'D-' + d : d === 0 ? '오늘' : '';
-    var pct = total ? Math.round(done / total * 100) : 0;
-    var next = null; for (var i = 0; i < stops.length; i++) if (!stops[i].done) { next = i; break; }
-    var side = '<div class="fair-hero"><div class="fair-hero__row"><b>' + escapeHtml(FAIR.title) + '</b>' + (dtxt ? '<span class="fair-dday">' + dtxt + '</span>' : '') + '</div>' +
-      '<p>' + shortDate(FAIR.visit) + ' 방문 · <b>' + FAIR.gate + '</b>로 입장 · 한 바퀴에 ' + total + '곳</p>' +
-      '<div class="bt-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '" aria-label="들른 곳"><i style="width:' + pct + '%"></i></div>' +
-      '<p class="fair-hero__now">' + (total === 0 ? '' : next === null ? '<b>모두 들렀어요!</b> 수고 많으셨어요.' : '들른 곳 ' + done + '/' + total + ' · 다음 <b>' + (next + 1) + '번 ' + escapeHtml(stops[next].name) + '</b>') + '</p></div>';
-    side += '<div class="fair-map"><button type="button" class="fair-map__open" data-action="fair-viewer-open" aria-label="배치도 크게 보기">' + fairMapSvg() + '<span class="fair-map__hint">🔍 눌러서 크게 보기</span></button><div class="fair-legend"><span><i style="background:#FF8A70"></i>들를 곳</span><span><i style="background:#1F7A57"></i>들른 곳</span><span><i style="background:#3E7BD6"></i>입구·출구</span></div></div>';
-    side += '<div class="fair-tips"><b>동선 원칙</b><br>· 입장하면 아래쪽 통로로 왼쪽 끝까지 먼저 가요.<br>· 위쪽 통로를 따라 오른쪽으로 한 번에 지나가요. 되돌아가지 않아요.<br>· 오른쪽 끝에서 내려와 다이치를 마지막에 들르고, 바로 옆 입구로 나와요.</div>';
-    $('#fair-side').innerHTML = side;
-    renderFairViewer();
-    $('#fair-list').innerHTML = stops.map(function (s, i) {
-      var rel = fairRelatedItems(s);
-      var id = escapeHtml(s.id);
-      return '<li class="fair-stop' + (s.done ? ' is-done' : '') + (i === next ? ' is-next' : '') + '" data-fair-id="' + id + '">' +
-        '<button type="button" class="fair-stop__main" role="checkbox" aria-checked="' + (s.done ? 'true' : 'false') + '" data-action="fair-toggle" data-focus-key="fair:' + id + '">' +
-        '<span class="fair-num" aria-hidden="true">' + (s.done ? '✓' : (i + 1)) + '</span>' +
-        '<span class="fair-stop__body"><span class="fair-stop__head"><span class="fair-code">' + escapeHtml(s.code) + '</span><span class="fair-name">' + escapeHtml(s.name) + '</span></span>' +
-        (s.note && !s.done ? '<span class="fair-note">' + escapeHtml(s.note) + '</span>' : '') + '</span>' +
-        '<span class="bt-box" aria-hidden="true"></span></button>' +
-        (rel.length ? '<div class="fair-rel"><span class="fair-rel__label">내 준비물</span>' + rel.map(function (it) { return '<span class="fair-chip' + (it.done ? ' is-done' : '') + '">' + (it.done ? '✓ ' : '') + escapeHtml(it.name) + (typeof it.price === 'number' ? ' · ' + formatNumber(it.price) + '원' : '') + '</span>'; }).join('') + '</div>' : '') +
-        (s.memo || fairMemoOpen === s.id ?
-          '<div class="fair-memo"><label class="visually-hidden" for="fair-memo-' + id + '">' + escapeHtml(s.name) + ' 메모</label>' +
-          '<input type="text" id="fair-memo-' + id + '" data-fair-memo="' + id + '" data-focus-key="fair-memo:' + id + '" maxlength="' + FAIR_MEMO_MAX + '" placeholder="가격·혜택 메모 (가족과 공유)" value="' + escapeHtml(s.memo || '') + '" autocomplete="off" enterkeyhint="done"></div>'
-          : '<div class="fair-memo"><button type="button" class="fair-memo__add" data-action="fair-memo-open" data-focus-key="fair-memo-add:' + id + '">＋ 가격·혜택 메모</button></div>') +
-        '</li>';
-    }).join('');
-  }
 
   /* ---------- 아기 공통 ---------- */
   function isoOf(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
@@ -4435,7 +4281,6 @@ datesSorted().forEach(function (d) {
       growth: state.growth,
       babyLog: state.babyLog,
       vaccines: state.vaccines,
-      fairStops: state.fairStops,
       ledger: state.ledger,
       budget: state.budget
     }, null, pretty ? 2 : 0);
@@ -4538,15 +4383,15 @@ datesSorted().forEach(function (d) {
     if (el.readOnly || el.disabled) return false; // readonly share-link etc. must not block sync
     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'button') return false;
     // Only editable fields inside an item/note/highlights editor should defer a remote update.
-    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .fair-memo, .gr-form, .bl-form, .bl-birth, .vx-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
+    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .gr-form, .bl-form, .bl-birth, .vx-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
   }
 
   var migrationsQueued = false;
   function scheduleOneTimeMigrations() {
-    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.supportsSeeded && ui.birthSeeded && ui.fairSeeded)) return;
+    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.supportsSeeded && ui.birthSeeded)) return;
     migrationsQueued = true;
     // 방 참여 직후에는 구독(attach)이 applyRemote 뒤에 붙으므로 한 틱 뒤에 실행한다.
-    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedSupportsOnce(); seedBirthTasksOnce(); seedFairOnce(); }, 0);
+    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedSupportsOnce(); seedBirthTasksOnce(); }, 0);
   }
   function applyRemote(remoteState) {
     var result = normalizeState(remoteState);
@@ -5168,42 +5013,6 @@ datesSorted().forEach(function (d) {
       // '마지막 수유 n분 전'·'자는 중' 시간을 30초마다 갱신
       setInterval(function () { if (ui.view === 'babylog' && !ui.blEdit && !isTyping() && document.visibilityState === 'visible') renderBabyLog(); }, 30000);
     }
-    // 베이비페어 동선
-    var faView = $('#view-fair');
-    if (faView) {
-      faView.addEventListener('click', function (e) {
-        if (e.target.closest('[data-action="fair-viewer-open"]')) { openFairViewer(); return; }
-        var mo = e.target.closest('[data-action="fair-memo-open"]');
-        if (mo) {
-          fairMemoOpen = mo.closest('[data-fair-id]').dataset.fairId; renderFair();
-          var mi = document.querySelector('[data-fair-memo="' + fairMemoOpen + '"]'); if (mi) mi.focus();
-          return;
-        }
-        if (e.target.closest('[data-action="fair-viewer-close"]')) { closeFairViewer(); return; }
-        var zb = e.target.closest('[data-zoom]');
-        if (zb) {
-          var sc = $('#fair-viewer .fair-viewer__scroll');
-          var cx = (sc.scrollLeft + sc.clientWidth / 2) / sc.scrollWidth, cy = (sc.scrollTop + sc.clientHeight / 2) / sc.scrollHeight;
-          fairZoom = Number(zb.dataset.zoom) || 2; renderFairViewer();
-          sc.scrollLeft = cx * sc.scrollWidth - sc.clientWidth / 2; sc.scrollTop = cy * sc.scrollHeight - sc.clientHeight / 2;
-          return;
-        }
-        var btn = e.target.closest('button[data-action="fair-toggle"]'); if (!btn) return;
-        var s = findFairStop(btn.closest('[data-fair-id]').dataset.fairId); if (!s) return;
-        s.done = !s.done;
-        commit(); act('fair', (s.done ? '들름: ' : '들름 취소: ') + s.code + ' ' + s.name);
-        if (s.done && state.fairStops.every(function (x) { return x.done; })) showToast('베이비페어 7곳을 모두 들렀어요! 수고 많으셨어요.');
-      });
-      var saveFairMemo = function (input) {
-        var s = findFairStop(input.dataset.fairMemo); if (!s) return;
-        var v = input.value.slice(0, FAIR_MEMO_MAX);
-        if (v === (s.memo || '')) return;
-        s.memo = v; saveState(); act('fair', s.code + ' 메모: ' + v.slice(0, 30));
-      };
-      faView.addEventListener('change', function (e) { if (e.target.dataset.fairMemo) saveFairMemo(e.target); });
-      faView.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.dataset.fairMemo) { e.preventDefault(); e.target.blur(); } });
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !$('#fair-viewer').hidden) { e.preventDefault(); closeFairViewer(); } });
-    }
     // 출산 당일 할 일
     var bdView = $('#view-birthday');
     if (bdView) {
@@ -5792,7 +5601,7 @@ datesSorted().forEach(function (d) {
     }
     var storedRoom = null;
     try { storedRoom = window.localStorage.getItem('birth-bag-checklist:room'); } catch (e) { /* ignore */ }
-    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); seedSupportsOnce(); seedBirthTasksOnce(); seedFairOnce(); }
+    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); seedSupportsOnce(); seedBirthTasksOnce(); }
     try { window.history.replaceState({ view: ui.view }, ''); } catch (e) { /* ignore */ }
     window.addEventListener('popstate', function (e) {
       if (sheetPopSilently) { sheetPopSilently = false; return; }
