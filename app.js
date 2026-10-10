@@ -338,7 +338,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [] };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [] };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -483,6 +483,7 @@
 
     var dueDate = typeof raw.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.dueDate) ? raw.dueDate : '';
     var anniversary = typeof raw.anniversary === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.anniversary) ? raw.anniversary : '';
+    var weekBase = typeof raw.weekBase === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.weekBase) ? raw.weekBase : '';
     var ledger = normalizeLedger(raw.ledger);
     var budget = typeof raw.budget === 'number' && isFinite(raw.budget) && raw.budget > 0 ? Math.min(Math.round(raw.budget), PRICE_MAX) : 0;
     var memo = typeof raw.memo === 'string' ? raw.memo.replace(/\r\n?/g, '\n').slice(0, MEMO_MAX) : '';
@@ -571,7 +572,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines } };
   }
 
   /* ---------- storage ---------- */
@@ -653,7 +654,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, weekSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -689,6 +690,7 @@
         ui.highlightsCollapsed = parsed.highlightsCollapsed === true;
         if (VIEWS.indexOf(parsed.view) !== -1) ui.view = parsed.view;
         ui.portalSeeded = parsed.portalSeeded === true;
+        ui.weekSeeded = parsed.weekSeeded === true;
         ui.onboardingDismissed = parsed.onboardingDismissed === true;
         if (typeof parsed.deviceName === 'string') ui.deviceName = parsed.deviceName.slice(0, 12);
         if (typeof parsed.autoName === 'string') ui.autoName = parsed.autoName.slice(0, 12);
@@ -770,6 +772,7 @@
         tagFilter: ui.tagFilter,
         toastRemote: ui.toastRemote,
         portalSeeded: ui.portalSeeded,
+        weekSeeded: ui.weekSeeded,
         highlightsCollapsed: ui.highlightsCollapsed
       }));
     } catch (e) { /* ignore */ }
@@ -2284,17 +2287,21 @@ datesSorted().forEach(function (d) {
     miles.push({ n: to, label: yearLabel(years + 1), date: md(addDays(w, to - 1)) });
     return { start: from, end: to, miles: miles };
   }
-  // 축복이 만나기까지: 임신 시작(예정일 280일 전)부터 예정일까지 채워지는 진행 바. 날이 지날 때마다 '오늘'이 오른쪽으로 간다.
-  function pregnancyTrackHtml(daysLeft) {
-    // 남은 일정 위주: 막달 구간(30주→출산)만 보여 주고, 아직 30주 전이면 20주→출산 구간. 날이 지날수록 '오늘'이 오른쪽으로 간다.
-    var total = 280, now = total - daysLeft;
-    var due = dateOf(state.dueDate), start0 = addDays(due, -total);
-    var fromWeek = daysLeft > 70 ? 20 : 30;
+  // 축복이 만나기까지: 임신 주수 진행 바. 주수는 '40주 0일이 되는 날'(weekBase, 없으면 출산 예정일) 기준으로 세고,
+  // 바의 끝은 실제로 만나는 날(출산 예정일). 막달 구간(30주→만나는 날)만, 아직 30주 전이면 20주부터 보여 준다.
+  function pregnancyTrackHtml() {
+    var start0 = addDays(dateOf(state.weekBase || state.dueDate), -280); // 0주 0일
+    var dayN = function (d) { return Math.round((d - start0) / 86400000); };
+    var now = dayN(todayDate()), end = dayN(dateOf(state.dueDate));
+    var fromWeek = end - now > 70 ? 20 : 30;
+    if (fromWeek * 7 >= end) fromWeek = Math.max(0, Math.floor(end / 7) - 8);
     var mark = function (week, label) { var n = week * 7; return { n: n, label: label || (week + '주'), date: md(addDays(start0, n)) }; };
-    var miles = fromWeek === 30 ? [mark(30), mark(34), mark(37, '만삭'), mark(40, '출산 예정')] : [mark(20), mark(28), mark(34), mark(40, '출산 예정')];
-    var w = Math.floor(Math.max(0, now) / 7), dd = Math.max(0, now) % 7;
-    var nowLabel = now < fromWeek * 7 ? '오늘' : '오늘 ' + w + '주' + (dd ? ' ' + dd + '일' : '');
-    return mileTrackHtml(fromWeek * 7, total, Math.max(fromWeek * 7, now), miles, nowLabel);
+    var wk = function (n) { return Math.floor(n / 7) + '주' + (n % 7 ? ' ' + (n % 7) + '일' : ''); };
+    var marks = fromWeek >= 30 ? [[30], [34], [37, '만삭']] : [[fromWeek], [28], [34]];
+    var miles = marks.filter(function (m) { return m[0] * 7 < end - 6; }).map(function (m) { return mark(m[0], m[1]); });
+    miles.push({ n: end, label: '출산 예정', date: md(addDays(start0, end)) });
+    var nowLabel = now < fromWeek * 7 ? '오늘' : '오늘 ' + wk(Math.max(0, now));
+    return mileTrackHtml(fromWeek * 7, end, Math.min(end, Math.max(fromWeek * 7, now)), miles, nowLabel);
   }
   function weeksLeftText(d) {
     var wk = Math.floor(d / 7), dd = d % 7;
@@ -2311,7 +2318,7 @@ datesSorted().forEach(function (d) {
     var html = '';
     if (state.dueDate) {
       var d = daysFromToday(state.dueDate);
-      if (d > 0) html += dcardHtml('baby', '축복이 만나기까지', escapeHtml(ddayText(state.dueDate)), shortDate(state.dueDate) + ' · ' + weeksLeftText(d), BABY_ART, pregnancyTrackHtml(d));
+      if (d > 0) html += dcardHtml('baby', '축복이 만나기까지', escapeHtml(ddayText(state.dueDate)), shortDate(state.dueDate) + ' · ' + weeksLeftText(d), BABY_ART, pregnancyTrackHtml());
       else if (d === 0) html += dcardHtml('baby', '오늘 축복이를 만나요', 'D-Day', shortDate(state.dueDate), BABY_ART, '');
       else {
         var born = 1 - d, bm = dayMilestones(state.dueDate, born, '탄생', function (y) { return y === 1 ? '돌' : y + '번째 생일'; });
@@ -2335,7 +2342,8 @@ datesSorted().forEach(function (d) {
   }
 
   // 처음 한 번: 비어 있는 날짜에 우리 가족 날짜를 채운다(이미 적힌 값은 건드리지 않음)
-  var FAMILY_DUE = '2026-11-20' /* 금요일 = 새 주차 0일 (2026-10-09 금 = 34주 0일) */, FAMILY_ANNIVERSARY = '2026-05-23';
+  // 만나는 날(D-day)은 11/9, 임신 주수는 40주 0일 = 11/20 기준(10/10 = 34주 1일)
+  var FAMILY_DUE = '2026-11-09', FAMILY_WEEK_BASE = '2026-11-20', FAMILY_ANNIVERSARY = '2026-05-23';
   function seedFamilyDatesOnce() {
     if (ui.portalSeeded) return;
     ui.portalSeeded = true;
@@ -2344,6 +2352,12 @@ datesSorted().forEach(function (d) {
     if (!state.anniversary) { state.anniversary = FAMILY_ANNIVERSARY; changed = true; }
     if (!state.dueDate) { state.dueDate = FAMILY_DUE; changed = true; }
     if (changed) commit();
+  }
+  function seedWeekBaseOnce() {
+    if (ui.weekSeeded) return;
+    ui.weekSeeded = true;
+    saveUiPrefs();
+    if (!state.weekBase) { state.weekBase = FAMILY_WEEK_BASE; commit(); }
   }
 
   /* ---------- 가계부 ---------- */
@@ -2902,6 +2916,7 @@ datesSorted().forEach(function (d) {
     var dn = $('#device-name'); if (dn && document.activeElement !== dn) { dn.value = ui.deviceName; dn.placeholder = ui.deviceName ? '예: 남편, 아내' : '예: 남편, 아내 (지금은 ' + autoName() + ')'; }
     var dd = $('#due-date'); if (dd && document.activeElement !== dd) dd.value = state.dueDate || '';
     var an = $('#anniversary'); if (an && document.activeElement !== an) an.value = state.anniversary || '';
+    var wb = $('#week-base'); if (wb && document.activeElement !== wb) wb.value = state.weekBase || '';
     var tr = $('#toast-remote'); if (tr) tr.checked = ui.toastRemote;
     renderArchive();
   }
@@ -4273,6 +4288,7 @@ datesSorted().forEach(function (d) {
       names: state.names,
       dueDate: state.dueDate,
       anniversary: state.anniversary,
+      weekBase: state.weekBase,
       memo: state.memo,
       memos: state.memos,
       supports: state.supports,
@@ -4388,10 +4404,10 @@ datesSorted().forEach(function (d) {
 
   var migrationsQueued = false;
   function scheduleOneTimeMigrations() {
-    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.supportsSeeded && ui.birthSeeded)) return;
+    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.weekSeeded && ui.supportsSeeded && ui.birthSeeded)) return;
     migrationsQueued = true;
     // 방 참여 직후에는 구독(attach)이 applyRemote 뒤에 붙으므로 한 틱 뒤에 실행한다.
-    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedSupportsOnce(); seedBirthTasksOnce(); }, 0);
+    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedWeekBaseOnce(); seedSupportsOnce(); seedBirthTasksOnce(); }, 0);
   }
   function applyRemote(remoteState) {
     var result = normalizeState(remoteState);
@@ -4915,6 +4931,13 @@ datesSorted().forEach(function (d) {
       if (v === (state.dueDate || '')) return;
       state.dueDate = v; commit(); act('due', v ? '출산 예정일을 ' + formatNoteDate(v) + '로 설정' : '출산 예정일 지움');
       showToast(v ? '출산 예정일을 저장했습니다. ' + ddayText(v) : '출산 예정일을 지웠습니다.');
+    });
+    var wbInput = $('#week-base');
+    if (wbInput) wbInput.addEventListener('change', function () {
+      var v = wbInput.value; if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) v = '';
+      if (v === (state.weekBase || '')) return;
+      state.weekBase = v; commit(); act('due', v ? '임신 주수 기준일(40주)을 ' + formatNoteDate(v) + '로 설정' : '임신 주수 기준일 지움');
+      showToast(v ? '임신 주수 기준일을 저장했습니다.' : '주수는 출산 예정일 기준으로 계산합니다.');
     });
     var anInput = $('#anniversary');
     if (anInput) anInput.addEventListener('change', function () {
@@ -5601,7 +5624,7 @@ datesSorted().forEach(function (d) {
     }
     var storedRoom = null;
     try { storedRoom = window.localStorage.getItem('birth-bag-checklist:room'); } catch (e) { /* ignore */ }
-    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) seedFamilyDatesOnce(); seedSupportsOnce(); seedBirthTasksOnce(); }
+    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) { seedFamilyDatesOnce(); seedWeekBaseOnce(); } seedSupportsOnce(); seedBirthTasksOnce(); }
     try { window.history.replaceState({ view: ui.view }, ''); } catch (e) { /* ignore */ }
     window.addEventListener('popstate', function (e) {
       if (sheetPopSilently) { sheetPopSilently = false; return; }

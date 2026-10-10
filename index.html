@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261009a">
+  <link rel="stylesheet" href="./style.css?v=20261010a">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
@@ -301,6 +301,8 @@
         <input type="text" id="device-name" maxlength="12" placeholder="예: 남편, 아내" autocomplete="nickname"></div>
       <div class="field"><label for="due-date">출산 예정일 (포털·마미백에 D-day 표시, 가족과 공유됨)</label>
         <input type="date" id="due-date"></div>
+      <div class="field"><label for="week-base">임신 주수 기준일 (40주 0일이 되는 날, 병원 예정일 · 비우면 출산 예정일로 계산)</label>
+        <input type="date" id="week-base"></div>
       <div class="field"><label for="anniversary">결혼기념일 (포털에 함께한 날 표시, 결혼한 날 = 1일)</label>
         <input type="date" id="anniversary"></div>
     </section>
@@ -392,9 +394,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261009a"></script>
-  <script src="./app.js?v=20261009a"></script>
-  <script src="./sync.js?v=20261009a"></script>
+  <script src="./firebase-config.js?v=20261010a"></script>
+  <script src="./app.js?v=20261010a"></script>
+  <script src="./sync.js?v=20261010a"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {

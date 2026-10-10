@@ -129,6 +129,7 @@
     doc.dates = {};
     (s.dates || []).forEach(function (d, i) { doc.dates[d.id] = { date: d.date || '', time: d.time || '', label: d.label || '', memo: d.memo || '', fav: !!d.fav, likes: (d.likes && d.likes.length) ? d.likes.slice() : null, comments: (d.comments && d.comments.length) ? d.comments.map(function (c) { return { id: c.id, who: c.who || '', text: c.text || '', t: c.t || 0 }; }) : null, order: i }; });
     doc.dueDate = s.dueDate || '';
+    doc.weekBase = s.weekBase || '';
     doc.birthDate = s.birthDate || '';
     doc.growth = {};
     (s.growth || []).forEach(function (g) { doc.growth[g.id] = { date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; });
@@ -175,6 +176,7 @@
       names: sortedEntries(doc.names).map(function (n) { return { id: n.id, name: n.name || '', favorite: n.favorite === true, likes: n.likes || [], comments: n.comments || [], memo: n.memo || '', hanja: asArr(n.hanja).map(function (h) { return { id: (h && h.id) || '', chars: (h && h.chars) || '', meaning: (h && h.meaning) || '' }; }), dateIds: asArr(n.dateIds).filter(function (x) { return typeof x === 'string'; }) }; }),
       highlights: typeof doc.highlights === 'string' ? doc.highlights : '',
       dueDate: typeof doc.dueDate === 'string' ? doc.dueDate : '',
+      weekBase: typeof doc.weekBase === 'string' ? doc.weekBase : '',
       birthDate: typeof doc.birthDate === 'string' ? doc.birthDate : '',
       growth: Object.keys(doc.growth || {}).map(function (id) { var g = doc.growth[id] || {}; return { id: id, date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; }),
       vaccines: Object.keys(doc.vaccines || {}).map(function (id) { var v = doc.vaccines[id] || {}; return { id: id, date: v.date || '', place: v.place || '', who: v.who || '' }; }),
@@ -207,6 +209,7 @@
     });
     if ((prev.highlights || '') !== (next.highlights || '')) updates.highlights = next.highlights || '';
     if ((prev.dueDate || '') !== (next.dueDate || '')) updates.dueDate = next.dueDate || '';
+    if ((prev.weekBase || '') !== (next.weekBase || '')) updates.weekBase = next.weekBase || '';
     if ((prev.birthDate || '') !== (next.birthDate || '')) updates.birthDate = next.birthDate || '';
     if ((prev.anniversary || '') !== (next.anniversary || '')) updates.anniversary = next.anniversary || '';
     if ((prev.budget || 0) !== (next.budget || 0)) updates.budget = next.budget || 0;
