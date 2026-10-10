@@ -1127,6 +1127,24 @@ body { padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding
 .dcard--baby .dtrack__now { background: var(--lav-ink); }
 .dcard--baby .dtrack--miles .dtrack__fill { height: 4px; top: 4px; border-radius: 99px; }
 .dcard--baby .dtrack--miles .dtrack__line { height: 4px; top: 4px; border-radius: 99px; }
+/* 주 단위 진행 바(30주 31주 … 출산 예정): 점이 많아 글자를 작게, 양 끝 글자는 안쪽으로 붙인다 */
+.dtrack--weekly .dtrack__mile { gap: 3px; font-size: 0.58rem; }
+.dtrack--weekly .dtrack__mile b { font-size: 0.6rem; }
+.dtrack--weekly .dtrack__mile i { width: 10px; height: 10px; margin-top: 1px; }
+.dtrack--weekly .dtrack__mile:nth-child(3) { align-items: flex-start; transform: translateX(-5px); }
+.dtrack--weekly .dtrack__mile:nth-last-child(2) { align-items: flex-end; transform: translateX(calc(-100% + 5px)); }
+/* '오늘' 표시는 점 위쪽에 띄워 점을 가리지 않게 */
+.dtrack--weekly { margin-top: 18px; }
+.dtrack__mile small { font-size: inherit; }
+/* 좁은 폰(≤380px): 가운데 날짜는 숨기고 첫·끝 날짜만, 좌우 여백도 줄인다 */
+@media (max-width: 380px) {
+  .dtrack--weekly { margin-left: 6px; margin-right: 6px; }
+  .dtrack--weekly .dtrack__mile b { font-size: 0.55rem; letter-spacing: -0.03em; }
+  .dtrack--weekly .dtrack__mile:not(:nth-child(3)):not(:nth-last-child(2)) small { visibility: hidden; }
+}
+@media (max-width: 340px) { .dtrack--weekly .dtrack__mile:nth-last-child(2) b { white-space: normal; width: 2.4em; text-align: right; line-height: 1.15; } }
+.dtrack--weekly .dtrack__now { top: -26px; }
+.dtrack--weekly .dtrack__now::after { content: ''; position: absolute; left: 50%; bottom: -4px; margin-left: -4px; border: 4px solid transparent; border-bottom: 0; border-top-color: var(--lav-ink); }
 .dday-empty { min-height: 56px; padding: 10px 18px; border: 1.5px dashed #E8E0D9; border-radius: 16px; background: transparent; color: var(--muted); font: inherit; font-size: 0.9rem; cursor: pointer; }
 .portal__spaces { margin-top: auto; padding-top: 28px; align-self: stretch; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; justify-items: center; }
 .space-tile { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 4px; border: 0; background: none; font: inherit; font-size: 0.9rem; font-weight: 600; color: var(--text); cursor: pointer; border-radius: 26px; }

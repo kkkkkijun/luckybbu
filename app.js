@@ -2268,11 +2268,11 @@ datesSorted().forEach(function (d) {
       pts.map(function (p, i) { return '<span class="dtrack__pt' + (i === 0 ? ' is-now' : p.edge ? ' is-end' : '') + '"><i></i>' + (p.edge ? '<b>' + p.label + '</b>' : p.label) + '</span>'; }).join('') + '</div>';
   }
   // 기념일 점: start일째 ~ end일째 구간에 이정표를 놓고 오늘(now일째) 위치를 표시
-  function mileTrackHtml(start, end, now, miles, nowLabel) {
-    var pos = function (n) { return Math.max(0, Math.min(100, (n - start) / (end - start) * 100)); };
-    return '<div class="dtrack dtrack--miles" role="img" aria-label="' + escapeHtml(miles.map(function (m) { return m.label + (m.n <= now ? ' 지남' : ''); }).join(', ')) + '">' +
+  function mileTrackHtml(start, end, now, miles, nowLabel, posFn, cls) {
+    var pos = posFn || function (n) { return Math.max(0, Math.min(100, (n - start) / (end - start) * 100)); };
+    return '<div class="dtrack dtrack--miles' + (cls ? ' ' + cls : '') + '" role="img" aria-label="' + escapeHtml(miles.map(function (m) { return m.label + (m.n <= now ? ' 지남' : ''); }).join(', ')) + '">' +
       '<span class="dtrack__line"></span><span class="dtrack__fill" style="width:' + pos(now).toFixed(1) + '%"></span>' +
-      miles.map(function (m) { return '<span class="dtrack__mile' + (m.n <= now ? ' is-done' : '') + '" style="left:' + pos(m.n).toFixed(1) + '%"><i></i><b>' + escapeHtml(m.label) + '</b>' + escapeHtml(m.date) + '</span>'; }).join('') +
+      miles.map(function (m) { return '<span class="dtrack__mile' + (m.n <= now ? ' is-done' : '') + '" style="left:' + pos(m.n).toFixed(1) + '%"><i></i><b>' + escapeHtml(m.label) + '</b><small>' + escapeHtml(m.date) + '</small></span>'; }).join('') +
       '<span class="dtrack__now" style="left:' + pos(now).toFixed(1) + '%">' + escapeHtml(nowLabel || '오늘') + '</span></div>';
   }
   // 함께한 날(첫날 = 1일)의 이정표: 지난 기념일(또는 첫날) ~ 다음 기념일 사이, 100일 단위 포함
@@ -2287,21 +2287,28 @@ datesSorted().forEach(function (d) {
     miles.push({ n: to, label: yearLabel(years + 1), date: md(addDays(w, to - 1)) });
     return { start: from, end: to, miles: miles };
   }
-  // 축복이 만나기까지: 임신 주수 진행 바. 주수는 '40주 0일이 되는 날'(weekBase, 없으면 출산 예정일) 기준으로 세고,
-  // 바의 끝은 실제로 만나는 날(출산 예정일). 막달 구간(30주→만나는 날)만, 아직 30주 전이면 20주부터 보여 준다.
+  // 축복이 만나기까지: 30주부터 한 주씩(30주 31주 … ) 점을 찍고 끝은 만나는 날(출산 예정). 점은 같은 간격으로 놓고,
+  // '오늘'은 그 주 안에서 지난 날만큼 다음 점 쪽으로 간다. 주수는 '40주 0일이 되는 날'(weekBase, 없으면 출산 예정일) 기준이라
+  // 0주 0일과 같은 요일(우리 집은 금요일)에 주가 바뀐다.
   function pregnancyTrackHtml() {
     var start0 = addDays(dateOf(state.weekBase || state.dueDate), -280); // 0주 0일
     var dayN = function (d) { return Math.round((d - start0) / 86400000); };
     var now = dayN(todayDate()), end = dayN(dateOf(state.dueDate));
-    var fromWeek = end - now > 70 ? 20 : 30;
-    if (fromWeek * 7 >= end) fromWeek = Math.max(0, Math.floor(end / 7) - 8);
-    var mark = function (week, label) { var n = week * 7; return { n: n, label: label || (week + '주'), date: md(addDays(start0, n)) }; };
     var wk = function (n) { return Math.floor(n / 7) + '주' + (n % 7 ? ' ' + (n % 7) + '일' : ''); };
-    var marks = fromWeek >= 30 ? [[30], [34], [37, '만삭']] : [[fromWeek], [28], [34]];
-    var miles = marks.filter(function (m) { return m[0] * 7 < end - 6; }).map(function (m) { return mark(m[0], m[1]); });
+    var miles = [];
+    for (var w = Math.min(30, Math.floor(end / 7)); w * 7 < end; w++) miles.push({ n: w * 7, label: w + '주', date: md(addDays(start0, w * 7)) });
     miles.push({ n: end, label: '출산 예정', date: md(addDays(start0, end)) });
-    var nowLabel = now < fromWeek * 7 ? '오늘' : '오늘 ' + wk(Math.max(0, now));
-    return mileTrackHtml(fromWeek * 7, end, Math.min(end, Math.max(fromWeek * 7, now)), miles, nowLabel);
+    var last = miles.length - 1;
+    // 마지막 칸('출산 예정')은 글자가 길어 한 칸 반 너비로 둔다
+    var slots = last ? last + 0.5 : 1, slotAt = function (i) { return i === last ? slots : i; };
+    var pos = function (n) {
+      if (!last || n <= miles[0].n) return 0;
+      if (n >= end) return 100;
+      for (var i = 0; i < last; i++) if (n < miles[i + 1].n) return (slotAt(i) + (slotAt(i + 1) - slotAt(i)) * (n - miles[i].n) / (miles[i + 1].n - miles[i].n)) / slots * 100;
+      return 100;
+    };
+    var nowLabel = now < miles[0].n ? '오늘' : '오늘 ' + wk(now);
+    return mileTrackHtml(miles[0].n, end, Math.min(end, Math.max(miles[0].n, now)), miles, nowLabel, pos, 'dtrack--weekly');
   }
   function weeksLeftText(d) {
     var wk = Math.floor(d / 7), dd = d % 7;
