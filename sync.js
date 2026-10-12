@@ -142,10 +142,11 @@
     doc.ledger = {};
     (s.ledger || []).forEach(function (e) { doc.ledger[e.id] = { date: e.date, type: e.type, amount: e.amount, cat: e.cat || '', text: e.text || '', who: e.who || '', pay: e.pay || '', t: e.t || 0 }; });
     doc.memo = s.memo || '';
+    doc.spendTags = (s.spendTags && s.spendTags.length) ? s.spendTags.slice() : null;
     doc.memos = {};
     (s.memos || []).forEach(function (m, i) { doc.memos[m.id] = { text: m.text || '', updated: m.updated || 0, who: m.who || '', fav: !!m.fav, likes: (m.likes && m.likes.length) ? m.likes.slice() : null, comments: (m.comments && m.comments.length) ? m.comments.map(function (c) { return { id: c.id, who: c.who || '', text: c.text || '', t: c.t || 0 }; }) : null, tables: (m.tables && m.tables.length) ? m.tables.map(function (t) { return { id: t.id, cols: t.cols.slice(), rowH: t.rowH.slice(), rows: t.rows.map(function (r) { return r.slice(); }) }; }) : null, order: i }; });
     doc.supports = {};
-    (s.supports || []).forEach(function (x, i) { doc.supports[x.id] = { title: x.title || '', target: x.target || '', benefit: x.benefit || '', howto: x.howto || '', deadline: x.deadline || '', link: x.link || '', status: x.status || 'todo', memo: x.memo || '', stage: x.stage || 'birth', amount: x.amount || '', amountWon: typeof x.amountWon === 'number' ? x.amountWon : null, where: x.where || '', dueText: x.dueText || '', dueBase: x.dueBase || '', dueDays: typeof x.dueDays === 'number' ? x.dueDays : null, order: i }; });
+    (s.supports || []).forEach(function (x, i) { doc.supports[x.id] = { title: x.title || '', target: x.target || '', benefit: x.benefit || '', howto: x.howto || '', deadline: x.deadline || '', link: x.link || '', status: x.status || 'todo', memo: x.memo || '', stage: x.stage || 'birth', amount: x.amount || '', amountWon: typeof x.amountWon === 'number' ? x.amountWon : null, where: x.where || '', dueText: x.dueText || '', dueBase: x.dueBase || '', dueDays: typeof x.dueDays === 'number' ? x.dueDays : null, received: typeof x.received === 'number' ? x.received : null, useBy: x.useBy || '', spends: spendsDoc(x.spends), order: i }; });
     doc.birthTasks = {};
     (s.birthTasks || []).forEach(function (t, i) { doc.birthTasks[t.id] = { stage: t.stage || 'prep', text: t.text || '', note: t.note || '', done: !!t.done, link: t.link || '', csec: !!t.csec, order: i }; });
     doc.names = {};
@@ -153,6 +154,15 @@
     return doc;
   }
 
+  function spendsDoc(arr) {
+    if (!arr || !arr.length) return null;
+    var m = {}; arr.forEach(function (e) { m[e.id] = { date: e.date || '', tag: e.tag || '', text: e.text || '', amount: typeof e.amount === 'number' ? e.amount : 0, who: e.who || '' }; });
+    return m;
+  }
+  function spendsState(m) {
+    return Object.keys(m || {}).map(function (id) { var e = m[id] || {}; return { id: id, date: e.date || '', tag: e.tag || '', text: e.text || '', amount: typeof e.amount === 'number' ? e.amount : 0, who: e.who || '' }; })
+      .sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (a.id < b.id ? 1 : -1); });
+  }
   function sortedEntries(map) {
     var arr = Object.keys(map || {}).map(function (id) { var v = map[id] || {}; v.id = id; return v; });
     arr.sort(function (a, b) {
@@ -185,8 +195,9 @@
       budget: typeof doc.budget === 'number' ? doc.budget : 0,
       ledger: Object.keys(doc.ledger || {}).map(function (id) { var e = doc.ledger[id] || {}; return { id: id, date: e.date, type: e.type, amount: e.amount, cat: e.cat, text: e.text || '', who: e.who || '', pay: e.pay || '', t: typeof e.t === 'number' ? e.t : 0 }; }),
       memo: typeof doc.memo === 'string' ? doc.memo : '',
+      spendTags: asArr(doc.spendTags).filter(function (t) { return typeof t === 'string'; }),
       memos: sortedEntries(doc.memos).map(function (m) { return { id: m.id, text: m.text || '', updated: typeof m.updated === 'number' ? m.updated : 0, who: m.who || '', fav: m.fav === true, likes: m.likes || [], comments: m.comments || [], tables: m.tables || [] }; }),
-      supports: sortedEntries(doc.supports).map(function (x) { return { id: x.id, title: x.title || '', target: x.target || '', benefit: x.benefit || '', howto: x.howto || '', deadline: x.deadline || '', link: x.link || '', status: x.status || 'todo', memo: x.memo || '', stage: x.stage || 'birth', amount: x.amount || '', amountWon: typeof x.amountWon === 'number' ? x.amountWon : null, where: x.where || '', dueText: x.dueText || '', dueBase: x.dueBase || '', dueDays: typeof x.dueDays === 'number' ? x.dueDays : null }; }),
+      supports: sortedEntries(doc.supports).map(function (x) { return { id: x.id, title: x.title || '', target: x.target || '', benefit: x.benefit || '', howto: x.howto || '', deadline: x.deadline || '', link: x.link || '', status: x.status || 'todo', memo: x.memo || '', stage: x.stage || 'birth', amount: x.amount || '', amountWon: typeof x.amountWon === 'number' ? x.amountWon : null, where: x.where || '', dueText: x.dueText || '', dueBase: x.dueBase || '', dueDays: typeof x.dueDays === 'number' ? x.dueDays : null, received: typeof x.received === 'number' ? x.received : null, useBy: x.useBy || '', spends: spendsState(x.spends) }; }),
       birthTasks: sortedEntries(doc.birthTasks).map(function (t) { return { id: t.id, stage: t.stage || 'prep', text: t.text || '', note: t.note || '', done: t.done === true, link: t.link || '', csec: t.csec === true }; }),
       picks: { gpt: (doc.picks && typeof doc.picks.gpt === 'string') ? doc.picks.gpt : '', claude: (doc.picks && typeof doc.picks.claude === 'string') ? doc.picks.claude : '' }
     };
@@ -214,6 +225,7 @@
     if ((prev.anniversary || '') !== (next.anniversary || '')) updates.anniversary = next.anniversary || '';
     if ((prev.budget || 0) !== (next.budget || 0)) updates.budget = next.budget || 0;
     if ((prev.memo || '') !== (next.memo || '')) updates.memo = next.memo || '';
+    if (JSON.stringify(prev.spendTags || null) !== JSON.stringify(next.spendTags || null)) updates.spendTags = next.spendTags || null;
     if (JSON.stringify(prev.picks || {}) !== JSON.stringify(next.picks || {})) updates.picks = next.picks || { gpt: '', claude: '' };
     if (prev.version !== next.version) updates.version = next.version;
     return updates;

@@ -338,7 +338,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [] };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [] };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -528,7 +528,11 @@
           amount: str(sp.amount, 40), amountWon: (typeof sp.amountWon === 'number' && isFinite(sp.amountWon) && sp.amountWon >= 0) ? Math.round(sp.amountWon) : null,
           where: str(sp.where, 120), dueText: str(sp.dueText, 60),
           dueBase: SUPPORT_DUE_BASE.indexOf(sp.dueBase) !== -1 ? sp.dueBase : '',
-          dueDays: (typeof sp.dueDays === 'number' && isFinite(sp.dueDays)) ? Math.round(sp.dueDays) : null });
+          dueDays: (typeof sp.dueDays === 'number' && isFinite(sp.dueDays)) ? Math.round(sp.dueDays) : null,
+          received: (typeof sp.received === 'number' && isFinite(sp.received) && sp.received >= 0) ? Math.round(sp.received) : null,
+          useBy: (typeof sp.useBy === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(sp.useBy)) ? sp.useBy : '',
+          spends: (Array.isArray(sp.spends) ? sp.spends : []).filter(function (e) { return e && typeof e.id === 'string' && e.id && typeof e.amount === 'number' && isFinite(e.amount) && e.amount > 0 && typeof e.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date); })
+            .map(function (e) { return { id: e.id, date: e.date, tag: typeof e.tag === 'string' ? e.tag.trim().slice(0, 12) : '', text: typeof e.text === 'string' ? e.text.trim().slice(0, 40) : '', amount: Math.round(e.amount), who: typeof e.who === 'string' ? e.who.trim().slice(0, 12) : '' }; }) });
       }
     }
     // 출산 당일 할 일 (올바르지 않은 항목은 건너뛴다)
@@ -547,6 +551,7 @@
       });
     }
     // 아기: 태어난 날 · 성장 기록 · 육아 일지 (올바르지 않은 항목은 건너뛴다)
+    var spendTags = Array.isArray(raw.spendTags) ? raw.spendTags.filter(function (t) { return typeof t === 'string' && t.trim(); }).map(function (t) { return t.trim().slice(0, 12); }).filter(function (t, i, a) { return a.indexOf(t) === i; }).slice(0, 30) : [];
     var birthDate = typeof raw.birthDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.birthDate) ? raw.birthDate : '';
     var numIn = function (v, lo, hi) { return typeof v === 'number' && isFinite(v) && v >= lo && v <= hi ? Math.round(v * 100) / 100 : null; };
     var growth = [], seenGr = {};
@@ -572,7 +577,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags } };
   }
 
   /* ---------- storage ---------- */
@@ -654,7 +659,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, weekSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, weekSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false, spSpendOpen: {}, spSpendTag: '', spSpendMore: {}, spTagEdit: false, spDraft: {} };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -2983,6 +2988,7 @@ datesSorted().forEach(function (d) {
     h += '<button type="button" class="support__head" data-action="open-support" data-focus-key="sp-head:' + id + '" aria-haspopup="dialog">';
     h += '<span class="support__title">' + escapeHtml(sp.title) + '</span><span class="support__more" aria-hidden="true">자세히 ›</span><span class="sp-stat sp-stat--' + sp.status + '">' + SUPPORT_STATUS_LABEL[sp.status] + '</span></button>';
     if (sp.amount) h += '<p class="support__amount">' + escapeHtml(sp.amount) + '</p>';
+    h += supportCardBalanceHtml(sp);
     h += supportDueHtml(sp);
     if (sp.where) h += '<div class="support__where">' + sp.where.split(/\s*,\s*/).filter(Boolean).map(function (w) { return '<span>' + escapeHtml(w) + '</span>'; }).join('') + (href ? '<a class="support__where-link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">공식 안내 ↗</a>' : '') + '</div>';
     else if (href) h += '<div class="support__where"><a class="support__where-link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">공식 안내 ↗</a></div>';
@@ -2998,6 +3004,98 @@ datesSorted().forEach(function (d) {
       return '<button type="button" class="support__step' + (sp.status === k ? ' is-on' : (idx > ki ? ' is-past' : '')) + '" data-action="sp-status" data-status="' + k + '" aria-pressed="' + (sp.status === k ? 'true' : 'false') + '">' + SUPPORT_STATUS_LABEL[k] + '</button>';
     }).join('') + '<button type="button" class="support__step support__step--na' + (sp.status === 'na' ? ' is-on' : '') + '" data-action="sp-status" data-status="na" aria-pressed="' + (sp.status === 'na' ? 'true' : 'false') + '">해당 없음</button></div>';
   }
+  /* ---------- 받은 지원금 잔액 ---------- */
+  var SPEND_TAGS_DEFAULT = ['정기검진', '초음파', '약국', '분만'];
+  function spendTags() { return state.spendTags && state.spendTags.length ? state.spendTags : SPEND_TAGS_DEFAULT; }
+  // 바우처·포인트처럼 ‘받으면 쓰는’ 지원은 받음이 되면 바로 잔액 관리, 현금 지원은 사용 내역을 적으면 보인다
+  function isVoucher(sp) { return /바우처|이용권|교통비|산후조리경비|택시|포인트/.test(sp.title + ' ' + (sp.amount || '')); }
+  // 받은 돈: 직접 적은 값 → (바우처·포인트만) 안내 금액 → 0. 현금 지원은 매달 나눠 받으니 안내 금액으로 채우지 않는다
+  function spReceived(sp) { return typeof sp.received === 'number' ? sp.received : (isVoucher(sp) && typeof sp.amountWon === 'number' ? sp.amountWon : 0); }
+  function spSpent(sp) { return (sp.spends || []).reduce(function (s, e) { return s + (e.amount || 0); }, 0); }
+  function spTracked(sp) {
+    if (sp.status === 'na') return false;
+    if ((sp.spends || []).length || typeof sp.received === 'number') return true;
+    return sp.status === 'received' && isVoucher(sp) && spReceived(sp) > 0;
+  }
+  function balanceSummary() {
+    var items = state.supports.filter(spTracked), rec = 0, spent = 0;
+    items.forEach(function (sp) { rec += spReceived(sp); spent += spSpent(sp); });
+    return { items: items, rec: rec, spent: spent, left: rec - spent };
+  }
+  function pctLeft(sp) { var r = spReceived(sp); return r > 0 ? Math.max(0, Math.min(100, Math.round((r - spSpent(sp)) / r * 100))) : 0; }
+  function spendSectionHtml(sp) {
+    var id = escapeHtml(sp.id), tracked = spTracked(sp);
+    if (!tracked && !ui.spSpendOpen[sp.id]) {
+      if (sp.status === 'na') return '';
+      return '<button type="button" class="sp-spend-open" data-action="sp-spend-open">💳 받은 돈 사용 내역 기록하기</button>';
+    }
+    var rec = spReceived(sp), spent = spSpent(sp), left = rec - spent;
+    var h = '<section class="sp-spend" aria-label="사용 내역">';
+    h += '<div class="sp-spend__head"><b>💳 사용 내역</b><span>가족과 공유</span></div>';
+    h += '<div class="sp-spend__three"><label class="sp-spend__rec"><small>받은 돈 ✎</small><input type="text" inputmode="numeric" name="spReceived" data-price-input data-focus-key="sp-rec:' + id + '" value="' + (rec ? formatNumber(rec) : '') + '" placeholder="0" aria-label="받은 돈"></label>' +
+      '<div><small>쓴 돈</small><b>' + formatNumber(spent) + '</b></div><div class="' + (left < 0 ? 'is-minus' : 'is-left') + '"><small>남은 돈</small><b>' + formatNumber(left) + '</b></div></div>';
+    h += '<div class="sp-bar"><i style="width:' + pctLeft(sp) + '%"></i></div>';
+    if (!rec) h += '<p class="sp-spend__hint">받은 돈 칸에 지금까지 실제로 받은 금액을 적어 주세요.</p>';
+    var list = sp.spends || [], more = ui.spSpendMore[sp.id], shown = more ? list : list.slice(0, 4);
+    if (list.length) {
+      h += '<ul class="sp-spend__list">' + shown.map(function (e) {
+        return '<li><span class="sp-spend__d">' + mdText(e.date) + '</span><span class="sp-spend__t">' + (e.tag ? '<em>' + escapeHtml(e.tag) + '</em>' : '') + escapeHtml(e.text || '') + (e.who ? '<small>' + escapeHtml(e.who) + '</small>' : '') + '</span><span class="sp-spend__m">−' + formatNumber(e.amount) + '</span>' +
+          '<button type="button" class="sp-spend__x" data-action="sp-spend-del" data-sid="' + escapeHtml(e.id) + '" aria-label="이 사용 내역 지우기">×</button></li>';
+      }).join('') + (list.length > 4 && !more ? '<li class="sp-spend__more"><button type="button" data-action="sp-spend-more">이전 ' + (list.length - 4) + '건 더 보기 ▾</button></li>' : '') + '</ul>';
+    } else h += '<p class="sp-spend__empty">아직 쓴 기록이 없어요. 아래에 쓴 곳과 금액을 적어 주세요.</p>';
+    var tags = spendTags(), dr = ui.spDraft[sp.id] || {};
+    h += '<form class="sp-spend__form" data-spend-form>' +
+      '<div class="sp-spend__row"><input type="date" name="date" value="' + escapeHtml(dr.date || todayStamp()) + '" max="' + todayStamp() + '" aria-label="쓴 날">' +
+      '<input type="text" name="text" maxlength="40" placeholder="어디에 썼나요" data-focus-key="sp-text:' + id + '" value="' + escapeHtml(dr.text || '') + '" autocomplete="off" aria-label="쓴 곳">' +
+      '<input type="text" name="amount" inputmode="numeric" data-price-input placeholder="금액(원)" data-focus-key="sp-amt:' + id + '" value="' + escapeHtml(dr.amount || '') + '" autocomplete="off" aria-label="금액"></div>' +
+      '<div class="sp-tags" role="group" aria-label="사용처 태그">' + tags.map(function (t) {
+        var on = ui.spSpendTag === t;
+        return '<span class="sp-tag' + (on ? ' is-on' : '') + '"><button type="button" data-action="sp-tag" data-tag="' + escapeHtml(t) + '" aria-pressed="' + on + '">' + escapeHtml(t) + '</button>' + (ui.spTagEdit ? '<button type="button" class="sp-tag__x" data-action="sp-tag-del" data-tag="' + escapeHtml(t) + '" aria-label="' + escapeHtml(t) + ' 태그 지우기">×</button>' : '') + '</span>';
+      }).join('') +
+      '<button type="button" class="sp-tag sp-tag--add" data-action="sp-tag-add">＋ 태그</button>' +
+      '<button type="button" class="sp-tag sp-tag--edit" data-action="sp-tag-edit" aria-pressed="' + ui.spTagEdit + '">' + (ui.spTagEdit ? '완료' : '편집') + '</button></div>' +
+      '<button type="submit" class="btn btn--primary sp-spend__add">− 사용 추가</button></form>';
+    h += '<label class="sp-useby">⏰ 사용 기한 <input type="date" name="spUseBy" value="' + escapeHtml(sp.useBy || '') + '" aria-label="사용 기한">' + (sp.useBy ? '<span>' + (daysFromToday(sp.useBy) >= 0 ? 'D-' + daysFromToday(sp.useBy) : '지남') + '</span>' : '<span class="mut">있으면 적어 두세요</span>') + '</label>';
+    return h + '</section>';
+  }
+  function addSpend(sp, form) {
+    var amt = parseInt(String(form.elements.amount.value || '').replace(/[^\d]/g, ''), 10);
+    if (!(amt > 0)) { showToast('쓴 금액을 적어 주세요.'); form.elements.amount.focus(); return; }
+    var date = form.elements.date.value; if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = todayStamp();
+    var text = String(form.elements.text.value || '').trim().slice(0, 40), tag = ui.spSpendTag || '';
+    if (!text && !tag) { showToast('어디에 썼는지 적거나 태그를 골라 주세요.'); form.elements.text.focus(); return; }
+    sp.spends = (sp.spends || []).concat([{ id: uid(), date: date, tag: tag, text: text, amount: amt, who: myName() }])
+      .sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    ui.spSpendTag = ''; delete ui.spSpendOpen[sp.id]; delete ui.spDraft[sp.id];
+    commit(); act('support', '‘' + sp.title + '’ 사용 ' + formatNumber(amt) + '원' + (tag ? ' · ' + tag : '') + (text ? ' · ' + text : ''));
+    var left = spReceived(sp) - spSpent(sp);
+    showToast('사용 ' + formatNumber(amt) + '원 기록 · 남은 돈 ' + formatNumber(left) + '원');
+    var f = document.querySelector('[data-focus-key="sp-text:' + sp.id + '"]'); if (f) f.focus();
+  }
+  function balanceCardHtml(b) {
+    if (!b.items.length) return '';
+    var pct = b.rec > 0 ? Math.max(0, Math.min(100, Math.round(b.left / b.rec * 100))) : 0;
+    return '<button type="button" class="sp-balance" data-action="sp-filter" data-filter="balance"><span class="sp-balance__row"><span>받은 지원금 남은 돈</span><span>' + b.items.length + '개 항목</span></span>' +
+      '<b class="sp-balance__big' + (b.left < 0 ? ' is-minus' : '') + '">' + formatNumber(b.left) + '원</b><span class="sp-bar"><i style="width:' + pct + '%"></i></span>' +
+      '<span class="sp-balance__sub">받은 ' + formatNumber(b.rec) + '원 중 ' + formatNumber(b.spent) + '원 사용</span></button>';
+  }
+  function balanceListHtml(b) {
+    var rows = b.items.slice().sort(function (x, y) { return (spReceived(y) - spSpent(y)) - (spReceived(x) - spSpent(x)); });
+    var h = '<li class="sp-bal-list">' + (rows.length ? rows.map(function (sp) {
+      var left = spReceived(sp) - spSpent(sp);
+      return '<button type="button" class="sp-bal-row" data-action="open-support" data-support-id="' + escapeHtml(sp.id) + '"><span><b>' + escapeHtml(sp.title) + '</b><small>' + (sp.useBy ? '기한 ' + escapeHtml(sp.useBy.replace(/-/g, '.')) : (sp.spends || []).length + '건 사용') + '</small></span>' +
+        '<span class="sp-bal-row__r"><b class="' + (left < 0 ? 'is-minus' : '') + '">' + formatNumber(left) + '원</b><small>' + escapeHtml(formatWonShort(spReceived(sp))) + ' 중</small></span></button>';
+    }).join('') : '<p class="sp-spend__empty">아직 받은 지원금이 없어요.</p>') + '</li>';
+    var waiting = state.supports.filter(function (sp) { return !spTracked(sp) && sp.status !== 'na' && isVoucher(sp) && spReceived(sp) > 0; });
+    if (waiting.length) h += '<li class="sp-bal-wait"><b>받으면 여기에 추가돼요</b><p>' + waiting.map(function (sp) { return escapeHtml(sp.title) + (sp.amountWon ? ' ' + escapeHtml(formatWonShort(sp.amountWon)) : ''); }).join(' · ') + '</p><p class="mut">상태를 ‘받음’으로 바꾸면 자동으로 잔액 관리가 시작돼요. 현금 지원은 팝업에서 ‘사용 내역 기록하기’를 누르면 돼요.</p></li>';
+    return h;
+  }
+  function supportCardBalanceHtml(sp) {
+    if (!spTracked(sp)) return '';
+    var rec = spReceived(sp), spent = spSpent(sp), left = rec - spent;
+    return '<div class="sp-card-bal"><span class="sp-bar"><i style="width:' + pctLeft(sp) + '%"></i></span><span class="sp-card-bal__row"><span>' + formatNumber(spent) + '원 사용</span><span>남은 돈 <b class="' + (left < 0 ? 'is-minus' : '') + '">' + formatNumber(left) + '원</b></span></span></div>';
+  }
+
   // 팝업: 카드 하나의 자세한 내용(또는 수정 폼)
   function supportModalHtml(sp) {
     var id = escapeHtml(sp.id), href = safeHref(sp.link), editing = ui.supportEdit === sp.id;
@@ -3009,6 +3107,7 @@ datesSorted().forEach(function (d) {
     h += supportDueHtml(sp);
     if (sp.where || href) h += '<div class="support__where">' + (sp.where ? sp.where.split(/\s*,\s*/).filter(Boolean).map(function (w) { return '<span>' + escapeHtml(w) + '</span>'; }).join('') : '') + (href ? '<a class="support__where-link" href="' + escapeHtml(href) + '" target="_blank" rel="noopener noreferrer">공식 안내 열기 ↗</a>' : '') + '</div>';
     h += supportStepsHtml(sp);
+    h += spendSectionHtml(sp);
     h += '<div class="modal__rows">';
     if (sp.target) h += '<p class="support__row"><b>대상</b>' + escapeHtml(sp.target) + '</p>';
     if (sp.benefit) h += '<p class="support__row"><b>내용</b>' + escapeHtml(sp.benefit) + '</p>';
@@ -3029,13 +3128,13 @@ datesSorted().forEach(function (d) {
   }
   function openSupportModal(id) {
     if (!findSupport(id)) return;
-    ui.supportModal = id; ui.supportEdit = null;
+    ui.supportModal = id; ui.supportEdit = null; ui.spSpendTag = ''; ui.spTagEdit = false;
     renderSupports();
     var c = document.querySelector('[data-focus-key="sp-modal-close"]'); if (c) c.focus();
   }
   function closeSupportModal() {
     var was = ui.supportModal;
-    ui.supportModal = null; if (ui.supportEdit && ui.supportEdit !== 'new') ui.supportEdit = null;
+    ui.supportModal = null; ui.spSpendTag = ''; ui.spTagEdit = false; if (ui.supportEdit && ui.supportEdit !== 'new') ui.supportEdit = null;
     renderSupports();
     var back = was ? document.querySelector('[data-focus-key="sp-head:' + was + '"]') : null; if (back) back.focus();
   }
@@ -3056,7 +3155,8 @@ datesSorted().forEach(function (d) {
     if (stats) {
       if (!all.length) stats.innerHTML = '';
       else stats.innerHTML = '<div class="sp-sum"><div><b>' + (won ? '약 ' + escapeHtml(formatWonShort(won)) : '–') + '</b><small>받을 수 있는 금액</small></div><div class="sp-sum__mid"><b>' + done + ' / ' + total + '</b><small>신청·수령</small></div><div><b class="' + (soon ? 'is-soon' : '') + '">' + soon + '건</b><small>기한 30일 안</small></div></div>' +
-        '<div class="sp-filter" role="group" aria-label="상태로 보기">' + [['all', '전체', all.length], ['todo', '할 일', counts.todo], ['applied', '신청함', counts.applied], ['received', '받음', counts.received]].map(function (o) {
+        balanceCardHtml(balanceSummary()) +
+        '<div class="sp-filter" role="group" aria-label="상태로 보기">' + [['all', '전체', all.length], ['todo', '할 일', counts.todo], ['applied', '신청함', counts.applied], ['received', '받음', counts.received], ['balance', '남은 돈', '']].map(function (o) {
           return '<button type="button" class="sp-filter__btn' + (ui.supportFilter === o[0] ? ' is-active' : '') + '" data-action="sp-filter" data-filter="' + o[0] + '" aria-pressed="' + (ui.supportFilter === o[0] ? 'true' : 'false') + '">' + o[1] + '<b>' + o[2] + '</b></button>';
         }).join('') + '</div>';
     }
@@ -3066,6 +3166,7 @@ datesSorted().forEach(function (d) {
     if (!all.length && ui.supportEdit !== 'new') {
       html += '<li class="datecard-empty">아직 항목이 없습니다. ‘항목 추가’로 첫만남이용권, 부모급여, 산후조리경비 같은 지원을 하나씩 정리해 보세요.</li>';
     }
+    if (ui.supportFilter === 'balance') { list.innerHTML = html + balanceListHtml(balanceSummary()); var ab = $('#add-support-btn'); if (ab) ab.hidden = ui.supportEdit === 'new'; return; }
     var byStatus = function (x) { return ui.supportFilter === 'all' || x.status === ui.supportFilter; };
     SUPPORT_STAGES.forEach(function (st) {
       var items = all.filter(function (x) { return x.stage === st && byStatus(x); });
@@ -4304,6 +4405,7 @@ datesSorted().forEach(function (d) {
       growth: state.growth,
       babyLog: state.babyLog,
       vaccines: state.vaccines,
+      spendTags: state.spendTags,
       ledger: state.ledger,
       budget: state.budget
     }, null, pretty ? 2 : 0);
@@ -4406,7 +4508,7 @@ datesSorted().forEach(function (d) {
     if (el.readOnly || el.disabled) return false; // readonly share-link etc. must not block sync
     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'button') return false;
     // Only editable fields inside an item/note/highlights editor should defer a remote update.
-    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .gr-form, .bl-form, .bl-birth, .vx-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
+    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .gr-form, .bl-form, .bl-birth, .vx-form, .sp-spend, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
   }
 
   var migrationsQueued = false;
@@ -5115,9 +5217,36 @@ datesSorted().forEach(function (d) {
           case 'edit-support': ui.supportEdit = sid; renderSupports(); var ff = document.querySelector('[data-focus-key="sp-title:' + sid + '"]'); if (ff) ff.focus(); break;
           case 'cancel-support': ui.supportEdit = null; renderSupports(); var back = ui.supportModal ? document.querySelector('[data-focus-key="sp-modal-close"]') : (li ? document.querySelector('[data-focus-key="sp-head:' + sid + '"]') : $('#add-support-btn')); if (back) back.focus(); break;
           case 'delete-support': deleteSupport(sid); break;
+          case 'sp-spend-open': ui.spSpendOpen[sid] = true; renderSupports(); { var t0 = document.querySelector('[data-focus-key="sp-text:' + sid + '"]'); if (t0) t0.focus(); } break;
+          case 'sp-spend-more': ui.spSpendMore[sid] = true; renderSupports(); break;
+          case 'sp-tag': ui.spSpendTag = ui.spSpendTag === btn.dataset.tag ? '' : btn.dataset.tag; renderSupports(); break;
+          case 'sp-tag-edit': ui.spTagEdit = !ui.spTagEdit; renderSupports(); break;
+          case 'sp-tag-add': {
+            var nt = window.prompt('추가할 사용처 태그 (예: 산후조리원, 유모차, 기저귀)', ''); if (nt === null) break;
+            nt = nt.trim().slice(0, 12); if (!nt) break;
+            var cur = spendTags().slice(); if (cur.indexOf(nt) !== -1) { ui.spSpendTag = nt; renderSupports(); break; }
+            state.spendTags = cur.concat([nt]); ui.spSpendTag = nt; commit(); act('support', '사용처 태그 추가: ' + nt); break;
+          }
+          case 'sp-tag-del': {
+            var dt = btn.dataset.tag, before = spendTags().slice();
+            state.spendTags = before.filter(function (x) { return x !== dt; }); if (!state.spendTags.length) state.spendTags = [];
+            if (ui.spSpendTag === dt) ui.spSpendTag = '';
+            commit(); showToast('‘' + dt + '’ 태그를 지웠어요. 이미 적은 내역의 태그는 그대로예요.', function () { state.spendTags = before; commit(); });
+            break;
+          }
+          case 'sp-spend-del': {
+            var spx = findSupport(sid); if (!spx) break;
+            var eid = btn.dataset.sid, gone = null;
+            spx.spends = (spx.spends || []).filter(function (e) { if (e.id === eid) { gone = e; return false; } return true; });
+            if (!gone) break;
+            commit(); showToast('사용 ' + formatNumber(gone.amount) + '원 기록을 지웠어요.', function () { spx.spends = (spx.spends || []).concat([gone]).sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; }); commit(); showToast('되돌렸어요.'); });
+            break;
+          }
         }
       });
       supView.addEventListener('submit', function (e) {
+        var sf = e.target.closest('form[data-spend-form]');
+        if (sf) { e.preventDefault(); var ssp = findSupport(sf.closest('[data-support-id]').dataset.supportId); if (ssp) addSpend(ssp, sf); return; }
         var form = e.target.closest('form[data-support-form]'); if (!form) return;
         e.preventDefault(); submitSupportForm(form);
       });
@@ -5125,7 +5254,20 @@ datesSorted().forEach(function (d) {
       var sModal = $('#support-modal');
       if (sModal) sModal.addEventListener('click', function (e) { if (e.target === sModal) closeSupportModal(); });
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ui.supportModal) { e.preventDefault(); closeSupportModal(); } });
+      supView.addEventListener('change', function (e) {
+        var host = e.target.closest('[data-support-id]'); var hsp = host ? findSupport(host.dataset.supportId) : null; if (!hsp) return;
+        if (e.target.name === 'spReceived') {
+          var rv = parseInt(String(e.target.value || '').replace(/[^\d]/g, ''), 10);
+          hsp.received = rv >= 0 ? rv : null; commit(); act('support', '‘' + hsp.title + '’ 받은 돈 ' + formatNumber(hsp.received || 0) + '원');
+        } else if (e.target.name === 'spUseBy') {
+          var ub = e.target.value; hsp.useBy = /^\d{4}-\d{2}-\d{2}$/.test(ub) ? ub : ''; commit();
+        }
+      });
       supView.addEventListener('input', function (e) {
+        if (e.target.hasAttribute('data-price-input') && !e.isComposing) formatPriceInput(e.target);
+        var dfm = e.target.closest('form[data-spend-form]');
+        if (dfm) { var dsid = dfm.closest('[data-support-id]').dataset.supportId; ui.spDraft[dsid] = { date: dfm.elements.date.value, text: dfm.elements.text.value, amount: dfm.elements.amount.value }; return; }
+        if (e.target.hasAttribute('data-price-input')) return;
         if (e.target.name === 'amountWon') { var d = e.target.value.replace(/[^\d]/g, '').slice(0, 11); e.target.value = d ? formatNumber(d) : ''; }
       });
     }
