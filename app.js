@@ -338,7 +338,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [] };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [] };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -484,6 +484,7 @@
     var dueDate = typeof raw.dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.dueDate) ? raw.dueDate : '';
     var anniversary = typeof raw.anniversary === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.anniversary) ? raw.anniversary : '';
     var weekBase = typeof raw.weekBase === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.weekBase) ? raw.weekBase : '';
+    var goal = normalizeGoal(raw.goal);
     var ledger = normalizeLedger(raw.ledger);
     var budget = typeof raw.budget === 'number' && isFinite(raw.budget) && raw.budget > 0 ? Math.min(Math.round(raw.budget), PRICE_MAX) : 0;
     var memo = typeof raw.memo === 'string' ? raw.memo.replace(/\r\n?/g, '\n').slice(0, MEMO_MAX) : '';
@@ -577,7 +578,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags } };
   }
 
   /* ---------- storage ---------- */
@@ -2351,6 +2352,126 @@ datesSorted().forEach(function (d) {
       html += '<button type="button" class="dday-empty" data-action="open-settings">결혼기념일을 넣으면 함께한 날이 보여요</button>';
     }
     box.innerHTML = html;
+    renderGoal();
+  }
+
+  /* ---------- 포털: 모으는 돈 목표 (시안 ③ 원형 + 표) ---------- */
+  var GOAL_TITLE = '축복이 맞이 자금', GOAL_TITLE_MAX = 30;
+  function emptyGoal() { return { title: GOAL_TITLE, target: 0, current: 0, due: '', updated: 0 }; }
+  function normalizeGoal(raw) {
+    var g = emptyGoal();
+    if (!raw || typeof raw !== 'object') return g;
+    var num = function (v) { return typeof v === 'number' && isFinite(v) && v > 0 ? Math.min(Math.round(v), PRICE_MAX) : 0; };
+    if (typeof raw.title === 'string' && raw.title.trim()) g.title = raw.title.trim().slice(0, GOAL_TITLE_MAX);
+    g.target = num(raw.target); g.current = num(raw.current);
+    g.due = typeof raw.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.due) ? raw.due : '';
+    g.updated = typeof raw.updated === 'number' ? raw.updated : 0;
+    return g;
+  }
+  var COIN_SVG = '<svg class="goal__coin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></svg>';
+  var PEN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
+  function manWon(n) { return n >= 10000 ? '약 ' + formatNumber(Math.round(n / 10000)) + '만원' : formatNumber(n) + '원'; }
+  function goalPct(g) { return g.target ? Math.floor(g.current / g.target * 100) : 0; }
+  // 목표일까지 한 달에 모아야 할 돈
+  function goalPaceText(g) {
+    if (!g.due) return '';
+    var days = daysFromToday(g.due), left = g.target - g.current;
+    if (left <= 0) return shortDate(g.due).replace(/ \(.\)/, '') + ' · 달성했어요';
+    if (days < 0) return '목표일이 지났어요';
+    var months = Math.max(1, days / 30.44);
+    return md(dateOf(g.due)) + ' · 한 달 ' + manWon(Math.ceil(left / months));
+  }
+  function renderGoal() {
+    var box = $('#portal-goal');
+    if (!box) return;
+    var g = state.goal;
+    var head = '<div class="goal__head"><button type="button" class="goal__title" data-action="goal-edit" data-focus="title" aria-label="목표 이름 바꾸기: ' + escapeHtml(g.title) + '">' + COIN_SVG + '<span>' + escapeHtml(g.title) + '</span>' + PEN_SVG + '</button>' +
+      '<button type="button" class="goal__add" data-action="goal-edit" data-focus="amount">＋ ' + (g.target ? '금액 입력' : '목표 정하기') + '</button></div>';
+    if (!g.target) {
+      box.innerHTML = '<section class="goal" aria-label="모으는 돈">' + head + '<p class="goal__empty">모을 금액 목표를 정하면 지금까지 얼마나 모았는지 한눈에 보여 드려요.</p></section>';
+      return;
+    }
+    var pct = goalPct(g), left = g.target - g.current, r = 46, c = 2 * Math.PI * r;
+    var pace = goalPaceText(g);
+    box.innerHTML = '<section class="goal" aria-label="모으는 돈">' + head +
+      '<div class="goal__body"><span class="goal__ring" role="img" aria-label="' + pct + '% 모았어요"><svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true"><circle cx="56" cy="56" r="' + r + '" class="goal__track"/><circle cx="56" cy="56" r="' + r + '" class="goal__arc" stroke-dasharray="' + (c * Math.min(1, pct / 100)).toFixed(1) + ' ' + c.toFixed(1) + '"/></svg>' +
+      '<span class="goal__pct"><b>' + pct + '%</b><small>' + (left <= 0 ? '달성!' : '모았어요') + '</small></span></span>' +
+      '<dl class="goal__rows"><dt>모은 돈</dt><dd class="is-big">' + formatNumber(g.current) + '원</dd>' +
+      '<dt>목표</dt><dd>' + formatNumber(g.target) + '원</dd>' +
+      '<dt>' + (left > 0 ? '남은 돈' : '넘은 돈') + '</dt><dd>' + formatNumber(Math.abs(left)) + '원</dd>' +
+      (pace ? '<dt>목표일</dt><dd class="is-pace">' + escapeHtml(pace) + '</dd>' : '') + '</dl></div>' +
+      (g.updated ? '<p class="goal__updated">' + escapeHtml(shortDate(isoOfDate(new Date(g.updated)))) + ' 업데이트</p>' : '') + '</section>';
+  }
+  function isoOfDate(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+
+  // 금액 입력 창
+  function goalFormHtml() {
+    var g = state.goal, first = !g.target;
+    return '<form id="goal-form" novalidate><div class="modal__head"><h3 class="modal__title" id="goal-modal-title">' + (first ? '모을 돈 목표 정하기' : '모으는 돈 업데이트') + '</h3>' +
+      '<button type="button" class="modal__close" data-action="goal-close" aria-label="닫기">×</button></div>' +
+      '<div class="goal-form">' +
+      '<div class="field"><label for="goal-title-input">목표 이름</label><input type="text" id="goal-title-input" maxlength="' + GOAL_TITLE_MAX + '" value="' + escapeHtml(g.title) + '" autocomplete="off"></div>' +
+      (first ? '' : '<div class="seg" role="radiogroup" aria-label="입력 방법"><label class="choice"><input type="radio" name="goal-mode" value="add" checked><span>넣은 돈 더하기</span></label><label class="choice"><input type="radio" name="goal-mode" value="set"><span>지금 총액으로 바꾸기</span></label></div>') +
+      '<div class="field"><label for="goal-amount" id="goal-amount-label">' + (first ? '지금까지 모은 돈' : '더할 금액') + '</label><input type="text" id="goal-amount" inputmode="numeric" autocomplete="off" data-price-input placeholder="' + (first ? '예: 3,000,000' : '예: 500,000') + '"></div>' +
+      '<div class="goal-form__chips" aria-label="빠르게 더하기">' + [100000, 500000, 1000000].map(function (n) { return '<button type="button" class="goal-chip" data-action="goal-chip" data-add="' + n + '">+' + (n / 10000) + '만</button>'; }).join('') + '</div>' +
+      '<p class="goal-form__preview" id="goal-preview" aria-live="polite"></p>' +
+      '<div class="goal-form__two"><div class="field"><label for="goal-target">목표 금액</label><input type="text" id="goal-target" inputmode="numeric" autocomplete="off" data-price-input value="' + (g.target ? formatNumber(g.target) : '') + '" placeholder="예: 20,000,000"></div>' +
+      '<div class="field"><label for="goal-due">목표일 (선택)</label><input type="date" id="goal-due" value="' + g.due + '"></div></div>' +
+      '<div class="modal__actions"><button type="button" class="btn" data-action="goal-close">취소</button><button type="submit" class="btn btn--primary goal-form__save">저장</button></div></div></form>';
+  }
+  function goalNext() {
+    var g = state.goal, form = $('#goal-form');
+    if (!form) return null;
+    var modeEl = form.querySelector('input[name="goal-mode"]:checked');
+    var mode = modeEl ? modeEl.value : 'set';
+    var amt = parsePrice($('#goal-amount').value), tgt = parsePrice($('#goal-target').value);
+    if (!amt.ok || !tgt.ok) return { error: '금액은 숫자로 적어 주세요.' };
+    var current = mode === 'add' ? g.current + (amt.value || 0) : (amt.value === null ? g.current : amt.value);
+    return { mode: mode, current: Math.min(current, PRICE_MAX), target: tgt.value || 0, amount: amt.value };
+  }
+  function updateGoalPreview() {
+    var p = $('#goal-preview'), n = goalNext();
+    if (!p || !n) return;
+    if (n.error) { p.textContent = n.error; return; }
+    var g = state.goal;
+    if (!n.target) { p.textContent = '목표 금액을 적어 주세요.'; return; }
+    p.innerHTML = '저장하면 <b>' + formatNumber(g.current) + '원 → ' + formatNumber(n.current) + '원</b> (' + Math.floor(n.current / n.target * 100) + '%)';
+  }
+  var goalOpen = false;
+  function openGoal(focus) {
+    var m = $('#goal-modal');
+    if (!m) return;
+    m.querySelector('.modal__box').innerHTML = goalFormHtml();
+    m.hidden = false; goalOpen = true;
+    document.body.classList.add('has-modal');
+    try { window.history.pushState({ view: 'portal', sheet: true }, ''); } catch (e) { /* ignore */ }
+    updateGoalPreview();
+    var f = focus === 'title' ? $('#goal-title-input') : (state.goal.target ? $('#goal-amount') : $('#goal-target'));
+    if (f) { f.focus({ preventScroll: true }); if (focus === 'title') f.select(); }
+  }
+  function closeGoal(fromHistory) {
+    var m = $('#goal-modal');
+    if (!m || m.hidden) { goalOpen = false; return; }
+    m.hidden = true; goalOpen = false;
+    document.body.classList.remove('has-modal');
+    if (!fromHistory) dropSheetHistory();
+    var back = document.querySelector('#portal-goal .goal__add'); if (back) back.focus({ preventScroll: true });
+  }
+  function saveGoal() {
+    var n = goalNext();
+    if (!n) return;
+    if (n.error) { showToast(n.error); return; }
+    if (!n.target) { showToast('목표 금액을 적어 주세요.'); $('#goal-target').focus(); return; }
+    var due = $('#goal-due').value;
+    if (due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) due = '';
+    var title = $('#goal-title-input').value.trim().slice(0, GOAL_TITLE_MAX) || GOAL_TITLE;
+    var g = state.goal, before = g.current, firstTime = !g.target;
+    g.title = title; g.target = n.target; g.current = n.current; g.due = due; g.updated = Date.now();
+    closeGoal();
+    commit();
+    var diff = g.current - before;
+    act('goal', '‘' + title + '’ ' + (diff > 0 ? '+' + formatWon(diff) + ' → ' : '') + formatWon(g.current) + ' / ' + formatWon(g.target));
+    showToast(firstTime ? '목표를 정했어요. 지금 ' + goalPct(g) + '%' : diff > 0 ? '+' + formatWon(diff) + ' 모았어요. 지금 ' + goalPct(g) + '%' : '저장했어요. 지금 ' + goalPct(g) + '%');
   }
 
   // 처음 한 번: 비어 있는 날짜에 우리 가족 날짜를 채운다(이미 적힌 값은 건드리지 않음)
@@ -4397,6 +4518,7 @@ datesSorted().forEach(function (d) {
       dueDate: state.dueDate,
       anniversary: state.anniversary,
       weekBase: state.weekBase,
+      goal: state.goal,
       memo: state.memo,
       memos: state.memos,
       supports: state.supports,
@@ -4508,7 +4630,7 @@ datesSorted().forEach(function (d) {
     if (el.readOnly || el.disabled) return false; // readonly share-link etc. must not block sync
     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'button') return false;
     // Only editable fields inside an item/note/highlights editor should defer a remote update.
-    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .gr-form, .bl-form, .bl-birth, .vx-form, .sp-spend, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form');
+    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .gr-form, .bl-form, .bl-birth, .vx-form, .sp-spend, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form, #goal-form');
   }
 
   var migrationsQueued = false;
@@ -4823,8 +4945,29 @@ datesSorted().forEach(function (d) {
         var b = e.target.closest('[data-action]');
         if (!b) return;
         if (b.dataset.action === 'open-space') setView(b.dataset.space === 'ledger' ? 'ledger' : 'home');
+        else if (b.dataset.action === 'goal-edit') openGoal(b.dataset.focus);
+        else if (b.dataset.action === 'goal-close') closeGoal();
+        else if (b.dataset.action === 'goal-chip') {
+          var ai = $('#goal-amount'), cur = parsePrice(ai.value);
+          ai.value = formatNumber((cur.ok && cur.value ? cur.value : 0) + Number(b.dataset.add));
+          updateGoalPreview();
+        }
         else if (b.dataset.action === 'add-space') showToast('새 공간은 준비 중이에요. 필요한 공간을 알려 주시면 만들어 드릴게요.');
       });
+      portalView.addEventListener('submit', function (e) { if (e.target.id === 'goal-form') { e.preventDefault(); saveGoal(); } });
+      portalView.addEventListener('input', function (e) {
+        if (!e.target.closest('#goal-form')) return;
+        if (e.target.hasAttribute('data-price-input') && !e.isComposing) formatPriceInput(e.target);
+        updateGoalPreview();
+      });
+      portalView.addEventListener('change', function (e) {
+        if (e.target.name !== 'goal-mode') return;
+        var lab = $('#goal-amount-label'); if (lab) lab.textContent = e.target.value === 'add' ? '더할 금액' : '지금 모은 총액';
+        updateGoalPreview();
+      });
+      var gm = $('#goal-modal');
+      if (gm) gm.addEventListener('click', function (e) { if (e.target === gm) closeGoal(); }); // 바깥(어두운 곳) 누르면 닫기
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && goalOpen) { e.preventDefault(); closeGoal(); } });
     }
 
     // 가계부
@@ -5778,6 +5921,7 @@ datesSorted().forEach(function (d) {
     window.addEventListener('popstate', function (e) {
       if (sheetPopSilently) { sheetPopSilently = false; return; }
       if (ui.ledgerForm) { closeLedgerForm(true); return; }
+      if (goalOpen) { closeGoal(true); return; }
       var v = e.state && VIEWS.indexOf(e.state.view) !== -1 ? e.state.view : 'portal';
       setView(v, v === 'settings' ? ui.settingsFrom : undefined, true);
     });
@@ -5891,7 +6035,7 @@ datesSorted().forEach(function (d) {
     function reset() { active = false; dist = 0; startY = null; el.classList.remove('is-ready', 'is-visible', 'is-loading'); el.style.transform = ''; }
     document.addEventListener('touchstart', function (e) {
       if (e.touches.length !== 1 || window.scrollY > 0 || isTyping()) return;
-      if (document.body.classList.contains('has-sheet') || (e.target.closest && e.target.closest('.sheet, textarea'))) return;
+      if (document.body.classList.contains('has-sheet') || document.body.classList.contains('has-modal') || (e.target.closest && e.target.closest('.sheet, .modal, textarea'))) return;
       startY = e.touches[0].clientY; active = true; dist = 0;
     }, { passive: true });
     document.addEventListener('touchmove', function (e) {

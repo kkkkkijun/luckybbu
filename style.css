@@ -1576,3 +1576,47 @@ button.sp-tag { padding: 5px 11px; min-height: 32px; }
 .sp-bal-wait b { color: var(--text); } .sp-bal-wait p { margin: 4px 0 0; }
 body.has-modal .toast, body.has-sheet .toast { z-index: 95; }
 .sp-spend__hint { margin: 0; font-size: 0.8rem; color: var(--sky-ink); background: var(--sky-soft); border-radius: 8px; padding: 6px 10px; }
+
+/* ---------- 포털: 모으는 돈 목표 (원형 + 표) ---------- */
+:root { --gold-soft: #FFF6D9; --gold-fill: #FFE7A3; --gold-bar: #F5C24B; --gold-ink: #7A5A00; }
+.portal__goal { align-self: stretch; margin-top: 12px; }
+.goal { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 26px; background: var(--gold-soft); }
+.goal__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.goal__title { display: inline-flex; align-items: center; gap: 6px; min-width: 0; min-height: var(--tap); padding: 0 6px 0 0; border: 0; background: none; font: inherit; font-size: 0.9rem; font-weight: 700; color: var(--gold-ink); cursor: pointer; text-align: left; }
+.goal__title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.goal__title svg:last-child { flex-shrink: 0; opacity: 0.55; }
+.goal__title:hover svg:last-child { opacity: 1; }
+.goal__coin { flex-shrink: 0; }
+.goal__add { flex-shrink: 0; min-height: 40px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--gold-fill); color: var(--gold-ink); font: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.goal__add:hover { background: #FFDD85; }
+.goal__empty { margin: 0; font-size: 0.85rem; color: #5F5C68; }
+.goal__body { display: flex; align-items: center; gap: 16px; }
+.goal__ring { position: relative; flex-shrink: 0; width: 112px; height: 112px; display: inline-flex; align-items: center; justify-content: center; }
+.goal__ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.goal__track, .goal__arc { fill: none; stroke-width: 12; }
+.goal__track { stroke: #fff; }
+.goal__arc { stroke: var(--gold-bar); stroke-linecap: round; transition: stroke-dasharray 0.4s ease; }
+.goal__pct { position: relative; display: flex; flex-direction: column; align-items: center; }
+.goal__pct b { font-size: 1.6rem; line-height: 1; color: var(--gold-ink); font-variant-numeric: tabular-nums; }
+.goal__pct small { font-size: 0.65rem; color: var(--muted); }
+.goal__rows { margin: 0; min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; align-items: baseline; font-size: 0.75rem; }
+.goal__rows dt { color: var(--muted); }
+.goal__rows dd { margin: 0; font-size: 0.88rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.goal__rows dd.is-big { font-size: 1.05rem; }
+.goal__rows dd.is-pace { font-size: 0.78rem; color: var(--gold-ink); }
+.goal__updated { margin: -4px 0 0; font-size: 0.7rem; color: var(--muted); text-align: right; }
+@media (max-width: 350px) { .goal__ring { width: 92px; height: 92px; } .goal__ring svg { width: 92px; height: 92px; } .goal__body { gap: 10px; } }
+/* 입력 창 */
+.goal-form { display: grid; gap: 12px; margin-top: 8px; }
+.goal-form .field input { width: 100%; min-height: 46px; font-size: 1rem; }
+.goal-form__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.goal-chip { min-height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font: inherit; font-size: 0.85rem; cursor: pointer; }
+.goal-chip:hover { border-color: var(--gold-bar); }
+.goal-form__preview { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--gold-soft); font-size: 0.85rem; color: #5F5C68; }
+.goal-form__preview:empty { display: none; }
+.goal-form__preview b { color: var(--text); }
+.goal-form__two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 360px) { .goal-form__two { grid-template-columns: 1fr; } }
+.goal-form .modal__actions .btn { min-height: 48px; flex: 1 1 0; }
+.goal-form .goal-form__save { background: var(--gold-fill); border-color: var(--gold-fill); color: var(--gold-ink); }
+.goal-form .goal-form__save:hover { background: #FFDD85; border-color: #FFDD85; }
