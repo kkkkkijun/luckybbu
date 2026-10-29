@@ -2400,11 +2400,13 @@ datesSorted().forEach(function (d) {
   function goalPaceText(g) {
     if (!g.due) return '';
     var days = daysFromToday(g.due), left = g.target - g.current;
-    if (left <= 0) return shortDate(g.due).replace(/ \(.\)/, '') + ' · 달성했어요';
-    if (days < 0) return '목표일이 지났어요';
+    if (left <= 0) return [ymdDot(g.due), '달성했어요'];
+    if (days < 0) return [ymdDot(g.due), '목표일이 지났어요'];
     var months = Math.max(1, days / 30.44);
-    return md(dateOf(g.due)) + ' · 한 달 ' + manWon(Math.ceil(left / months));
+    return [ymdDot(g.due), '한 달 ' + manWon(Math.ceil(left / months))];
   }
+  // 목표일 표시: 2027.1.1
+  function ymdDot(iso) { var d = dateOf(iso); return d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate(); }
   function renderGoal() {
     var box = $('#portal-goal');
     if (!box) return;
@@ -2423,7 +2425,7 @@ datesSorted().forEach(function (d) {
       '<dl class="goal__rows"><dt>모은 돈</dt><dd class="is-big">' + formatNumber(g.current) + '원</dd>' +
       '<dt>목표</dt><dd>' + formatNumber(g.target) + '원</dd>' +
       '<dt>' + (left > 0 ? '남은 돈' : '넘은 돈') + '</dt><dd>' + formatNumber(Math.abs(left)) + '원</dd>' +
-      (pace ? '<dt>목표일</dt><dd class="is-pace">' + escapeHtml(pace) + '</dd>' : '') + '</dl></div>' +
+      (pace ? '<dt>목표일</dt><dd class="is-pace">' + escapeHtml(pace[0]) + '<small>' + escapeHtml(pace[1]) + '</small></dd>' : '') + '</dl></div>' +
       (g.updated ? '<p class="goal__updated">' + escapeHtml(shortDate(isoOfDate(new Date(g.updated)))) + ' 업데이트</p>' : '') + '</section>';
   }
   function isoOfDate(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }

@@ -1672,3 +1672,4 @@ body.has-modal .toast, body.has-sheet .toast { z-index: 95; }
 .care-form { display: grid; gap: 6px; padding: 10px 12px; background: #fffaf7; }
 .care-form input { min-height: 42px; padding: 0 10px; border: 1px solid var(--border); border-radius: 10px; background: #fff; font: inherit; font-size: 16px; }
 .care-warn { margin: 0; background: #FFF6DA; color: #8A6A00; border-radius: 12px; padding: 10px 12px; font-size: 0.8rem; line-height: 1.55; }
+.goal__rows dd.is-pace small { display: block; font-size: 0.82em; font-weight: 600; opacity: 0.85; margin-top: 1px; white-space: nowrap; }
