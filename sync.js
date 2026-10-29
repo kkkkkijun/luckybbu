@@ -123,7 +123,7 @@
     var doc = { version: s.version || 1, categories: {}, items: {}, notes: {}, highlights: s.highlights || '', picks: { gpt: (s.picks && s.picks.gpt) || '', claude: (s.picks && s.picks.claude) || '' } };
     s.categories.forEach(function (c, i) { doc.categories[c.id] = { name: c.name, icon: c.icon || '', doneTabs: !!c.doneTabs, group: c.group || '', subs: (c.subs && c.subs.length) ? c.subs.map(function (sb) { return { id: sb.id, name: sb.name, icon: sb.icon || '' }; }) : null, order: i }; });
     s.items.forEach(function (it, i) {
-      doc.items[it.id] = { categoryId: it.categoryId, name: it.name, price: typeof it.price === 'number' ? it.price : null, tags: Array.isArray(it.tags) && it.tags.length ? it.tags.slice() : null, sub: it.sub || '', memo: it.memo || '', done: !!it.done, excluded: !!it.excluded, order: i };
+      doc.items[it.id] = { categoryId: it.categoryId, name: it.name, role: it.role || '', price: typeof it.price === 'number' ? it.price : null, tags: Array.isArray(it.tags) && it.tags.length ? it.tags.slice() : null, sub: it.sub || '', memo: it.memo || '', done: !!it.done, excluded: !!it.excluded, order: i };
     });
     s.notes.forEach(function (n) { doc.notes[n.id] = { date: n.date || '', title: n.title || '', body: n.body || '', fav: !!n.fav, likes: (n.likes && n.likes.length) ? n.likes.slice() : null, comments: (n.comments && n.comments.length) ? n.comments.map(function (c) { return { id: c.id, who: c.who || '', text: c.text || '', t: c.t || 0 }; }) : null }; });
     doc.dates = {};
@@ -135,6 +135,9 @@
     doc.birthDate = s.birthDate || '';
     doc.growth = {};
     (s.growth || []).forEach(function (g) { doc.growth[g.id] = { date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; });
+    doc.careTasks = {};
+    (s.careTasks || []).forEach(function (t, i) { doc.careTasks[t.id] = { place: t.place, rel: typeof t.rel === 'number' ? t.rel : 0, all: !!t.all, text: t.text || '', why: t.why || '', link: t.link || '', done: !!t.done, order: i }; });
+    doc.careDates = s.careDates && Object.keys(s.careDates).length ? JSON.parse(JSON.stringify(s.careDates)) : null;
     doc.vaccines = {};
     (s.vaccines || []).forEach(function (v) { doc.vaccines[v.id] = { date: v.date || '', place: v.place || '', who: v.who || '' }; });
     doc.babyLog = {};
@@ -181,7 +184,7 @@
       version: typeof doc.version === 'number' ? doc.version : 1,
       categories: sortedEntries(doc.categories).map(function (c) { return { id: c.id, name: c.name, icon: c.icon || '', doneTabs: c.doneTabs === true, subs: c.subs || [], group: c.group || undefined }; }),
       items: sortedEntries(doc.items).map(function (it) {
-        return { id: it.id, categoryId: it.categoryId, name: it.name, price: typeof it.price === 'number' ? it.price : null, tags: Array.isArray(it.tags) ? it.tags : (it.tags && typeof it.tags === 'object' ? Object.keys(it.tags).map(function (k) { return it.tags[k]; }) : []), sub: typeof it.sub === 'string' ? it.sub : '', memo: it.memo || '', done: it.done === true, excluded: it.excluded === true };
+        return { id: it.id, categoryId: it.categoryId, name: it.name, role: typeof it.role === 'string' ? it.role : '', price: typeof it.price === 'number' ? it.price : null, tags: Array.isArray(it.tags) ? it.tags : (it.tags && typeof it.tags === 'object' ? Object.keys(it.tags).map(function (k) { return it.tags[k]; }) : []), sub: typeof it.sub === 'string' ? it.sub : '', memo: it.memo || '', done: it.done === true, excluded: it.excluded === true };
       }),
       notes: Object.keys(doc.notes || {}).map(function (id) { var n = doc.notes[id] || {}; return { id: id, date: n.date || '', title: n.title || '', body: n.body || '', fav: n.fav === true, likes: n.likes || [], comments: n.comments || [] }; }),
       dates: sortedEntries(doc.dates).map(function (d) { return { id: d.id, date: d.date || '', time: d.time || '', label: d.label || '', memo: d.memo || '', fav: d.fav === true, likes: d.likes || [], comments: d.comments || [] }; }),
@@ -192,6 +195,8 @@
       goal: doc.goal && typeof doc.goal === 'object' ? doc.goal : null,
       birthDate: typeof doc.birthDate === 'string' ? doc.birthDate : '',
       growth: Object.keys(doc.growth || {}).map(function (id) { var g = doc.growth[id] || {}; return { id: id, date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; }),
+      careTasks: sortedEntries(doc.careTasks).map(function (t) { return { id: t.id, place: t.place || 'hosp', rel: typeof t.rel === 'number' ? t.rel : 0, all: t.all === true, text: t.text || '', why: t.why || '', link: t.link || '', done: t.done === true }; }),
+      careDates: (doc.careDates && typeof doc.careDates === 'object') ? doc.careDates : {},
       vaccines: Object.keys(doc.vaccines || {}).map(function (id) { var v = doc.vaccines[id] || {}; return { id: id, date: v.date || '', place: v.place || '', who: v.who || '' }; }),
       babyLog: Object.keys(doc.babyLog || {}).map(function (id) { var e = doc.babyLog[id] || {}; return { id: id, kind: e.kind || '', t: typeof e.t === 'number' ? e.t : 0, who: e.who || '', detail: e.detail || '' }; }),
       anniversary: typeof doc.anniversary === 'string' ? doc.anniversary : '',
@@ -207,14 +212,14 @@
   }
 
   function isEmptyDoc(doc) {
-    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !Object.keys(doc.vaccines || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
+    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !Object.keys(doc.vaccines || {}).length && !Object.keys(doc.careTasks || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
   }
 
   // Multi-path update: only entities that changed, null for removed ones.
   function diff(prev, next) {
     var updates = {};
     prev = prev || { categories: {}, items: {}, notes: {}, highlights: '' };
-    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'birthTasks', 'growth', 'babyLog', 'vaccines'].forEach(function (group) {
+    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'birthTasks', 'growth', 'babyLog', 'vaccines', 'careTasks'].forEach(function (group) {
       var a = prev[group] || {}, b = next[group] || {};
       Object.keys(b).forEach(function (id) {
         if (!a[id] || JSON.stringify(a[id]) !== JSON.stringify(b[id])) updates[group + '/' + id] = b[id];
@@ -226,6 +231,7 @@
     if ((prev.weekBase || '') !== (next.weekBase || '')) updates.weekBase = next.weekBase || '';
     if (JSON.stringify(prev.goal || null) !== JSON.stringify(next.goal || null)) updates.goal = next.goal;
     if ((prev.birthDate || '') !== (next.birthDate || '')) updates.birthDate = next.birthDate || '';
+    if (JSON.stringify(prev.careDates || null) !== JSON.stringify(next.careDates || null)) updates.careDates = next.careDates || null;
     if ((prev.anniversary || '') !== (next.anniversary || '')) updates.anniversary = next.anniversary || '';
     if ((prev.budget || 0) !== (next.budget || 0)) updates.budget = next.budget || 0;
     if ((prev.memo || '') !== (next.memo || '')) updates.memo = next.memo || '';

@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261016b">
+  <link rel="stylesheet" href="./style.css?v=20261029a">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
@@ -112,6 +112,7 @@
     <div class="toolbar">
       <div class="ctrl-row">
         <button type="button" class="ctrl-btn" id="search-toggle" aria-pressed="false" aria-label="준비물 검색">🔍</button>
+        <button type="button" class="ctrl-btn" id="role-toggle" aria-pressed="true" aria-label="준비물 역할 보기" title="역할 보기">💡</button>
         <div class="ctrl-filter" id="filter-group">
           <label class="visually-hidden" for="filter-select">보기 필터</label>
           <select id="filter-select" name="filter">
@@ -287,6 +288,8 @@
       </div>
       <button type="button" class="btn btn--small" id="bt-edit-btn" aria-pressed="false">편집</button>
     </div>
+    <div class="bt-tabs" id="bt-tabs" role="group" aria-label="출산 당일 보기"></div>
+    <div class="bt-care" id="bt-care" hidden></div>
     <div class="bt-layout">
       <div class="bt-side" id="bt-side"></div>
       <div class="bt-stages" id="bt-stages"></div>
@@ -396,9 +399,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261016b"></script>
-  <script src="./app.js?v=20261016b"></script>
-  <script src="./sync.js?v=20261016b"></script>
+  <script src="./firebase-config.js?v=20261029a"></script>
+  <script src="./app.js?v=20261029a"></script>
+  <script src="./sync.js?v=20261029a"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
