@@ -579,7 +579,7 @@
       if (!ctext || (t.place !== 'hosp' && t.place !== 'cc')) return;
       seenCt[t.id] = true;
       careTasks.push({ id: t.id, place: t.place, rel: (typeof t.rel === 'number' && isFinite(t.rel)) ? Math.max(-30, Math.min(60, Math.round(t.rel))) : 0, all: t.all === true, text: ctext,
-        why: typeof t.why === 'string' ? t.why.trim().slice(0, 80) : '', link: (t.link === 'supports' || t.link === 'vaccine') ? t.link : '', done: t.done === true });
+        why: typeof t.why === 'string' ? t.why.trim().slice(0, 80) : '', link: (t.link === 'supports' || t.link === 'vaccine' || (typeof t.link === 'string' && /^tel:\d{4,12}$/.test(t.link))) ? t.link : '', done: t.done === true });
     });
     var careDates = {};
     if (raw.careDates && typeof raw.careDates === 'object') ['hospIn', 'surgery', 'hospOut', 'ccIn', 'ccOut'].forEach(function (k) { if (typeof raw.careDates[k] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.careDates[k])) careDates[k] = raw.careDates[k]; });
@@ -3592,6 +3592,7 @@ datesSorted().forEach(function (d) {
     ['cc', 0, '조리원 시간표·보호자 수칙 사진 찍기', ''],
     ['cc', 0, '아내 바로 쉬게 하기', '이동만으로도 많이 지쳐요'],
     ['cc', 1, '주민센터: 출생신고 + 행복출산 원스톱', '첫만남이용권·부모급여·아동수당·출산축하금 한 번에', 'supports'],
+    ['cc', 1, '현대해상 어린이보험 아기 등록 전화', '주민번호 나오면 전용콜센터 1688-0055 → 내선 2번 → 1번, 아기 이름·주민번호만 말하면 서류 없이 등록', 'tel:16880055'],
     ['cc', 1, '산후도우미·서울아기 건강 첫걸음 신청 확인', '산후도우미는 출산 후 60일, 방문 건강관리는 6주 안', 'supports'],
     ['cc', 2, '수유콜 함께: 트림·기저귀·재우기', '아빠 손에 익혀 두면 집에서 편해요'],
     ['cc', 2, '복대 착용 돕기', '상처 지지·자세 유지'],
@@ -3661,7 +3662,8 @@ datesSorted().forEach(function (d) {
   }
   function careItemHtml(t) {
     var id = escapeHtml(t.id);
-    var link = t.link === 'supports' ? '<button type="button" class="care-link" data-action="care-go" data-go="supports">→ 정부 지원</button>' : t.link === 'vaccine' ? '<button type="button" class="care-link" data-action="care-go" data-go="vaccine">→ 예방접종</button>' : '';
+    var tel = /^tel:(\d+)$/.exec(t.link || '');
+    var link = tel ? '<a class="care-link" href="tel:' + tel[1] + '">📞 ' + (tel[1].length === 8 ? tel[1].slice(0, 4) + '-' + tel[1].slice(4) : tel[1]) + ' 전화 걸기</a>' : t.link === 'supports' ? '<button type="button" class="care-link" data-action="care-go" data-go="supports">→ 정부 지원</button>' : t.link === 'vaccine' ? '<button type="button" class="care-link" data-action="care-go" data-go="vaccine">→ 예방접종</button>' : '';
     return '<li class="care-it' + (t.done ? ' is-done' : '') + '" data-care-id="' + id + '"><button type="button" class="care-toggle" role="checkbox" aria-checked="' + (t.done ? 'true' : 'false') + '" data-action="care-toggle" data-focus-key="care:' + id + '">' +
       '<span class="bt-box" aria-hidden="true"></span><span class="care-tx"><b>' + escapeHtml(t.text) + '</b>' + (t.why && !t.done ? '<small>' + escapeHtml(t.why) + '</small>' : '') + '</span></button>' +
       (link && !t.done ? '<div class="care-extra">' + link + '</div>' : '') +
