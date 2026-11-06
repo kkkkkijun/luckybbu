@@ -2437,8 +2437,8 @@ datesSorted().forEach(function (d) {
       '<button type="button" class="modal__close" data-action="goal-close" aria-label="닫기">×</button></div>' +
       '<div class="goal-form">' +
       '<div class="field"><label for="goal-title-input">목표 이름</label><input type="text" id="goal-title-input" maxlength="' + GOAL_TITLE_MAX + '" value="' + escapeHtml(g.title) + '" autocomplete="off"></div>' +
-      (first ? '' : '<div class="seg" role="radiogroup" aria-label="입력 방법"><label class="choice"><input type="radio" name="goal-mode" value="add" checked><span>넣은 돈 더하기</span></label><label class="choice"><input type="radio" name="goal-mode" value="set"><span>지금 총액으로 바꾸기</span></label></div>') +
-      '<div class="field"><label for="goal-amount" id="goal-amount-label">' + (first ? '지금까지 모은 돈' : '더할 금액') + '</label><input type="text" id="goal-amount" inputmode="numeric" autocomplete="off" data-price-input placeholder="' + (first ? '예: 3,000,000' : '예: 500,000') + '"></div>' +
+      // 금액은 '지금 모은 총액'으로만 적는다(현재 금액이 미리 채워져 있고, +10만 등은 그 총액에 더한다)
+      '<div class="field"><label for="goal-amount">' + (first ? '지금까지 모은 돈' : '지금 모은 총액') + '</label><input type="text" id="goal-amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (g.current ? formatNumber(g.current) : '') + '" placeholder="예: 3,000,000"></div>' +
       '<div class="goal-form__chips" aria-label="빠르게 더하기">' + [100000, 500000, 1000000].map(function (n) { return '<button type="button" class="goal-chip" data-action="goal-chip" data-add="' + n + '">+' + (n / 10000) + '만</button>'; }).join('') + '</div>' +
       '<p class="goal-form__preview" id="goal-preview" aria-live="polite"></p>' +
       '<div class="goal-form__two"><div class="field"><label for="goal-target">목표 금액</label><input type="text" id="goal-target" inputmode="numeric" autocomplete="off" data-price-input value="' + (g.target ? formatNumber(g.target) : '') + '" placeholder="예: 20,000,000"></div>' +
@@ -2446,14 +2446,12 @@ datesSorted().forEach(function (d) {
       '<div class="modal__actions"><button type="button" class="btn" data-action="goal-close">취소</button><button type="submit" class="btn btn--primary goal-form__save">저장</button></div></div></form>';
   }
   function goalNext() {
-    var g = state.goal, form = $('#goal-form');
+    var form = $('#goal-form');
     if (!form) return null;
-    var modeEl = form.querySelector('input[name="goal-mode"]:checked');
-    var mode = modeEl ? modeEl.value : 'set';
     var amt = parsePrice($('#goal-amount').value), tgt = parsePrice($('#goal-target').value);
     if (!amt.ok || !tgt.ok) return { error: '금액은 숫자로 적어 주세요.' };
-    var current = mode === 'add' ? g.current + (amt.value || 0) : (amt.value === null ? g.current : amt.value);
-    return { mode: mode, current: Math.min(current, PRICE_MAX), target: tgt.value || 0, amount: amt.value };
+    var current = amt.value === null ? 0 : amt.value;
+    return { current: Math.min(current, PRICE_MAX), target: tgt.value || 0, amount: amt.value };
   }
   function updateGoalPreview() {
     var p = $('#goal-preview'), n = goalNext();
@@ -5183,11 +5181,6 @@ datesSorted().forEach(function (d) {
       portalView.addEventListener('input', function (e) {
         if (!e.target.closest('#goal-form')) return;
         if (e.target.hasAttribute('data-price-input') && !e.isComposing) formatPriceInput(e.target);
-        updateGoalPreview();
-      });
-      portalView.addEventListener('change', function (e) {
-        if (e.target.name !== 'goal-mode') return;
-        var lab = $('#goal-amount-label'); if (lab) lab.textContent = e.target.value === 'add' ? '더할 금액' : '지금 모은 총액';
         updateGoalPreview();
       });
       var gm = $('#goal-modal');
