@@ -338,7 +338,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {} };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {} };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -486,6 +486,7 @@
     var anniversary = typeof raw.anniversary === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.anniversary) ? raw.anniversary : '';
     var weekBase = typeof raw.weekBase === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.weekBase) ? raw.weekBase : '';
     var goal = normalizeGoal(raw.goal);
+    var hospDoneAt = typeof raw.hospDoneAt === 'number' && raw.hospDoneAt > 0 ? raw.hospDoneAt : 0;
     var ledger = normalizeLedger(raw.ledger);
     var budget = typeof raw.budget === 'number' && isFinite(raw.budget) && raw.budget > 0 ? Math.min(Math.round(raw.budget), PRICE_MAX) : 0;
     var memo = typeof raw.memo === 'string' ? raw.memo.replace(/\r\n?/g, '\n').slice(0, MEMO_MAX) : '';
@@ -590,7 +591,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates } };
   }
 
   /* ---------- storage ---------- */
@@ -4546,6 +4547,26 @@ datesSorted().forEach(function (d) {
     act('category', '병원캐리어를 확정 리스트 24개로 정리' + (rest.length ? ' · 정리할 항목 ' + rest.length + '개' : ''));
     showToast('병원캐리어를 확정 리스트 24개로 정리했어요' + (rest.length ? '. 목록에 없던 ' + rest.length + '개는 ‘정리할 항목’ 탭에 있어요.' : '.'));
   }
+  // 확정 리스트 24개는 이미 가방에 담은 것(준비 후), 그 외 병원캐리어 항목은 준비 전으로 한 번 표시한다.
+  // 가족 중 한 기기에서만 적용되도록 공유 데이터에 적용 시각(hospDoneAt)을 남긴다.
+  function markHospPackedOnce() {
+    if (state.hospDoneAt) return;
+    var cat = null;
+    for (var i = 0; i < state.categories.length; i++) if (isHospCat(state.categories[i])) { cat = state.categories[i]; break; }
+    if (!cat) return;
+    var names = {};
+    HOSP_LIST.forEach(function (g) { g[1].forEach(function (n) { names[n] = true; }); });
+    var packed = 0, todo = 0;
+    state.items.forEach(function (it) {
+      if (it.categoryId !== cat.id) return;
+      it.done = !!names[it.name];
+      if (it.done) packed++; else todo++;
+    });
+    state.hospDoneAt = Date.now();
+    commit();
+    act('category', '병원캐리어: 리스트 ' + packed + '개 준비 후, 나머지 ' + todo + '개 준비 전');
+    showToast('병원캐리어: 리스트 ' + packed + '개는 준비 후, 나머지 ' + todo + '개는 준비 전으로 표시했어요.');
+  }
   // 준비 상태 탭 이름: 병원캐리어는 '준비 전/준비 후', 나머지는 '미완료/완료'
   function doneTabNames(cat) { return isHospCat(cat) ? ['준비 전', '준비 후'] : ['미완료', '완료']; }
 
@@ -4797,6 +4818,7 @@ datesSorted().forEach(function (d) {
       anniversary: state.anniversary,
       weekBase: state.weekBase,
       goal: state.goal,
+      hospDoneAt: state.hospDoneAt,
       memo: state.memo,
       memos: state.memos,
       supports: state.supports,
@@ -4915,10 +4937,10 @@ datesSorted().forEach(function (d) {
 
   var migrationsQueued = false;
   function scheduleOneTimeMigrations() {
-    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.weekSeeded && ui.hospSeeded && ui.supportsSeeded && ui.birthSeeded && ui.careSeeded)) return;
+    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.weekSeeded && ui.hospSeeded && state.hospDoneAt && ui.supportsSeeded && ui.birthSeeded && ui.careSeeded)) return;
     migrationsQueued = true;
     // 방 참여 직후에는 구독(attach)이 applyRemote 뒤에 붙으므로 한 틱 뒤에 실행한다.
-    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedWeekBaseOnce(); seedHospitalBagOnce(); seedSupportsOnce(); seedBirthTasksOnce(); seedCareOnce(); }, 0);
+    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedWeekBaseOnce(); seedHospitalBagOnce(); markHospPackedOnce(); seedSupportsOnce(); seedBirthTasksOnce(); seedCareOnce(); }, 0);
   }
   function applyRemote(remoteState) {
     var result = normalizeState(remoteState);
@@ -6237,7 +6259,7 @@ datesSorted().forEach(function (d) {
     }
     var storedRoom = null;
     try { storedRoom = window.localStorage.getItem('birth-bag-checklist:room'); } catch (e) { /* ignore */ }
-    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) { seedFamilyDatesOnce(); seedWeekBaseOnce(); seedHospitalBagOnce(); } seedSupportsOnce(); seedBirthTasksOnce(); seedCareOnce(); }
+    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) { seedFamilyDatesOnce(); seedWeekBaseOnce(); seedHospitalBagOnce(); markHospPackedOnce(); } seedSupportsOnce(); seedBirthTasksOnce(); seedCareOnce(); }
     try { window.history.replaceState({ view: ui.view }, ''); } catch (e) { /* ignore */ }
     window.addEventListener('popstate', function (e) {
       if (sheetPopSilently) { sheetPopSilently = false; return; }

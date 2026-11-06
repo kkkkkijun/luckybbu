@@ -130,6 +130,7 @@
     (s.dates || []).forEach(function (d, i) { doc.dates[d.id] = { date: d.date || '', time: d.time || '', label: d.label || '', memo: d.memo || '', fav: !!d.fav, likes: (d.likes && d.likes.length) ? d.likes.slice() : null, comments: (d.comments && d.comments.length) ? d.comments.map(function (c) { return { id: c.id, who: c.who || '', text: c.text || '', t: c.t || 0 }; }) : null, order: i }; });
     doc.dueDate = s.dueDate || '';
     doc.weekBase = s.weekBase || '';
+    doc.hospDoneAt = s.hospDoneAt || 0;
     var gl = s.goal || {};
     doc.goal = { title: gl.title || '', target: gl.target || 0, current: gl.current || 0, due: gl.due || '', updated: gl.updated || 0 };
     doc.birthDate = s.birthDate || '';
@@ -192,6 +193,7 @@
       highlights: typeof doc.highlights === 'string' ? doc.highlights : '',
       dueDate: typeof doc.dueDate === 'string' ? doc.dueDate : '',
       weekBase: typeof doc.weekBase === 'string' ? doc.weekBase : '',
+      hospDoneAt: typeof doc.hospDoneAt === 'number' ? doc.hospDoneAt : 0,
       goal: doc.goal && typeof doc.goal === 'object' ? doc.goal : null,
       birthDate: typeof doc.birthDate === 'string' ? doc.birthDate : '',
       growth: Object.keys(doc.growth || {}).map(function (id) { var g = doc.growth[id] || {}; return { id: id, date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; }),
@@ -229,6 +231,7 @@
     if ((prev.highlights || '') !== (next.highlights || '')) updates.highlights = next.highlights || '';
     if ((prev.dueDate || '') !== (next.dueDate || '')) updates.dueDate = next.dueDate || '';
     if ((prev.weekBase || '') !== (next.weekBase || '')) updates.weekBase = next.weekBase || '';
+    if ((prev.hospDoneAt || 0) !== (next.hospDoneAt || 0)) updates.hospDoneAt = next.hospDoneAt || 0;
     if (JSON.stringify(prev.goal || null) !== JSON.stringify(next.goal || null)) updates.goal = next.goal;
     if ((prev.birthDate || '') !== (next.birthDate || '')) updates.birthDate = next.birthDate || '';
     if (JSON.stringify(prev.careDates || null) !== JSON.stringify(next.careDates || null)) updates.careDates = next.careDates || null;
