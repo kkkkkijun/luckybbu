@@ -672,7 +672,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, weekSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false, spSpendOpen: {}, spSpendTag: '', spSpendMore: {}, spTagEdit: false, spDraft: {}, careSeeded: false, bdTab: 'todo', careExpand: {}, careAdd: null, careDateEdit: false, showRoles: true };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, weekSeeded: false, hospSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false, spSpendOpen: {}, spSpendTag: '', spSpendMore: {}, spTagEdit: false, spDraft: {}, careSeeded: false, bdTab: 'todo', careExpand: {}, careAdd: null, careDateEdit: false, showRoles: true };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -709,6 +709,7 @@
         if (VIEWS.indexOf(parsed.view) !== -1) ui.view = parsed.view;
         ui.portalSeeded = parsed.portalSeeded === true;
         ui.weekSeeded = parsed.weekSeeded === true;
+        ui.hospSeeded = parsed.hospSeeded === true;
         ui.onboardingDismissed = parsed.onboardingDismissed === true;
         if (typeof parsed.deviceName === 'string') ui.deviceName = parsed.deviceName.slice(0, 12);
         if (typeof parsed.autoName === 'string') ui.autoName = parsed.autoName.slice(0, 12);
@@ -797,6 +798,7 @@
         toastRemote: ui.toastRemote,
         portalSeeded: ui.portalSeeded,
         weekSeeded: ui.weekSeeded,
+        hospSeeded: ui.hospSeeded,
         highlightsCollapsed: ui.highlightsCollapsed
       }));
     } catch (e) { /* ignore */ }
@@ -1260,7 +1262,8 @@
         var nAll = scope.filter(function (it) { return !it.excluded; }).length;
         var nDone = scope.filter(function (it) { return !it.excluded && it.done; }).length;
         html += '<div class="done-tabs" role="tablist" aria-label="' + escapeHtml(cat.name) + ' 완료 여부">';
-        [['all', '전체', nAll], ['todo', '미완료', nAll - nDone], ['done', '완료', nDone]].forEach(function (o) {
+        var dtn = doneTabNames(cat);
+        [['all', '전체', nAll], ['todo', dtn[0], nAll - nDone], ['done', dtn[1], nDone]].forEach(function (o) {
           var on = dt === o[0];
           html += '<button type="button" role="tab" class="done-tab' + (on ? ' is-active' : '') + '" data-action="done-tab" data-tab="' + o[0] + '" data-focus-key="dt:' + cidE + ':' + o[0] + '" aria-selected="' + (on ? 'true' : 'false') + '">' + o[1] + '<b>' + o[2] + '</b></button>';
         });
@@ -4492,6 +4495,60 @@ datesSorted().forEach(function (d) {
     });
   }
   // 상세 분류 자동 구성(한 번): 분류 이름으로 규칙을 고르고, 준비물 이름·태그로 상세 분류를 정한다. 되돌리기 가능.
+  // 병원캐리어 확정 리스트(2026-11): 처음 한 번 이 목록으로 정리한다. 이름이 같은 기존 항목은 체크·금액을 살리고,
+  // 목록에 없는 기존 항목은 지우지 않고 '정리할 항목' 상세 분류로 옮긴다. 병원캐리어에는 준비 전/후 탭을 켠다.
+  var HOSP_SUBS = [['👕', '의류/보온'], ['🩹', '위생/회복'], ['🤱🏻', '수유'], ['👶🏻', '아기'], ['🔌', '편의/기타'], ['🗂️', '정리할 항목']];
+  var HOSP_LIST = [
+    ['의류/보온', ['가디건', '압박스타킹', '손목보호대']],
+    ['위생/회복', ['안심깔개매트 1개(10입)', '안심팬티 1개(8입)', '살균소독티슈 1개', '바디샤워티슈', '비데티슈', '베라수 3개', '여분수건', '샴푸', '마스크', '겔시트', '연고', '방수테이프', '기름종이']],
+    ['수유', ['디판테놀']],
+    ['아기', ['축복이옷']],
+    ['편의/기타', ['텀블러', '빨대', '커피', '핸드폰거치대', '가위', '네임펜']]
+  ];
+  // 비교용 이름: 공백·수량 표기((10입), 1개, 3개)를 빼고 비교한다
+  function hospKey(name) { return String(name || '').replace(/\([^)]*\)/g, '').replace(/\d+\s*(개|입|장|매)/g, '').replace(/\s+/g, ''); }
+  function isHospCat(cat) { return /병원/.test(cat.name); }
+  function seedHospitalBagOnce() {
+    if (ui.hospSeeded) return;
+    ui.hospSeeded = true;
+    saveUiPrefs();
+    var cat = null;
+    for (var i = 0; i < state.categories.length; i++) if (isHospCat(state.categories[i])) { cat = state.categories[i]; break; }
+    if (!cat) { cat = { id: uid(), name: '병원캐리어', icon: '🧳', doneTabs: true, subs: [], group: 'birth' }; state.categories.unshift(cat); }
+    cat.subs = cat.subs || [];
+    var snapshot = function () { return JSON.stringify([cat, state.items.filter(function (it) { return it.categoryId === cat.id; })]); };
+    var before = snapshot();
+    var subId = {};
+    HOSP_SUBS.forEach(function (s) {
+      var found = null;
+      cat.subs.forEach(function (x) { if (x.name === s[1]) found = x; });
+      if (!found && s[1] !== '정리할 항목' && cat.subs.length < SUB_MAX) { found = { id: uid(), name: s[1], icon: s[0] }; cat.subs.push(found); }
+      if (found) subId[s[1]] = found.id;
+    });
+    var mine = state.items.filter(function (it) { return it.categoryId === cat.id; });
+    var used = {}, added = 0;
+    HOSP_LIST.forEach(function (grp) {
+      grp[1].forEach(function (name) {
+        var k = hospKey(name), hit = null;
+        mine.forEach(function (it) { if (!hit && !used[it.id] && hospKey(it.name) === k) hit = it; });
+        if (hit) { used[hit.id] = true; hit.name = name; hit.sub = subId[grp[0]] || ''; if (name === '축복이옷' && hit.tags.indexOf('축복') === -1) hit.tags.push('축복'); }
+        else { state.items.push({ id: uid(), categoryId: cat.id, name: name, price: null, tags: name === '축복이옷' ? ['축복'] : [], sub: subId[grp[0]] || '', memo: '', done: false, excluded: false }); added++; }
+      });
+    });
+    var rest = mine.filter(function (it) { return !used[it.id]; });
+    if (rest.length) {
+      if (!subId['정리할 항목'] && cat.subs.length < SUB_MAX) { var s = { id: uid(), name: '정리할 항목', icon: '🗂️' }; cat.subs.push(s); subId['정리할 항목'] = s.id; }
+      rest.forEach(function (it) { it.sub = subId['정리할 항목'] || ''; });
+    }
+    cat.doneTabs = true;
+    if (snapshot() === before) return; // 다른 기기에서 이미 정리됨
+    commit();
+    act('category', '병원캐리어를 확정 리스트 24개로 정리' + (rest.length ? ' · 정리할 항목 ' + rest.length + '개' : ''));
+    showToast('병원캐리어를 확정 리스트 24개로 정리했어요' + (rest.length ? '. 목록에 없던 ' + rest.length + '개는 ‘정리할 항목’ 탭에 있어요.' : '.'));
+  }
+  // 준비 상태 탭 이름: 병원캐리어는 '준비 전/준비 후', 나머지는 '미완료/완료'
+  function doneTabNames(cat) { return isHospCat(cat) ? ['준비 전', '준비 후'] : ['미완료', '완료']; }
+
   var SUB_RULES = [
     { cat: /병원/, subs: [
       ['👶🏻', '아기', function (it) { return it.tags.indexOf('축복') !== -1 && it.tags.indexOf('윤서') === -1; }],
@@ -4858,10 +4915,10 @@ datesSorted().forEach(function (d) {
 
   var migrationsQueued = false;
   function scheduleOneTimeMigrations() {
-    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.weekSeeded && ui.supportsSeeded && ui.birthSeeded && ui.careSeeded)) return;
+    if (migrationsQueued || (ui.templateCleared && ui.tagsMigrated && ui.subsMigrated && ui.portalSeeded && ui.weekSeeded && ui.hospSeeded && ui.supportsSeeded && ui.birthSeeded && ui.careSeeded)) return;
     migrationsQueued = true;
     // 방 참여 직후에는 구독(attach)이 applyRemote 뒤에 붙으므로 한 틱 뒤에 실행한다.
-    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedWeekBaseOnce(); seedSupportsOnce(); seedBirthTasksOnce(); seedCareOnce(); }, 0);
+    setTimeout(function () { migrationsQueued = false; if (isTyping()) return; clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); seedFamilyDatesOnce(); seedWeekBaseOnce(); seedHospitalBagOnce(); seedSupportsOnce(); seedBirthTasksOnce(); seedCareOnce(); }, 0);
   }
   function applyRemote(remoteState) {
     var result = normalizeState(remoteState);
@@ -6180,7 +6237,7 @@ datesSorted().forEach(function (d) {
     }
     var storedRoom = null;
     try { storedRoom = window.localStorage.getItem('birth-bag-checklist:room'); } catch (e) { /* ignore */ }
-    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) { seedFamilyDatesOnce(); seedWeekBaseOnce(); } seedSupportsOnce(); seedBirthTasksOnce(); seedCareOnce(); }
+    if (!storedRoom && !/[?&]room=/.test(window.location.search)) { clearTemplateItemsOnce(); migrateTagsOnce(); migrateSubsOnce(); if (!loaded.fresh) { seedFamilyDatesOnce(); seedWeekBaseOnce(); seedHospitalBagOnce(); } seedSupportsOnce(); seedBirthTasksOnce(); seedCareOnce(); }
     try { window.history.replaceState({ view: ui.view }, ''); } catch (e) { /* ignore */ }
     window.addEventListener('popstate', function (e) {
       if (sheetPopSilently) { sheetPopSilently = false; return; }
