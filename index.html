@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261118c">
+  <link rel="stylesheet" href="./style.css?v=20261118d">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
@@ -331,7 +331,7 @@
 
     <section class="settings-card" aria-labelledby="set-alert-title">
       <h3 id="set-alert-title" class="settings-card__title">🔔 알림</h3>
-      <p class="settings-card__text">가족이 준비물·일지·택일·작명을 바꾸면 앱을 보는 중에 바로 알림 문구가 뜹니다.</p>
+      <p class="settings-card__text">가족이 준비물·일지·메모를 바꾸면 앱을 보는 중에 바로 알림 문구가 뜹니다.</p>
       <label class="chk"><input type="checkbox" id="toast-remote"> 앱을 보는 중에 가족의 변경을 문구로 알려주기</label>
     </section>
 
@@ -383,7 +383,7 @@
       <span class="primary-tab__icon" aria-hidden="true">📝</span>
       <span class="primary-tab__label">일지·메모</span>
     </button>
-    <button type="button" class="primary-tab" data-view="picks" data-group="plan" role="tab" aria-selected="false" aria-controls="view-picks" id="ptab-picks" tabindex="-1">
+    <button type="button" class="primary-tab" data-view="picks" data-group="plan" hidden role="tab" aria-selected="false" aria-controls="view-picks" id="ptab-picks" tabindex="-1">
       <span class="primary-tab__icon" aria-hidden="true">📅</span>
       <span class="primary-tab__label">택일·작명</span>
     </button>
@@ -399,9 +399,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261118c"></script>
-  <script src="./app.js?v=20261118c"></script>
-  <script src="./sync.js?v=20261118c"></script>
+  <script src="./firebase-config.js?v=20261118d"></script>
+  <script src="./app.js?v=20261118d"></script>
+  <script src="./sync.js?v=20261118d"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {

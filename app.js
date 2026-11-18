@@ -21,6 +21,9 @@
   var SUPPORT_STAGE_LABEL = { now: '지금 · 임신 중', birth: '출산 직후 · 60일 안', monthly: '매달 받는 것', local: '우리 지역 (서울 마포구)' };
   var SUPPORT_DUE_BASE = ['', 'due', 'birth'];
   // 화면: portal(luckybbu 첫 화면) · ledger(가계부) · 나머지는 마미백 공간
+  // 화면에서 숨긴 공간(데이터는 그대로 보관·동기화): 출산 당일 · 택일 · 작명
+  var HIDDEN_VIEWS = ['birthday', 'picks', 'names'];
+  function shownView(v) { return HIDDEN_VIEWS.indexOf(v) !== -1 ? 'home' : v; }
   var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'growth', 'babylog', 'vaccine'];
   // 마미백 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
   var GROUPS = ['birth', 'baby'];
@@ -717,7 +720,7 @@
         if (parsed.collapsed && typeof parsed.collapsed === 'object') ui.collapsed = parsed.collapsed;
         if (typeof parsed.activeCategory === 'string') ui.activeCategory = parsed.activeCategory;
         ui.highlightsCollapsed = parsed.highlightsCollapsed === true;
-        if (VIEWS.indexOf(parsed.view) !== -1) ui.view = parsed.view;
+        if (VIEWS.indexOf(parsed.view) !== -1) ui.view = shownView(parsed.view);
         ui.portalSeeded = parsed.portalSeeded === true;
         ui.weekSeeded = parsed.weekSeeded === true;
         ui.hospSeeded = parsed.hospSeeded === true;
@@ -938,6 +941,7 @@
     return 'mamibag';
   }
   function setView(view, from, fromHistory) {
+    view = shownView(view);
     if (VIEWS.indexOf(view) === -1) return;
     if (!fromHistory && view !== ui.view) { try { window.history.pushState({ view: view }, ''); } catch (e) { /* ignore */ } }
     if (view === 'settings') ui.settingsFrom = from || (spaceOf(ui.view) === 'mamibag' ? 'mamibag' : spaceOf(ui.view));
@@ -1630,11 +1634,11 @@
       if (!pick(m)) return;
       out.push({ kind: 'memo', id: m.id, title: (memoLines(m)[0] || '').slice(0, 80), sub: [m.who, memoStamp(m.updated)].filter(Boolean).join(' · '), t: m.updated || 0, likes: m.likes.length, comments: m.comments.length });
     });
-    state.dates.forEach(function (d) {
+    if (HIDDEN_VIEWS.indexOf('picks') === -1) state.dates.forEach(function (d) {
       if (!(tab === 'fav' ? !!d.fav : d.likes.indexOf(me) !== -1)) return;
       out.push({ kind: 'date', id: d.id, title: dateHeadline(d) + (d.label ? ' · ' + d.label : ''), sub: d.memo ? d.memo.split('\n')[0].slice(0, 40) : '택일 후보', t: d.date ? Date.parse(d.date + 'T00:00:00') || 0 : 0, likes: d.likes.length, comments: d.comments.length });
     });
-    state.names.forEach(function (n) {
+    if (HIDDEN_VIEWS.indexOf('names') === -1) state.names.forEach(function (n) {
       if (!(tab === 'fav' ? !!n.favorite : n.likes.indexOf(me) !== -1)) return;
       out.push({ kind: 'name', id: n.id, title: n.name, sub: n.hanja.length ? n.hanja.map(function (x) { return x.chars; }).filter(Boolean).join(' / ') || '이름 후보' : '이름 후보', t: 0, likes: n.likes.length, comments: n.comments.length });
     });
@@ -1654,7 +1658,7 @@
     });
     var list = ui.archiveTab === 'like' ? likes : favs;
     if (!list.length) {
-      box.innerHTML = '<li class="archive-empty">' + (ui.archiveTab === 'like' ? '아직 좋아요를 누른 글이 없습니다. 일지·메모·택일·작명에서 ♡ 좋아요를 눌러 보세요.' : '아직 즐겨찾기한 글이 없습니다. 일지·메모·택일·작명에서 ☆를 눌러 보세요.') + '</li>';
+      box.innerHTML = '<li class="archive-empty">' + (ui.archiveTab === 'like' ? '아직 좋아요를 누른 글이 없습니다. 일지·메모에서 ♡ 좋아요를 눌러 보세요.' : '아직 즐겨찾기한 글이 없습니다. 일지·메모에서 ☆를 눌러 보세요.') + '</li>';
       return;
     }
     box.innerHTML = list.map(function (e) {
@@ -2222,7 +2226,6 @@ datesSorted().forEach(function (d) {
   var MB_FIXED = {
     birth: [
       { label: '산부인과 일지', icon: 'clinic', view: 'notes' },
-      { label: '택일·작명', icon: 'calendar', view: 'plan' },
       { label: '정부 지원', icon: 'gov', view: 'supports' }
     ],
     baby: [
@@ -2250,8 +2253,10 @@ datesSorted().forEach(function (d) {
       var ids = {}; cats.forEach(function (c) { ids[c.id] = true; });
       var p = computeProgress(state.items.filter(function (it) { return ids[it.categoryId]; }));
       var sum = $('#mb-' + g + '-sum');
-      if (sum) sum.textContent = p.total ? '준비물 ' + p.done + '/' + p.total : '';
+      if (sum) sum.textContent = g !== 'birth' && p.total ? '준비물 ' + p.done + '/' + p.total : '';
       // 출산 그룹의 분류들은 타일 하나 '출산 준비물'로 묶는다 (안에서는 분류 탭이 그대로 보인다)
+      // 출산 준비물 타일은 화면에서 숨김(준비물은 아래 '준비물' 탭에서 그대로 볼 수 있음)
+      if (g === 'birth') cats = [];
       var bundle = g === 'birth' && cats.length > 0;
       if (bundle) {
         var last = cats.filter(function (c) { return c.id === ui.activeCategory; })[0] || cats[0];
@@ -2277,7 +2282,6 @@ datesSorted().forEach(function (d) {
           '<span class="mb-tile__label">' + escapeHtml(f.label) + '</span>' +
           '<span class="mb-tile__meta">' + escapeHtml(meta) + '</span></button>';
       }).join('');
-      if (g === 'birth') html = birthTileHtml() + html;
       grid.innerHTML = html;
     });
   }
@@ -6509,7 +6513,7 @@ datesSorted().forEach(function (d) {
     // 앱을 새로 열면 포털에서 시작하고, 같은 탭에서 새로고침하면 보던 화면을 이어서 보여준다
     var sessionView = null;
     try { sessionView = window.sessionStorage.getItem(SESSION_VIEW_KEY); } catch (e) { /* ignore */ }
-    ui.view = VIEWS.indexOf(sessionView) !== -1 ? sessionView : 'portal';
+    ui.view = VIEWS.indexOf(sessionView) !== -1 ? shownView(sessionView) : 'portal';
     if (ui.view === 'settings') ui.settingsFrom = 'portal';
     var restoredDraft = restoreDrafts();
     bindEvents();
