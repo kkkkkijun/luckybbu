@@ -1,14 +1,14 @@
 /* 서비스 워커 — 앱 셸 오프라인 지원 (네트워크 우선, 실패 시 캐시)
    온라인이면 항상 최신 파일을 받고, 오프라인이면 마지막으로 받은 화면을 보여준다.
    같은 출처(same-origin)만 처리하고, Firebase 등 외부 요청은 건드리지 않는다. */
-var CACHE = 'birth-bag-checklist-20261118d'; // 배포마다 index.html의 ?v= 와 함께 올린다 → 옛 캐시 자동 삭제
+var CACHE = 'birth-bag-checklist-20261118e'; // 배포마다 index.html의 ?v= 와 함께 올린다 → 옛 캐시 자동 삭제
 var CORE = [
   './',
   './index.html',
-  './style.css?v=20261118d',
-  './app.js?v=20261118d',
-  './sync.js?v=20261118d',
-  './firebase-config.js?v=20261118d',
+  './style.css?v=20261118e',
+  './app.js?v=20261118e',
+  './sync.js?v=20261118e',
+  './firebase-config.js?v=20261118e',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
@@ -45,9 +45,10 @@ self.addEventListener('fetch', function (e) {
     fetch(req).then(function (res) {
       if (res && res.status === 200 && res.type === 'basic') {
         var copy = res.clone();
-        // 화면 주소(?room= 등)마다 따로 쌓이지 않게 페이지는 index.html 하나로 보관한다
-        var key = req.mode === 'navigate' ? './index.html' : req;
-        caches.open(CACHE).then(function (c) { c.put(key, copy); });
+        // 화면 주소(?room= 등)마다 따로 쌓이지 않게 페이지는 index.html 하나로 보관한다.
+        // 앱 화면(폴더 주소·index.html)만 보관 — README 같은 다른 문서가 오프라인 화면을 덮어쓰지 않게
+        var isShell = /\/(index\.html)?$/.test(url.pathname);
+        if (req.mode !== 'navigate' || isShell) caches.open(CACHE).then(function (c) { c.put(req.mode === 'navigate' ? './index.html' : req, copy); });
       }
       return res;
     }).catch(function () {

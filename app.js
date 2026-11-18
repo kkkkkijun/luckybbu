@@ -301,11 +301,11 @@
     breast: { label: '모유수유', icon: 'breast', chip: 'rose', grp: 'feed', ph: '왼쪽 10분 · 오른쪽 10분', quick: ['왼쪽', '오른쪽', '양쪽'] },
     formula: { label: '분유', icon: 'bottle', chip: 'peach', grp: 'feed', ph: '120ml', quick: ['60ml', '80ml', '100ml', '120ml', '140ml', '160ml'] },
     solid: { label: '이유식', icon: 'bowl', chip: 'mint', grp: 'feed', ph: '쌀미음 50g', quick: [] },
-    pee: { label: '소변', icon: 'drop', chip: 'yel', grp: 'diaper', ph: '메모', quick: [] },
-    poop: { label: '대변', icon: 'poop', chip: 'tan', grp: 'diaper', ph: '색 · 상태', quick: ['보통', '묽음', '단단함'] },
+    pee: { label: '소변', icon: 'drop', chip: 'yel', grp: 'diaper', ph: '', quick: [], plain: true },
+    poop: { label: '대변', icon: 'poop', chip: 'tan', grp: 'diaper', ph: '', quick: [], plain: true },
     sleep: { label: '수면', icon: 'moon', chip: 'lav', grp: 'sleep', ph: '', quick: [] },
     wake: { label: '깸', icon: 'sun', chip: 'lav', grp: 'sleep', ph: '', quick: [] },
-    bath: { label: '목욕', icon: 'bath', chip: 'sky', grp: 'bath', ph: '메모', quick: [] },
+    bath: { label: '목욕', icon: 'bath', chip: 'sky', grp: 'bath', ph: '', quick: [], plain: true },
     memo: { label: '메모', icon: 'pen', chip: 'gray', grp: 'memo', ph: '메모', quick: [] },
     feed: { label: '수유', icon: 'bottle', chip: 'peach', grp: 'feed', ph: '분유 120ml · 모유 15분', quick: ['분유', '모유', '분유+모유'], old: true },
     diaper: { label: '기저귀', icon: 'drop', chip: 'yel', grp: 'diaper', ph: '소변 · 대변', quick: ['소변', '대변', '소변+대변'], old: true }
@@ -686,7 +686,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, weekSeeded: false, hospSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', blTab: 'log', blRange: 'day', blMetric: 'feed', vxSheet: null, vxInfo: null, vxPastOpen: false, spSpendOpen: {}, spSpendTag: '', spSpendMore: {}, spTagEdit: false, spDraft: {}, careSeeded: false, bdTab: 'todo', careExpand: {}, careAdd: null, careDateEdit: false, showRoles: true };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, weekSeeded: false, hospSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', blTab: 'log', blRange: 'day', blMetric: 'feed', blSelect: false, blSel: {}, blMonth: '', vxSheet: null, vxInfo: null, vxPastOpen: false, spSpendOpen: {}, spSpendTag: '', spSpendMore: {}, spTagEdit: false, spDraft: {}, careSeeded: false, bdTab: 'todo', careExpand: {}, careAdd: null, careDateEdit: false, showRoles: true };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -953,7 +953,7 @@
     if (ui.view === 'supports' && ui.supportModal) { ui.supportModal = null; document.body.classList.remove('has-modal'); }
     if (ui.view === 'birthday') { ui.birthEdit = false; ui.birthForm = null; }
     if (ui.view === 'growth') ui.grForm = null;
-    if (ui.view === 'babylog') { ui.blEdit = null; closeBlGuide(); }
+    if (ui.view === 'babylog') { ui.blEdit = null; ui.blSelect = false; ui.blSel = {}; closeBlGuide(); }
     if (ui.view === 'vaccine') closeVxSheet(true);
     ui.view = view;
     if (view === 'notes' || view === 'memos') ui.recordTab = view;
@@ -4286,10 +4286,10 @@ datesSorted().forEach(function (d) {
       '<div class="bl-form__row">' + kindSel +
       '<label class="visually-hidden" for="bl-time-' + id + '">시각</label><input type="time" id="bl-time-' + id + '" name="time" value="' + p(d.getHours()) + ':' + p(d.getMinutes()) + '"></div>' +
       (k.quick.length ? '<div class="bl-quick">' + k.quick.map(function (q) { return '<button type="button" class="bt-chip" data-action="bl-quick" data-val="' + q + '">' + q + '</button>'; }).join('') + '</div>' : '') +
-      (e.kind === 'sleep' || e.kind === 'wake' ? '' : '<label class="visually-hidden" for="bl-detail-' + id + '">내용</label><input type="text" id="bl-detail-' + id + '" name="detail" maxlength="100" placeholder="' + escapeHtml(k.ph) + '" value="' + escapeHtml(blDetail(e)) + '" data-focus-key="bl-detail:' + id + '" autocomplete="off" enterkeyhint="done">') +
+      (e.kind === 'sleep' || e.kind === 'wake' || k.plain ? '' : '<label class="visually-hidden" for="bl-detail-' + id + '">내용</label><input type="text" id="bl-detail-' + id + '" name="detail" maxlength="100" placeholder="' + escapeHtml(k.ph) + '" value="' + escapeHtml(blDetail(e)) + '" data-focus-key="bl-detail:' + id + '" autocomplete="off" enterkeyhint="done">') +
       '<div class="bt-form__actions"><button type="button" class="btn btn--small bt-tool--danger" data-action="bl-del" style="margin-right:auto">삭제</button><button type="button" class="btn btn--small" data-action="bl-cancel">닫기</button><button type="submit" class="btn btn--primary btn--small">저장</button></div></form>';
   }
-  function blRangeDays() { return ui.blRange === 'month' ? 30 : ui.blRange === 'week' ? 7 : 1; }
+  function blRangeDays() { return ui.blRange === 'week' ? 7 : 1; }
   function renderBabyLog() {
     var view = $('#view-babylog'); if (!view || ui.view !== 'babylog') return;
     var sp = sleepPairs();
@@ -4308,16 +4308,24 @@ datesSorted().forEach(function (d) {
     var nav = '<div class="bl-day"><button type="button" class="bl-day__nav" data-action="bl-day" data-d="-1" aria-label="이전 날">‹</button><b>' + shortDate(day) + (isToday ? ' · 오늘' : '') + (ageText(day) ? ' <small>' + ageText(day) + '</small>' : '') + '</b>' +
       '<button type="button" class="bl-day__nav" data-action="bl-day" data-d="1" aria-label="다음 날"' + (isToday ? ' disabled' : '') + '>›</button></div>';
     var items = state.babyLog.filter(function (e) { return dayKey(e.t) === day && !(e.kind === 'wake' && sp.pairedWake[e.id]); }).sort(function (a, b) { return b.t - a.t; });
-    var list = items.length ? '<ul class="bl-list card">' + items.map(function (e) {
-      if (ui.blEdit === e.id) return '<li class="bl-li is-editing">' + blEditFormHtml(e) + '</li>';
+    var selecting = !!ui.blSelect && items.length > 0;
+    if (!items.length) ui.blSelect = false;
+    var selN = 0; items.forEach(function (e) { if (ui.blSel[e.id]) selN++; });
+    var selbar = !items.length ? '' : selecting
+      ? '<div class="bl-selbar is-on"><label class="bl-selall"><input type="checkbox" data-bl-sel-all' + (selN === items.length ? ' checked' : '') + '> 전체 선택</label><span class="bl-selbar__n">' + selN + '개 선택</span>' +
+        '<button type="button" class="btn btn--small bt-tool--danger" data-action="bl-sel-del"' + (selN ? '' : ' disabled') + '>삭제</button><button type="button" class="btn btn--small" data-action="bl-sel-off" data-focus-key="bl-sel-off">취소</button></div>'
+      : '<div class="bl-selbar"><button type="button" class="bl-selbar__on" data-action="bl-sel-on" data-focus-key="bl-sel-on">선택 삭제</button></div>';
+    var list = items.length ? '<ul class="bl-list card' + (selecting ? ' is-selecting' : '') + '">' + items.map(function (e) {
       var k = blKind(e);
       var detail = e.detail ? escapeHtml(blDetail(e)) : '';
       if (e.kind === 'sleep') { var end = sp.endOf[e.id]; detail = end ? '~ ' + timeStampOf(new Date(end.t)) + ' · ' + durText(end.t - e.t) : (sp.sleeping && sp.sleeping.id === e.id ? '자는 중' : ''); }
-      return '<li class="bl-li"><button type="button" class="bl-row" data-action="bl-edit" data-id="' + escapeHtml(e.id) + '" data-focus-key="bl-row:' + escapeHtml(e.id) + '">' +
-        '<span class="bl-row__t">' + timeStampOf(new Date(e.t)) + '</span>' + blChip(k) +
-        '<span class="bl-row__d">' + (detail || '<span class="mut">눌러서 내용 추가</span>') + '</span><span class="bl-row__who">' + escapeHtml(e.who || '') + '</span></button></li>';
+      var inner = '<span class="bl-row__t">' + timeStampOf(new Date(e.t)) + '</span>' + blChip(k) +
+        '<span class="bl-row__d">' + (detail || (k.plain || e.kind === 'sleep' || e.kind === 'wake' ? '' : '<span class="mut">눌러서 내용 추가</span>')) + '</span><span class="bl-row__who">' + escapeHtml(e.who || '') + '</span>';
+      if (selecting) return '<li class="bl-li"><label class="bl-row bl-row--sel' + (ui.blSel[e.id] ? ' is-checked' : '') + '"><input type="checkbox" data-bl-sel="' + escapeHtml(e.id) + '"' + (ui.blSel[e.id] ? ' checked' : '') + ' aria-label="' + escapeHtml(k.label + ' ' + timeStampOf(new Date(e.t))) + ' 선택">' + inner + '</label></li>';
+      if (ui.blEdit === e.id) return '<li class="bl-li is-editing">' + blEditFormHtml(e) + '</li>';
+      return '<li class="bl-li"><button type="button" class="bl-row" data-action="bl-edit" data-id="' + escapeHtml(e.id) + '" data-focus-key="bl-row:' + escapeHtml(e.id) + '">' + inner + '</button></li>';
     }).join('') + '</ul>' : '<div class="card bl-empty mut">' + (isToday ? '위 버튼을 누르면 지금 시각으로 바로 기록돼요.' : '이날은 기록이 없어요.') + '</div>';
-    $('#babylog-body').innerHTML = hero + tabs + buttons + nav + list + guide;
+    $('#babylog-body').innerHTML = hero + tabs + buttons + nav + selbar + list + guide;
   }
 
   /* ---------- 육아 일지: 패턴 그래프 (일간 · 주간 · 월간) ---------- */
@@ -4362,14 +4370,40 @@ datesSorted().forEach(function (d) {
   function blNowLine(d) { var now = Date.now(); return now >= d.start && now < d.start + BL_DAY_MS ? '<span class="blp-now" style="left:' + blPct(now, d.start).toFixed(2) + '%"></span>' : ''; }
   function blHours(ms) { var h = ms / 3600000; return h >= 10 ? Math.round(h) + '시간' : (Math.round(h * 10) / 10) + '시간'; }
   function blNum(n) { return Math.round(n * 10) / 10; }
+  // 고를 수 있는 달: 첫 기록이 있는 달 ~ 이번 달 (최근 달이 먼저)
+  function blMonths() {
+    var now = new Date(), first = now.getTime();
+    state.babyLog.forEach(function (e) { if (e.t < first) first = e.t; });
+    var f = new Date(first), y = now.getFullYear(), m = now.getMonth(), out = [];
+    while (y > f.getFullYear() || (y === f.getFullYear() && m >= f.getMonth())) {
+      out.push(y + '-' + (m < 9 ? '0' : '') + (m + 1));
+      if (--m < 0) { m = 11; y--; }
+      if (out.length > 120) break;
+    }
+    return out;
+  }
   function blPatternHtml(sp) {
     var range = ui.blRange === 'week' || ui.blRange === 'month' ? ui.blRange : 'day', n = blRangeDays();
-    var endIso = logDay(), today = todayStamp(), endD = dateOf(endIso), days = [];
+    var endIso = logDay(), today = todayStamp(), endD = dateOf(endIso), days = [], nav;
+    // 주간은 그 날이 들어 있는 주의 월요일 ~ 일요일, 월간은 고른 달의 1일 ~ 말일 (아직 안 온 날은 빈 줄)
+    if (range === 'week') { var back = (endD.getDay() + 6) % 7; endD = new Date(endD.getFullYear(), endD.getMonth(), endD.getDate() - back + 6); endIso = isoOf(endD); }
+    if (range === 'month') {
+      var months = blMonths(), ym = months.indexOf(ui.blMonth) !== -1 ? ui.blMonth : months[0];
+      var y = parseInt(ym.slice(0, 4), 10), mo = parseInt(ym.slice(5, 7), 10) - 1;
+      n = new Date(y, mo + 1, 0).getDate(); endD = new Date(y, mo, n); endIso = isoOf(endD);
+      var mi = months.indexOf(ym);
+      nav = '<div class="bl-day"><button type="button" class="bl-day__nav" data-action="bl-month" data-ym="' + (months[mi + 1] || '') + '" aria-label="이전 달"' + (months[mi + 1] ? '' : ' disabled') + '>‹</button>' +
+        '<label class="visually-hidden" for="bl-month">달 고르기</label><select id="bl-month" class="blp-month" data-bl-month>' +
+        months.map(function (m) { return '<option value="' + m + '"' + (m === ym ? ' selected' : '') + '>' + m.slice(0, 4) + '년 ' + parseInt(m.slice(5, 7), 10) + '월</option>'; }).join('') + '</select>' +
+        '<button type="button" class="bl-day__nav" data-action="bl-month" data-ym="' + (months[mi - 1] || '') + '" aria-label="다음 달"' + (mi > 0 ? '' : ' disabled') + '>›</button></div>';
+    }
     for (var i = n - 1; i >= 0; i--) { var dd = new Date(endD.getFullYear(), endD.getMonth(), endD.getDate() - i); days.push(blDayData(isoOf(dd), sp)); }
     var seg = '<div class="done-tabs blp-range" role="tablist" aria-label="기간">' + [['day', '일간'], ['week', '주간'], ['month', '월간']].map(function (o) { var on = range === o[0]; return '<button type="button" role="tab" class="done-tab' + (on ? ' is-active' : '') + '" data-action="bl-range" data-range="' + o[0] + '" data-focus-key="bl-range:' + o[0] + '" aria-selected="' + on + '">' + o[1] + '</button>'; }).join('') + '</div>';
-    var title = n === 1 ? shortDate(endIso) + (endIso === today ? ' · 오늘' : '') : shortDate(days[0].iso).replace(/ \(.\)$/, '') + ' ~ ' + shortDate(endIso).replace(/ \(.\)$/, '');
-    var nav = '<div class="bl-day"><button type="button" class="bl-day__nav" data-action="bl-day" data-d="-' + n + '" aria-label="이전 기간">‹</button><b>' + title + '</b>' +
-      '<button type="button" class="bl-day__nav" data-action="bl-day" data-d="' + n + '" aria-label="다음 기간"' + (endIso >= today ? ' disabled' : '') + '>›</button></div>';
+    if (!nav) {
+      var title = n === 1 ? shortDate(endIso) + (endIso === today ? ' · 오늘' : '') : shortDate(days[0].iso).replace(/ \(.\)$/, '') + ' ~ ' + shortDate(endIso).replace(/ \(.\)$/, '');
+      nav = '<div class="bl-day"><button type="button" class="bl-day__nav" data-action="bl-day" data-d="-' + n + '" aria-label="이전 기간">‹</button><b>' + title + '</b>' +
+        '<button type="button" class="bl-day__nav" data-action="bl-day" data-d="' + n + '" aria-label="다음 기간"' + (endIso >= today ? ' disabled' : '') + '>›</button></div>';
+    }
     // 합계(일간) 또는 기록한 날 기준 하루 평균(주간·월간)
     var tot = { feed: 0, breast: 0, formula: 0, solid: 0, ml: 0, pee: 0, poop: 0, diaper: 0, sleepMs: 0, bath: 0 }, used = 0;
     days.forEach(function (d) { if (!d.st.any) return; used++; Object.keys(tot).forEach(function (k) { tot[k] += d.st[k]; }); });
@@ -4411,6 +4445,17 @@ datesSorted().forEach(function (d) {
     var empty = used ? '' : '<div class="card bl-empty mut">' + (n === 1 ? '이날은 기록이 없어요.' : '이 기간에는 기록이 없어요.') + ' ‘기록’ 탭에서 버튼을 누르면 그래프가 채워져요.</div>';
     return seg + nav + (used ? stats + chart : empty);
   }
+  function blDeleteSelected() {
+    var sp = sleepPairs(), ids = {};
+    Object.keys(ui.blSel).forEach(function (id) { if (!ui.blSel[id]) return; ids[id] = true; var w = sp.endOf[id]; if (w) ids[w.id] = true; });
+    var gone = state.babyLog.filter(function (x) { return ids[x.id]; });
+    if (!gone.length) return;
+    var shown = Object.keys(ui.blSel).filter(function (id) { return ui.blSel[id]; }).length;
+    state.babyLog = state.babyLog.filter(function (x) { return !ids[x.id]; });
+    ui.blSel = {}; ui.blSelect = false; ui.blEdit = null;
+    commit(); act('babylog', '기록 ' + shown + '개 삭제');
+    showToast('기록 ' + shown + '개를 삭제했어요.', function () { gone.forEach(function (x) { state.babyLog.push(x); }); commit(); showToast('삭제를 취소했어요.'); });
+  }
   function blLog(kind) {
     var e = { id: uid(), kind: kind, t: Date.now(), who: myName(), detail: '' };
     state.babyLog.push(e);
@@ -4419,7 +4464,7 @@ datesSorted().forEach(function (d) {
     if (kind === 'memo') ui.blEdit = e.id;
     commit(); act('babylog', k.label + ' ' + timeStampOf(new Date(e.t)));
     if (kind === 'memo') { var f = document.querySelector('[data-focus-key="bl-detail:' + e.id + '"]'); if (f) f.focus(); return; }
-    var hint = kind === 'formula' ? ' · 양은 목록에서 눌러 추가' : kind === 'breast' || kind === 'solid' || kind === 'poop' ? ' · 내용은 목록에서 눌러 추가' : '';
+    var hint = kind === 'formula' ? ' · 양은 목록에서 눌러 추가' : kind === 'breast' || kind === 'solid' ? ' · 내용은 목록에서 눌러 추가' : '';
     showToast((kind === 'wake' ? '깼어요' : k.label) + ' ' + timeStampOf(new Date(e.t)) + ' 기록' + hint, function () {
       state.babyLog = state.babyLog.filter(function (x) { return x.id !== e.id; }); commit(); showToast('기록을 취소했어요.');
     });
@@ -5836,7 +5881,11 @@ datesSorted().forEach(function (d) {
             }
             break;
           }
-          case 'bl-tab': ui.blTab = b.dataset.tab === 'pattern' ? 'pattern' : 'log'; ui.blEdit = null; renderBabyLog(); { var tb = document.querySelector('[data-focus-key="bl-tab:' + ui.blTab + '"]'); if (tb) tb.focus(); } break;
+          case 'bl-sel-on': ui.blSelect = true; ui.blSel = {}; ui.blEdit = null; renderBabyLog(); { var so = document.querySelector('[data-focus-key="bl-sel-off"]'); if (so) so.focus(); } break;
+          case 'bl-sel-off': ui.blSelect = false; ui.blSel = {}; renderBabyLog(); { var sn = document.querySelector('[data-focus-key="bl-sel-on"]'); if (sn) sn.focus(); } break;
+          case 'bl-sel-del': blDeleteSelected(); break;
+          case 'bl-month': if (b.dataset.ym) { ui.blMonth = b.dataset.ym; renderBabyLog(); var mb = document.querySelector('[data-action="bl-month"][aria-label="' + b.getAttribute('aria-label') + '"]'); if (mb && !mb.disabled) mb.focus(); else { var ms = $('#bl-month'); if (ms) ms.focus(); } } break;
+          case 'bl-tab': ui.blSelect = false; ui.blSel = {}; ui.blTab = b.dataset.tab === 'pattern' ? 'pattern' : 'log'; ui.blEdit = null; renderBabyLog(); { var tb = document.querySelector('[data-focus-key="bl-tab:' + ui.blTab + '"]'); if (tb) tb.focus(); } break;
           case 'bl-range': ui.blRange = b.dataset.range; renderBabyLog(); { var rb = document.querySelector('[data-focus-key="bl-range:' + ui.blRange + '"]'); if (rb) rb.focus(); } break;
           case 'bl-metric': ui.blMetric = b.dataset.metric; renderBabyLog(); break;
           case 'bl-del': {
@@ -5845,10 +5894,20 @@ datesSorted().forEach(function (d) {
             showToast('기록을 삭제했어요.', function () { state.babyLog.push(ev); commit(); showToast('삭제를 취소했어요.'); });
             break;
           }
-          case 'bl-day': { var d = dateOf(logDay()); d.setDate(d.getDate() + Number(b.dataset.d)); var iso = isoOf(d); ui.logDay = iso >= todayStamp() ? '' : iso; ui.blEdit = null; renderBabyLog(); break; }
+          case 'bl-day': { var d = dateOf(logDay()); d.setDate(d.getDate() + Number(b.dataset.d)); var iso = isoOf(d); ui.logDay = iso >= todayStamp() ? '' : iso; ui.blEdit = null; ui.blSel = {}; renderBabyLog(); break; }
           case 'bl-guide-open': openBlGuide(); break;
           case 'bl-guide-close': closeBlGuide(); break;
           case 'bl-copy': copyText(b.dataset.text, b.dataset.label); break;
+        }
+      });
+      blView.addEventListener('change', function (e) {
+        var t = e.target;
+        if (t.hasAttribute('data-bl-month')) { ui.blMonth = t.value; renderBabyLog(); var ms2 = $('#bl-month'); if (ms2) ms2.focus(); return; }
+        if (t.hasAttribute('data-bl-sel')) { ui.blSel[t.dataset.blSel] = t.checked; renderBabyLog(); var again = document.querySelector('[data-bl-sel="' + t.dataset.blSel + '"]'); if (again) again.focus(); }
+        else if (t.hasAttribute('data-bl-sel-all')) {
+          var day = logDay(), sp = sleepPairs(), on = t.checked; ui.blSel = {};
+          if (on) state.babyLog.forEach(function (x) { if (dayKey(x.t) === day && !(x.kind === 'wake' && sp.pairedWake[x.id])) ui.blSel[x.id] = true; });
+          renderBabyLog(); var all = document.querySelector('[data-bl-sel-all]'); if (all) all.focus();
         }
       });
       blView.addEventListener('submit', function (e) { var f = e.target.closest('form[data-bl-form]'); if (!f) return; e.preventDefault(); submitBlForm(f); });

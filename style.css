@@ -1446,8 +1446,19 @@ body.kb-open .bottom-nav { opacity: 0; pointer-events: none; }
 .bl-btn { min-height: 84px; }
 .bl-form__kind { min-height: 44px; padding: 0 8px; border: 1px solid var(--border); border-radius: 10px; background: #fff; font-size: 16px; }
 @media (max-width: 360px) { .bl-btn { font-size: 0.78rem; } .bl-btn i { width: 34px; height: 34px; } }
+/* 육아 일지: 선택 삭제 */
+.bl-selbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-height: 36px; }
+.bl-selbar__on { min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+.bl-selbar.is-on { justify-content: flex-start; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 6px 8px 6px 12px; }
+.bl-selall { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; font-size: 0.86rem; font-weight: 700; cursor: pointer; }
+.bl-selall input, .bl-row--sel input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--peach-strong); }
+.bl-selbar__n { margin-right: auto; font-size: 0.8rem; color: var(--muted); }
+.bl-row--sel { cursor: pointer; }
+.bl-row--sel.is-checked { background: var(--peach-soft); }
+.bl-row--sel .bl-row__t { width: 40px; }
 /* 육아 일지: 패턴 그래프 */
 .blp-range { margin: 0; }
+.blp-month { min-height: 40px; padding: 0 30px 0 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23706E78' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; -webkit-appearance: none; appearance: none; font: inherit; font-size: 16px; font-weight: 700; color: var(--text); cursor: pointer; }
 .blp-cap { margin: 0 0 6px; font-size: 0.84rem; font-weight: 700; color: var(--text); }
 .blp-cap .mut { font-weight: 500; }
 .blp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
