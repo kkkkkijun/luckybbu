@@ -2738,7 +2738,8 @@ datesSorted().forEach(function (d) {
     var now = new Date(); var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     var diff = Math.round((target - today) / 86400000);
     if (diff === 0) return 'D-Day';
-    return diff > 0 ? 'D-' + diff : 'D+' + Math.abs(diff);
+    // 지난 뒤에는 그날을 1일로 센다(11/9 → 11/18 = D+10, 포털 '만난 지 +10일'과 같게)
+    return diff > 0 ? 'D-' + diff : 'D+' + (Math.abs(diff) + 1);
   }
   function renderDday() {
     var pill = $('#dday-pill');
