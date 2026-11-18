@@ -1609,9 +1609,6 @@ body.has-modal .toast, body.has-sheet .toast { z-index: 95; }
 /* 입력 창 */
 .goal-form { display: grid; gap: 12px; margin-top: 8px; }
 .goal-form .field input { width: 100%; min-height: 46px; font-size: 1rem; }
-.goal-form__chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.goal-chip { min-height: 38px; padding: 0 14px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font: inherit; font-size: 0.85rem; cursor: pointer; }
-.goal-chip:hover { border-color: var(--gold-bar); }
 .goal-form__preview { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--gold-soft); font-size: 0.85rem; color: #5F5C68; }
 .goal-form__preview:empty { display: none; }
 .goal-form__preview b { color: var(--text); }
@@ -1674,3 +1671,38 @@ body.has-modal .toast, body.has-sheet .toast { z-index: 95; }
 .care-warn { margin: 0; background: #FFF6DA; color: #8A6A00; border-radius: 12px; padding: 10px 12px; font-size: 0.8rem; line-height: 1.55; }
 .goal__rows dd.is-pace small { display: block; font-size: 0.82em; font-weight: 600; opacity: 0.85; margin-top: 1px; white-space: nowrap; }
 a.care-link { display: inline-flex; align-items: center; text-decoration: none; }
+
+/* 모으는 돈: 통장별 (합계 막대 + 통장 목록) */
+.goal-accs { display: flex; flex-direction: column; gap: 6px; padding: 12px 12px 4px; border-radius: 16px; background: rgba(255, 255, 255, 0.72); }
+.goal-accs__head { display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 700; }
+.goal-accs__head span:last-child { font-weight: 500; color: var(--muted); }
+.goal-accs__bar { display: flex; gap: 2px; height: 10px; border-radius: 99px; overflow: hidden; background: #F4EFE3; }
+.goal-accs__bar span { display: block; min-width: 3px; }
+.goal-accs__list { list-style: none; margin: 0; padding: 0; }
+.goal-accs__list li + li { border-top: 1px solid #F3E7C2; }
+.goal-acc { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 4px 0; border: 0; background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.goal-acc > svg { flex-shrink: 0; color: #A9A4AE; }
+.goal-acc:hover > svg { color: var(--gold-ink); }
+.goal-acc__dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.goal-acc__name { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.goal-acc__name b { font-size: 0.82rem; }
+.goal-acc__name small { font-size: 0.68rem; color: var(--muted); }
+.goal-acc__amt { font-size: 0.88rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* 입력 창의 통장 행 */
+.goal-acc-rows { display: grid; gap: 12px; }
+.goal-acc-row { display: grid; gap: 6px; }
+.goal-acc-row__head { display: flex; align-items: center; gap: 6px; min-height: 28px; }
+.goal-acc-row__name { font-size: 0.85rem; font-weight: 700; }
+.goal-acc-row__name-input { flex: 1 1 auto; min-width: 0; min-height: 36px !important; font-size: 1rem; font-weight: 700; }
+.goal-acc-row__info { margin-left: auto; font-size: 0.72rem; color: var(--muted); text-align: right; }
+.goal-acc-row__del { flex-shrink: 0; width: 36px; height: 36px; border: 0; border-radius: 50%; background: #F3EEE9; color: var(--muted); font-size: 1.2rem; cursor: pointer; }
+.goal-acc-row > input { width: 100%; min-height: 46px; font-size: 1rem; font-weight: 700; }
+.goal-acc-row__more summary { min-height: 32px; display: flex; align-items: center; font-size: 0.78rem; color: var(--gold-ink); cursor: pointer; }
+.goal-acc-row__three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+.goal-acc-row__three .field input { width: 100%; min-height: 42px; font-size: 1rem; }
+@media (max-width: 420px) { .goal-acc-row__three { grid-template-columns: 1fr 1fr; } .goal-acc-row__three .field:first-child { grid-column: 1 / -1; } }
+.goal-form__tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.goal-tool { min-height: 42px; padding: 0 14px; border-radius: 12px; font: inherit; font-size: 0.85rem; cursor: pointer; }
+.goal-tool--month { flex: 1 1 auto; border: 1px solid var(--gold-bar); background: var(--gold-soft); color: var(--gold-ink); font-weight: 700; }
+.goal-tool--month[hidden] { display: none; }
+.goal-tool--add { border: 1px dashed #E2D9D1; background: #fff; color: var(--muted); }

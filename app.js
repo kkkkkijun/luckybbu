@@ -2383,22 +2383,54 @@ datesSorted().forEach(function (d) {
     renderGoal();
   }
 
-  /* ---------- 포털: 모으는 돈 목표 (시안 ③ 원형 + 표) ---------- */
-  var GOAL_TITLE = '축복이 맞이 자금', GOAL_TITLE_MAX = 30;
-  function emptyGoal() { return { title: GOAL_TITLE, target: 0, current: 0, due: '', updated: 0 }; }
+  /* ---------- 포털: 모으는 돈 목표 (원형 + 표, 아래 통장별 막대 · 시안 ②) ---------- */
+  // 모은 돈 = 통장별 금액의 합. 기본 통장: 공동 통장 · 기준 적금 · 윤서 적금(적금은 매달 넣는 돈·가입일·만기일을 적을 수 있음)
+  var GOAL_TITLE = '축복이 맞이 자금', GOAL_TITLE_MAX = 30, ACC_NAME_MAX = 20, ACC_MAX = 8;
+  var ACC_DEFAULTS = [
+    { id: 'joint', name: '공동 통장', saving: false },
+    { id: 'p1', name: TAG_NAMES[0] + ' 적금', saving: true },
+    { id: 'p2', name: TAG_NAMES[1] + ' 적금', saving: true }
+  ];
+  var ACC_COLORS = { joint: '#F5C24B', p1: '#6FA8E8', p2: '#EE8FB0' };
+  var ACC_EXTRA_COLORS = ['#7FD6AE', '#B9A7FF', '#FFA48C', '#8DB9FF', '#FFD966'];
+  function accColor(a, i) { return ACC_COLORS[a.id] || ACC_EXTRA_COLORS[i % ACC_EXTRA_COLORS.length]; }
+  function emptyAccount(base) { return { id: base.id, name: base.name, amount: 0, saving: !!base.saving, monthly: 0, start: '', end: '' }; }
+  function emptyGoal() { return { title: GOAL_TITLE, target: 0, current: 0, due: '', updated: 0, accounts: ACC_DEFAULTS.map(emptyAccount) }; }
+  function isIsoDate(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v); }
   function normalizeGoal(raw) {
     var g = emptyGoal();
     if (!raw || typeof raw !== 'object') return g;
     var num = function (v) { return typeof v === 'number' && isFinite(v) && v > 0 ? Math.min(Math.round(v), PRICE_MAX) : 0; };
     if (typeof raw.title === 'string' && raw.title.trim()) g.title = raw.title.trim().slice(0, GOAL_TITLE_MAX);
-    g.target = num(raw.target); g.current = num(raw.current);
-    g.due = typeof raw.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.due) ? raw.due : '';
+    g.target = num(raw.target);
+    g.due = isIsoDate(raw.due) ? raw.due : '';
     g.updated = typeof raw.updated === 'number' ? raw.updated : 0;
+    var list = listOf(raw.accounts), seen = {}, accs = [];
+    list.forEach(function (a) {
+      if (!a || typeof a !== 'object') return;
+      var id = typeof a.id === 'string' ? a.id.trim().replace(/[.#$\[\]\/]/g, '_').slice(0, 40) : '';
+      if (!id || seen[id] || accs.length >= ACC_MAX) return;
+      seen[id] = true;
+      var def = null; ACC_DEFAULTS.forEach(function (d) { if (d.id === id) def = d; });
+      var name = typeof a.name === 'string' && a.name.trim() ? a.name.trim().slice(0, ACC_NAME_MAX) : (def ? def.name : '통장');
+      accs.push({ id: id, name: name, amount: num(a.amount), saving: def ? def.saving : a.saving === true, monthly: num(a.monthly), start: isIsoDate(a.start) ? a.start : '', end: isIsoDate(a.end) ? a.end : '' });
+    });
+    if (!accs.length) {
+      // 통장별로 나누기 전 데이터: 지금까지 모은 돈은 공동 통장에 넣어 둔다(합계는 그대로)
+      accs = ACC_DEFAULTS.map(emptyAccount);
+      accs[0].amount = num(raw.current);
+    } else {
+      // 기본 통장 세 개는 늘 있게 한다
+      ACC_DEFAULTS.forEach(function (d, i) { if (!seen[d.id]) accs.splice(Math.min(i, accs.length), 0, emptyAccount(d)); });
+    }
+    g.accounts = accs;
+    g.current = Math.min(accs.reduce(function (s, a) { return s + a.amount; }, 0), PRICE_MAX);
     return g;
   }
   var COIN_SVG = '<svg class="goal__coin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v5c0 1.7 3.1 3 7 3s7-1.3 7-3V7M5 12v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5"/></svg>';
   var PEN_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
   function manWon(n) { return n >= 10000 ? '약 ' + formatNumber(Math.round(n / 10000)) + '만원' : formatNumber(n) + '원'; }
+  function manShort(n) { return n >= 10000 && n % 10000 === 0 ? formatNumber(n / 10000) + '만' : formatNumber(n) + '원'; }
   function goalPct(g) { return g.target ? Math.floor(g.current / g.target * 100) : 0; }
   // 목표일까지 한 달에 모아야 할 돈
   function goalPaceText(g) {
@@ -2411,6 +2443,24 @@ datesSorted().forEach(function (d) {
   }
   // 목표일 표시: 2027.1.1
   function ymdDot(iso) { var d = dateOf(iso); return d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate(); }
+  function ymDot(iso) { var d = dateOf(iso); return d.getFullYear() + '.' + (d.getMonth() + 1); }
+  // 적금 회차: 가입한 달부터 만기 전 달까지를 전체 회차로, 이번 달까지를 넣은 회차로 본다
+  function monthIndex(d) { return d.getFullYear() * 12 + d.getMonth(); }
+  function savingRounds(a) {
+    if (!a.start || !a.end) return null;
+    var total = monthIndex(dateOf(a.end)) - monthIndex(dateOf(a.start));
+    if (total <= 0) return null;
+    var done = Math.max(0, Math.min(total, monthIndex(todayDate()) - monthIndex(dateOf(a.start)) + 1));
+    return { done: done, total: total };
+  }
+  function accInfo(a) {
+    if (!a.saving) return '';
+    var parts = [];
+    if (a.monthly) parts.push('매달 ' + manShort(a.monthly));
+    var r = savingRounds(a); if (r) parts.push(r.done + '/' + r.total + '회');
+    if (a.end) parts.push(ymDot(a.end) + ' 만기');
+    return parts.join(' · ');
+  }
   function renderGoal() {
     var box = $('#portal-goal');
     if (!box) return;
@@ -2423,6 +2473,16 @@ datesSorted().forEach(function (d) {
     }
     var pct = goalPct(g), left = g.target - g.current, r = 46, c = 2 * Math.PI * r;
     var pace = goalPaceText(g);
+    var accHtml = '<div class="goal-accs"><div class="goal-accs__head"><span>통장별</span><span>합계 ' + formatNumber(g.current) + '원</span></div>';
+    if (g.current > 0) accHtml += '<div class="goal-accs__bar" role="img" aria-label="' + escapeHtml(g.accounts.filter(function (a) { return a.amount; }).map(function (a) { return a.name + ' ' + Math.round(a.amount / g.current * 100) + '%'; }).join(', ')) + '">' +
+      g.accounts.map(function (a, i) { return a.amount ? '<span style="width:' + (a.amount / g.current * 100).toFixed(2) + '%;background:' + accColor(a, i) + '"></span>' : ''; }).join('') + '</div>';
+    accHtml += '<ul class="goal-accs__list">' + g.accounts.map(function (a, i) {
+      var info = accInfo(a);
+      return '<li><button type="button" class="goal-acc" data-action="goal-edit" data-focus="acc:' + escapeHtml(a.id) + '" aria-label="' + escapeHtml(a.name) + ' 금액 고치기">' +
+        '<span class="goal-acc__dot" style="background:' + accColor(a, i) + '"></span>' +
+        '<span class="goal-acc__name"><b>' + escapeHtml(a.name) + '</b>' + (info ? '<small>' + escapeHtml(info) + '</small>' : '') + '</span>' +
+        '<span class="goal-acc__amt">' + formatNumber(a.amount) + '원</span>' + PEN_SVG + '</button></li>';
+    }).join('') + '</ul></div>';
     box.innerHTML = '<section class="goal" aria-label="모으는 돈">' + head +
       '<div class="goal__body"><span class="goal__ring" role="img" aria-label="' + pct + '% 모았어요"><svg width="112" height="112" viewBox="0 0 112 112" aria-hidden="true"><circle cx="56" cy="56" r="' + r + '" class="goal__track"/><circle cx="56" cy="56" r="' + r + '" class="goal__arc" stroke-dasharray="' + (c * Math.min(1, pct / 100)).toFixed(1) + ' ' + c.toFixed(1) + '"/></svg>' +
       '<span class="goal__pct"><b>' + pct + '%</b><small>' + (left <= 0 ? '달성!' : '모았어요') + '</small></span></span>' +
@@ -2430,75 +2490,137 @@ datesSorted().forEach(function (d) {
       '<dt>목표</dt><dd>' + formatNumber(g.target) + '원</dd>' +
       '<dt>' + (left > 0 ? '남은 돈' : '넘은 돈') + '</dt><dd>' + formatNumber(Math.abs(left)) + '원</dd>' +
       (pace ? '<dt>목표일</dt><dd class="is-pace">' + escapeHtml(pace[0]) + '<small>' + escapeHtml(pace[1]) + '</small></dd>' : '') + '</dl></div>' +
+      accHtml +
       (g.updated ? '<p class="goal__updated">' + escapeHtml(shortDate(isoOfDate(new Date(g.updated)))) + ' 업데이트</p>' : '') + '</section>';
   }
   function isoOfDate(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 
-  // 금액 입력 창
+  // 통장별 금액 입력 창: 창이 열린 동안 통장 목록을 초안(goalDraft)으로 들고 있다가 저장할 때 반영한다
+  var goalDraft = null, goalOpen = false;
+  function accRowHtml(a, i) {
+    var id = escapeHtml(a.id), isDefault = ACC_DEFAULTS.some(function (d) { return d.id === a.id; });
+    var info = accInfo(a);
+    return '<div class="goal-acc-row" data-acc="' + id + '">' +
+      '<div class="goal-acc-row__head"><span class="goal-acc__dot" style="background:' + accColor(a, i) + '"></span>' +
+      // 이름은 모든 통장에서 고칠 수 있다(예: '기준 적금' → '기준 청년도약계좌'). 기본 통장 세 개만 지울 수 없다
+      '<label class="visually-hidden" for="acc-name-' + id + '">통장 이름</label><input type="text" id="acc-name-' + id + '" class="goal-acc-row__name-input" data-acc-field="name" maxlength="' + ACC_NAME_MAX + '" value="' + escapeHtml(a.name) + '" placeholder="통장 이름">' +
+      (info ? '<span class="goal-acc-row__info">' + escapeHtml(info) + '</span>' : '') +
+      (isDefault ? '' : '<button type="button" class="goal-acc-row__del" data-action="goal-acc-del" aria-label="' + escapeHtml(a.name) + ' 지우기">×</button>') + '</div>' +
+      '<input type="text" id="acc-amt-' + id + '" data-acc-field="amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (a.amount ? formatNumber(a.amount) : '') + '" placeholder="0" aria-label="' + escapeHtml(a.name) + ' 금액">' +
+      (a.saving ? '<details class="goal-acc-row__more"' + (a.monthly || a.start || a.end ? '' : ' open') + '><summary>적금 정보 (매달 넣는 돈 · 가입일 · 만기일)</summary><div class="goal-acc-row__three">' +
+        '<div class="field"><label for="acc-mon-' + id + '">매달 넣는 돈</label><input type="text" id="acc-mon-' + id + '" data-acc-field="monthly" inputmode="numeric" autocomplete="off" data-price-input value="' + (a.monthly ? formatNumber(a.monthly) : '') + '" placeholder="예: 400,000"></div>' +
+        '<div class="field"><label for="acc-start-' + id + '">가입일</label><input type="date" id="acc-start-' + id + '" data-acc-field="start" value="' + a.start + '"></div>' +
+        '<div class="field"><label for="acc-end-' + id + '">만기일</label><input type="date" id="acc-end-' + id + '" data-acc-field="end" value="' + a.end + '"></div></div></details>' : '') +
+      '</div>';
+  }
   function goalFormHtml() {
     var g = state.goal, first = !g.target;
-    return '<form id="goal-form" novalidate><div class="modal__head"><h3 class="modal__title" id="goal-modal-title">' + (first ? '모을 돈 목표 정하기' : '모으는 돈 업데이트') + '</h3>' +
+    return '<form id="goal-form" novalidate><div class="modal__head"><h3 class="modal__title" id="goal-modal-title">' + (first ? '모을 돈 목표 정하기' : '통장별 금액 업데이트') + '</h3>' +
       '<button type="button" class="modal__close" data-action="goal-close" aria-label="닫기">×</button></div>' +
       '<div class="goal-form">' +
       '<div class="field"><label for="goal-title-input">목표 이름</label><input type="text" id="goal-title-input" maxlength="' + GOAL_TITLE_MAX + '" value="' + escapeHtml(g.title) + '" autocomplete="off"></div>' +
-      // 금액은 '지금 모은 총액'으로만 적는다(현재 금액이 미리 채워져 있고, +10만 등은 그 총액에 더한다)
-      '<div class="field"><label for="goal-amount">' + (first ? '지금까지 모은 돈' : '지금 모은 총액') + '</label><input type="text" id="goal-amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (g.current ? formatNumber(g.current) : '') + '" placeholder="예: 3,000,000"></div>' +
-      '<div class="goal-form__chips" aria-label="빠르게 더하기">' + [100000, 500000, 1000000].map(function (n) { return '<button type="button" class="goal-chip" data-action="goal-chip" data-add="' + n + '">+' + (n / 10000) + '만</button>'; }).join('') + '</div>' +
+      '<div class="goal-acc-rows" id="goal-acc-rows">' + goalDraft.map(accRowHtml).join('') + '</div>' +
+      '<div class="goal-form__tools"><button type="button" class="goal-tool goal-tool--month" data-action="goal-month" id="goal-month-btn"></button>' +
+      '<button type="button" class="goal-tool goal-tool--add" data-action="goal-acc-add">＋ 통장 추가</button></div>' +
       '<p class="goal-form__preview" id="goal-preview" aria-live="polite"></p>' +
       '<div class="goal-form__two"><div class="field"><label for="goal-target">목표 금액</label><input type="text" id="goal-target" inputmode="numeric" autocomplete="off" data-price-input value="' + (g.target ? formatNumber(g.target) : '') + '" placeholder="예: 20,000,000"></div>' +
       '<div class="field"><label for="goal-due">목표일 (선택)</label><input type="date" id="goal-due" value="' + g.due + '"></div></div>' +
       '<div class="modal__actions"><button type="button" class="btn" data-action="goal-close">취소</button><button type="submit" class="btn btn--primary goal-form__save">저장</button></div></div></form>';
   }
-  function goalNext() {
-    var form = $('#goal-form');
-    if (!form) return null;
-    var amt = parsePrice($('#goal-amount').value), tgt = parsePrice($('#goal-target').value);
-    if (!amt.ok || !tgt.ok) return { error: '금액은 숫자로 적어 주세요.' };
-    var current = amt.value === null ? 0 : amt.value;
-    return { current: Math.min(current, PRICE_MAX), target: tgt.value || 0, amount: amt.value };
+  // 입력 칸의 값을 초안에 옮긴다. 잘못된 금액이 있으면 그 칸을 돌려준다
+  function readGoalDraft() {
+    var bad = null;
+    Array.prototype.forEach.call(document.querySelectorAll('#goal-acc-rows [data-acc]'), function (row) {
+      var a = null; goalDraft.forEach(function (x) { if (x.id === row.dataset.acc) a = x; });
+      if (!a) return;
+      Array.prototype.forEach.call(row.querySelectorAll('[data-acc-field]'), function (el) {
+        var f = el.dataset.accField;
+        if (f === 'name') { var def = null; ACC_DEFAULTS.forEach(function (d) { if (d.id === a.id) def = d; }); a.name = el.value.trim().slice(0, ACC_NAME_MAX) || (def ? def.name : '통장'); }
+        else if (f === 'amount' || f === 'monthly') { var p = parsePrice(el.value); if (!p.ok) { bad = bad || el; return; } a[f] = p.value || 0; }
+        else a[f] = isIsoDate(el.value) ? el.value : '';
+      });
+    });
+    return bad;
   }
+  function draftTotal() { return goalDraft.reduce(function (s, a) { return s + a.amount; }, 0); }
   function updateGoalPreview() {
-    var p = $('#goal-preview'), n = goalNext();
-    if (!p || !n) return;
-    if (n.error) { p.textContent = n.error; return; }
-    var g = state.goal;
-    if (!n.target) { p.textContent = '목표 금액을 적어 주세요.'; return; }
-    p.innerHTML = '저장하면 <b>' + formatNumber(g.current) + '원 → ' + formatNumber(n.current) + '원</b> (' + Math.floor(n.current / n.target * 100) + '%)';
+    var p = $('#goal-preview'), btn = $('#goal-month-btn');
+    if (!p) return;
+    var bad = readGoalDraft();
+    var monthSum = goalDraft.reduce(function (s, a) { return s + (a.saving ? a.monthly : 0); }, 0);
+    if (btn) { btn.hidden = !monthSum; btn.textContent = '이번 달 적금 넣기 (+' + manShort(monthSum) + ')'; }
+    if (bad) { p.textContent = '금액은 숫자로 적어 주세요.'; return; }
+    var tgt = parsePrice($('#goal-target').value), total = draftTotal(), g = state.goal;
+    var tail = tgt.ok && tgt.value ? ' (' + Math.floor(total / tgt.value * 100) + '%)' : '';
+    p.innerHTML = '합계 ' + (total !== g.current ? formatNumber(g.current) + '원 → ' : '') + '<b>' + formatNumber(total) + '원</b>' + tail;
   }
-  var goalOpen = false;
+  // 부르는 쪽에서 먼저 readGoalDraft()로 입력값을 초안에 옮긴 뒤 초안을 고치고 이 함수로 다시 그린다
+  function rerenderAccRows(focusId) {
+    $('#goal-acc-rows').innerHTML = goalDraft.map(accRowHtml).join('');
+    updateGoalPreview();
+    var f = focusId && document.getElementById(focusId); if (f) f.focus();
+  }
   function openGoal(focus) {
     var m = $('#goal-modal');
     if (!m) return;
+    goalDraft = JSON.parse(JSON.stringify(state.goal.accounts));
     m.querySelector('.modal__box').innerHTML = goalFormHtml();
     m.hidden = false; goalOpen = true;
     document.body.classList.add('has-modal');
     try { window.history.pushState({ view: 'portal', sheet: true }, ''); } catch (e) { /* ignore */ }
     updateGoalPreview();
-    var f = focus === 'title' ? $('#goal-title-input') : (state.goal.target ? $('#goal-amount') : $('#goal-target'));
-    if (f) { f.focus({ preventScroll: true }); if (focus === 'title') f.select(); }
+    var f;
+    if (focus === 'title') f = $('#goal-title-input');
+    else if (focus && focus.indexOf('acc:') === 0) f = document.getElementById('acc-amt-' + focus.slice(4));
+    else f = state.goal.target ? $('#goal-acc-rows input[data-acc-field="amount"]') : $('#goal-target');
+    if (f) { f.focus({ preventScroll: false }); if (focus === 'title') f.select(); }
   }
   function closeGoal(fromHistory) {
     var m = $('#goal-modal');
     if (!m || m.hidden) { goalOpen = false; return; }
-    m.hidden = true; goalOpen = false;
+    m.hidden = true; goalOpen = false; goalDraft = null;
     document.body.classList.remove('has-modal');
     if (!fromHistory) dropSheetHistory();
     var back = document.querySelector('#portal-goal .goal__add'); if (back) back.focus({ preventScroll: true });
   }
+  function goalMonthAdd() {
+    readGoalDraft();
+    var added = 0;
+    goalDraft.forEach(function (a) { if (a.saving && a.monthly) { a.amount = Math.min(a.amount + a.monthly, PRICE_MAX); added += a.monthly; } });
+    rerenderAccRows();
+    if (added) showToast('이번 달 적금 ' + formatWon(added) + '을 더했어요. 저장을 눌러야 반영돼요.');
+  }
+  function goalAccAdd() {
+    readGoalDraft();
+    if (goalDraft.length >= ACC_MAX) { showToast('통장은 ' + ACC_MAX + '개까지 둘 수 있어요.'); return; }
+    var id = 'a' + uid().replace(/[^a-z0-9]/gi, '').slice(0, 10);
+    goalDraft.push({ id: id, name: '', amount: 0, saving: false, monthly: 0, start: '', end: '' });
+    rerenderAccRows('acc-name-' + id);
+  }
+  function goalAccDel(id) {
+    readGoalDraft();
+    goalDraft = goalDraft.filter(function (a) { return a.id !== id || ACC_DEFAULTS.some(function (d) { return d.id === id; }); });
+    rerenderAccRows();
+  }
   function saveGoal() {
-    var n = goalNext();
-    if (!n) return;
-    if (n.error) { showToast(n.error); return; }
-    if (!n.target) { showToast('목표 금액을 적어 주세요.'); $('#goal-target').focus(); return; }
+    var bad = readGoalDraft();
+    if (bad) { showToast('금액은 숫자로 적어 주세요.'); bad.focus(); return; }
+    var tgt = parsePrice($('#goal-target').value);
+    if (!tgt.ok || !tgt.value) { showToast('목표 금액을 적어 주세요.'); $('#goal-target').focus(); return; }
+    var bad2 = null;
+    goalDraft.forEach(function (a) { if (a.start && a.end && a.end <= a.start) bad2 = bad2 || a; });
+    if (bad2) { showToast('‘' + bad2.name + '’ 만기일은 가입일보다 뒤여야 해요.'); var e = document.getElementById('acc-end-' + bad2.id); if (e) e.focus(); return; }
     var due = $('#goal-due').value;
-    if (due && !/^\d{4}-\d{2}-\d{2}$/.test(due)) due = '';
+    if (!isIsoDate(due)) due = '';
     var title = $('#goal-title-input').value.trim().slice(0, GOAL_TITLE_MAX) || GOAL_TITLE;
     var g = state.goal, before = g.current, firstTime = !g.target;
-    g.title = title; g.target = n.target; g.current = n.current; g.due = due; g.updated = Date.now();
+    g.title = title; g.target = tgt.value; g.due = due; g.updated = Date.now();
+    g.accounts = goalDraft.map(function (a) { return { id: a.id, name: a.name || '통장', amount: a.amount, saving: a.saving, monthly: a.monthly, start: a.start, end: a.end }; });
+    g.current = Math.min(draftTotal(), PRICE_MAX);
     closeGoal();
     commit();
     var diff = g.current - before;
-    act('goal', '‘' + title + '’ ' + (diff > 0 ? '+' + formatWon(diff) + ' → ' : '') + formatWon(g.current) + ' / ' + formatWon(g.target));
+    act('goal', '‘' + title + '’ ' + (diff ? (diff > 0 ? '+' : '−') + formatWon(Math.abs(diff)) + ' → ' : '') + formatWon(g.current) + ' / ' + formatWon(g.target));
     showToast(firstTime ? '목표를 정했어요. 지금 ' + goalPct(g) + '%' : diff > 0 ? '+' + formatWon(diff) + ' 모았어요. 지금 ' + goalPct(g) + '%' : '저장했어요. 지금 ' + goalPct(g) + '%');
   }
 
@@ -5250,11 +5372,9 @@ datesSorted().forEach(function (d) {
         if (b.dataset.action === 'open-space') setView(b.dataset.space === 'ledger' ? 'ledger' : 'home');
         else if (b.dataset.action === 'goal-edit') openGoal(b.dataset.focus);
         else if (b.dataset.action === 'goal-close') closeGoal();
-        else if (b.dataset.action === 'goal-chip') {
-          var ai = $('#goal-amount'), cur = parsePrice(ai.value);
-          ai.value = formatNumber((cur.ok && cur.value ? cur.value : 0) + Number(b.dataset.add));
-          updateGoalPreview();
-        }
+        else if (b.dataset.action === 'goal-month') goalMonthAdd();
+        else if (b.dataset.action === 'goal-acc-add') goalAccAdd();
+        else if (b.dataset.action === 'goal-acc-del') goalAccDel(b.closest('[data-acc]').dataset.acc);
         else if (b.dataset.action === 'add-space') showToast('새 공간은 준비 중이에요. 필요한 공간을 알려 주시면 만들어 드릴게요.');
       });
       portalView.addEventListener('submit', function (e) { if (e.target.id === 'goal-form') { e.preventDefault(); saveGoal(); } });

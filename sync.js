@@ -132,7 +132,8 @@
     doc.weekBase = s.weekBase || '';
     doc.hospDoneAt = s.hospDoneAt || 0;
     var gl = s.goal || {};
-    doc.goal = { title: gl.title || '', target: gl.target || 0, current: gl.current || 0, due: gl.due || '', updated: gl.updated || 0 };
+    doc.goal = { title: gl.title || '', target: gl.target || 0, current: gl.current || 0, due: gl.due || '', updated: gl.updated || 0,
+      accounts: (gl.accounts || []).map(function (a) { return { id: a.id, name: a.name || '', amount: a.amount || 0, saving: !!a.saving, monthly: a.monthly || 0, start: a.start || '', end: a.end || '' }; }) };
     doc.birthDate = s.birthDate || '';
     doc.growth = {};
     (s.growth || []).forEach(function (g) { doc.growth[g.id] = { date: g.date || '', weight: typeof g.weight === 'number' ? g.weight : null, height: typeof g.height === 'number' ? g.height : null, head: typeof g.head === 'number' ? g.head : null, memo: g.memo || '' }; });
