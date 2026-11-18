@@ -293,13 +293,23 @@
   var BT_TEXT_MAX = 60, BT_NOTE_MAX = 200;
   var BT_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
   /* ---------- 육아 일지 종류 ---------- */
+  // 버튼 순서 = BL_BUTTONS. feed·diaper는 예전 기록(수유·기저귀)과 이미 만든 단축어를 위해 남겨 둔다(버튼에는 안 보임)
   var BL_KINDS = {
-    feed: { label: '수유', icon: '🍼', chip: 'peach', ph: '분유 120ml · 모유 15분', quick: ['분유', '모유', '분유+모유'] },
-    diaper: { label: '기저귀', icon: '💧', chip: 'yel', ph: '소변 · 대변', quick: ['소변', '대변', '소변+대변'] },
-    sleep: { label: '잠', icon: '😴', chip: 'lav', ph: '', quick: [] },
-    wake: { label: '깸', icon: '🌤️', chip: 'lav', ph: '', quick: [] },
-    memo: { label: '메모', icon: '📝', chip: 'sky', ph: '메모', quick: [] }
+    breast: { label: '모유수유', icon: 'breast', chip: 'rose', grp: 'feed', ph: '왼쪽 10분 · 오른쪽 10분', quick: ['왼쪽', '오른쪽', '양쪽'] },
+    formula: { label: '분유', icon: 'bottle', chip: 'peach', grp: 'feed', ph: '120ml', quick: ['60ml', '80ml', '100ml', '120ml', '140ml', '160ml'] },
+    solid: { label: '이유식', icon: 'bowl', chip: 'mint', grp: 'feed', ph: '쌀미음 50g', quick: [] },
+    pee: { label: '소변', icon: 'drop', chip: 'yel', grp: 'diaper', ph: '메모', quick: [] },
+    poop: { label: '대변', icon: 'poop', chip: 'tan', grp: 'diaper', ph: '색 · 상태', quick: ['보통', '묽음', '단단함'] },
+    sleep: { label: '수면', icon: 'moon', chip: 'lav', grp: 'sleep', ph: '', quick: [] },
+    wake: { label: '깸', icon: 'sun', chip: 'lav', grp: 'sleep', ph: '', quick: [] },
+    bath: { label: '목욕', icon: 'bath', chip: 'sky', grp: 'bath', ph: '메모', quick: [] },
+    memo: { label: '메모', icon: 'pen', chip: 'gray', grp: 'memo', ph: '메모', quick: [] },
+    feed: { label: '수유', icon: 'bottle', chip: 'peach', grp: 'feed', ph: '분유 120ml · 모유 15분', quick: ['분유', '모유', '분유+모유'], old: true },
+    diaper: { label: '기저귀', icon: 'drop', chip: 'yel', grp: 'diaper', ph: '소변 · 대변', quick: ['소변', '대변', '소변+대변'], old: true }
   };
+  var BL_BUTTONS = ['breast', 'formula', 'solid', 'pee', 'poop', 'sleep', 'bath', 'memo'];
+  // 바꿀 수 있는 종류(수면·깸은 짝이 있어 제외)
+  var BL_SWITCH = ['breast', 'formula', 'solid', 'pee', 'poop', 'bath', 'memo'];
   var BL_KIND_KEYS = Object.keys(BL_KINDS);
   /* ---------- 예방접종 일정 (질병관리청 국가예방접종 표준 일정, 만 6세까지) ---------- */
   var VX_NAMES = { hepb: ['B형간염', ''], bcg: ['BCG', '결핵 · 생후 4주 안'], dtap: ['DTaP', '디프테리아·파상풍·백일해'], ipv: ['폴리오', '소아마비'], hib: ['Hib', 'b형 헤모필루스'], pcv: ['폐렴구균', ''], rota: ['로타', '먹는 백신'], mmr: ['MMR', '홍역·볼거리·풍진'], vari: ['수두', ''], hepa: ['A형간염', ''], je: ['일본뇌염', ''] };
@@ -673,7 +683,7 @@
 
   /* ---------- state ---------- */
   var state;
-  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, weekSeeded: false, hospSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', vxSheet: null, vxInfo: null, vxPastOpen: false, spSpendOpen: {}, spSpendTag: '', spSpendMore: {}, spTagEdit: false, spDraft: {}, careSeeded: false, bdTab: 'todo', careExpand: {}, careAdd: null, careDateEdit: false, showRoles: true };
+  var ui = { filter: 'all', editMode: false, pendingUndo: null, undoTimer: null, collapsed: {}, noteForm: null, qtyEdit: null, highlightEdit: false, activeCategory: null, highlightsCollapsed: false, itemEdit: null, view: 'checklist', picksEdit: null, picksActive: 'gpt', dateEdit: null, nameEdit: null, search: '', searchOpen: false, stripOpen: false, onboardingDismissed: false, deviceName: '', autoName: '', toastRemote: true, activity: [], supportEdit: null, memoFocus: null, templateCleared: false, bulkOpen: null, doneTab: {}, tagFilter: {}, tagsMigrated: false, subTab: {}, subsMigrated: false, showSubLabel: false, recordTab: 'notes', planTab: 'picks', addSub: {}, addSubPick: {}, memoOpen: null, memoEdit: false, memoDraft: '', commentDraft: '', tableSel: null, noteComments: {}, noteCommentDraft: {}, noteOpen: null, noteDraft: null, pendingDraft: null, detailFrom: null, archiveTab: 'fav', rxOpen: {}, rxDraft: {}, ledgerMonth: '', ledgerForm: null, ledgerType: 'out', budgetEdit: false, settingsFrom: 'mamibag', portalSeeded: false, weekSeeded: false, hospSeeded: false, supportModal: null, supportFilter: 'all', supportsSeeded: false, birthSeeded: false, birthEdit: false, birthFilter: 'all', birthHideCsec: false, birthExpand: {}, birthForm: null, grForm: null, blEdit: null, logDay: '', blTab: 'log', blRange: 'day', blMetric: 'feed', vxSheet: null, vxInfo: null, vxPastOpen: false, spSpendOpen: {}, spSpendTag: '', spSpendMore: {}, spTagEdit: false, spDraft: {}, careSeeded: false, bdTab: 'todo', careExpand: {}, careAdd: null, careDateEdit: false, showRoles: true };
 
   // Active tab (narrow screens): falls back to the first category when the saved one is gone.
   function activeCategoryId() {
@@ -2182,7 +2192,15 @@ datesSorted().forEach(function (d) {
     back: '<path d="M15 18l-6-6 6-6"/>',
     next: '<path d="M9 6l6 6-6 6"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
-    settings: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>'
+    settings: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+    breast: '<path d="M12 20.5s-7.5-4.6-7.5-10.4A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.5 2.7c0 5.8-7.5 10.4-7.5 10.4z"/><path d="M12 10.8c-1.1 1.4-1.7 2.3-1.7 3a1.7 1.7 0 0 0 3.4 0c0-.7-.6-1.6-1.7-3z"/>',
+    bowl: '<path d="M3 11.5h18a9 7.5 0 0 1-18 0z"/><path d="M8.5 20.5h7M14 11.5l4.5-8"/>',
+    drop: '<path d="M12 3c-3.6 4.6-6 7.9-6 11a6 6 0 0 0 12 0c0-3.1-2.4-6.4-6-11z"/><path d="M9.2 14.5a2.8 2.8 0 0 0 2.3 2.6"/>',
+    poop: '<path d="M6 20.5h12a2.6 2.6 0 0 0 .6-5.1 2.6 2.6 0 0 0-1.9-4.4h-.4a2.7 2.7 0 0 0-2.2-4.2c0-1.3.5-2.2 1.4-3.3-2.9 0-4.6 1.4-5.2 3.4A2.7 2.7 0 0 0 7.6 11h-.3a2.6 2.6 0 0 0-1.9 4.4A2.6 2.6 0 0 0 6 20.5z"/>',
+    moon: '<path d="M20 14.6A8.2 8.2 0 1 1 9.4 4a6.6 6.6 0 0 0 10.6 10.6z"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/>',
+    bath: '<path d="M3 12h18v1.5a5.5 5.5 0 0 1-5.5 5.5h-7A5.5 5.5 0 0 1 3 13.5z"/><path d="M6 12V6.2A2.2 2.2 0 0 1 10 5M7 19l-1 2M17 19l1 2"/>',
+    chart: '<path d="M4 20h16M7 16.5v-5M12 16.5V6M17 16.5V9.5"/>'
   };
   function svgIcon(name, size) {
     var s = size || 24;
@@ -2221,7 +2239,7 @@ datesSorted().forEach(function (d) {
     if (view === 'names') return state.names.length ? '후보 ' + state.names.length : '';
     if (view === 'growth') { var lg = latestGrowth('weight'); return lg ? formatKg(lg.weight) : (state.growth.length ? state.growth.length + '번' : '시작하기'); }
     if (view === 'vaccine') { var nx = vxCurrent(); if (!nx) return vxDoneCount() ? '모두 완료' : ''; if (!state.birthDate) return vxDoneCount() + '회'; var dd = daysFromToday(vxGroupDate(nx.g)); return dd > 0 ? '다음 D-' + dd : '지금 차례'; }
-    if (view === 'babylog') { var lf = lastOf('feed'); return lf ? '수유 ' + agoText(lf.t) : '시작하기'; }
+    if (view === 'babylog') { var lf = lastFeed(); return lf ? '수유 ' + agoText(lf.t) : '시작하기'; }
     return '';
   }
   function renderHome() {
@@ -4219,7 +4237,19 @@ datesSorted().forEach(function (d) {
   }
 
   /* ---------- 육아 일지 ---------- */
+  function blKind(e) { return BL_KINDS[e.kind] || BL_KINDS.memo; }
   function lastOf(kind) { var best = null; state.babyLog.forEach(function (e) { if (e.kind === kind && e.t <= Date.now() + 60000 && (!best || e.t > best.t)) best = e; }); return best; }
+  function lastFeed() { var best = null; state.babyLog.forEach(function (e) { if (blKind(e).grp === 'feed' && e.t <= Date.now() + 60000 && (!best || e.t > best.t)) best = e; }); return best; }
+  // 분유 양(ml): '120', '120ml', '분유 120ml' 모두 읽는다
+  function blMl(e) {
+    if (e.kind !== 'formula' && e.kind !== 'feed') return 0;
+    var d = String(e.detail || '').trim();
+    if (e.kind === 'formula' && /^\d{1,4}$/.test(d)) return parseInt(d, 10);
+    var m = d.match(/(\d{1,4})\s*(ml|mL|ML|㎖|cc|미리)/);
+    return m && (e.kind === 'formula' || /분유/.test(d)) ? parseInt(m[1], 10) : 0;
+  }
+  function blDetail(e) { var d = String(e.detail || ''); return e.kind === 'formula' && /^\d{1,4}$/.test(d.trim()) ? d.trim() + 'ml' : d; }
+  function blChip(k) { return '<span class="bchip bl-chip c-' + k.chip + '">' + svgIcon(k.icon, 14) + k.label + '</span>'; }
   function agoText(t) {
     var m = Math.max(0, Math.floor((Date.now() - t) / 60000));
     if (m < 1) return '방금';
@@ -4242,39 +4272,140 @@ datesSorted().forEach(function (d) {
   function dayKey(t) { return isoOf(new Date(t)); }
   function logDay() { return ui.logDay || todayStamp(); }
   function blEditFormHtml(e) {
-    var k = BL_KINDS[e.kind] || BL_KINDS.memo, d = new Date(e.t), id = escapeHtml(e.id);
+    var k = blKind(e), d = new Date(e.t), id = escapeHtml(e.id);
     var p = function (n) { return (n < 10 ? '0' : '') + n; };
-    return '<form class="bl-form" data-bl-form="' + id + '">' +
-      '<div class="bl-form__row"><span class="bchip c-' + k.chip + '">' + k.icon + ' ' + k.label + '</span>' +
+    var canSwitch = BL_SWITCH.indexOf(e.kind) !== -1 || k.old;
+    var kindSel = canSwitch ? '<label class="visually-hidden" for="bl-kind-' + id + '">종류</label><select id="bl-kind-' + id + '" name="kind" class="bl-form__kind">' +
+      (k.old ? '<option value="' + e.kind + '" selected>' + k.label + ' (예전)</option>' : '') +
+      BL_SWITCH.map(function (key) { return '<option value="' + key + '"' + (key === e.kind ? ' selected' : '') + '>' + BL_KINDS[key].label + '</option>'; }).join('') + '</select>' : blChip(k);
+    return '<form class="bl-form" data-bl-form="' + id + '" data-kind="' + e.kind + '">' +
+      '<div class="bl-form__row">' + kindSel +
       '<label class="visually-hidden" for="bl-time-' + id + '">시각</label><input type="time" id="bl-time-' + id + '" name="time" value="' + p(d.getHours()) + ':' + p(d.getMinutes()) + '"></div>' +
       (k.quick.length ? '<div class="bl-quick">' + k.quick.map(function (q) { return '<button type="button" class="bt-chip" data-action="bl-quick" data-val="' + q + '">' + q + '</button>'; }).join('') + '</div>' : '') +
-      (e.kind === 'sleep' || e.kind === 'wake' ? '' : '<label class="visually-hidden" for="bl-detail-' + id + '">내용</label><input type="text" id="bl-detail-' + id + '" name="detail" maxlength="100" placeholder="' + escapeHtml(k.ph) + '" value="' + escapeHtml(e.detail || '') + '" data-focus-key="bl-detail:' + id + '" autocomplete="off" enterkeyhint="done">') +
+      (e.kind === 'sleep' || e.kind === 'wake' ? '' : '<label class="visually-hidden" for="bl-detail-' + id + '">내용</label><input type="text" id="bl-detail-' + id + '" name="detail" maxlength="100" placeholder="' + escapeHtml(k.ph) + '" value="' + escapeHtml(blDetail(e)) + '" data-focus-key="bl-detail:' + id + '" autocomplete="off" enterkeyhint="done">') +
       '<div class="bt-form__actions"><button type="button" class="btn btn--small bt-tool--danger" data-action="bl-del" style="margin-right:auto">삭제</button><button type="button" class="btn btn--small" data-action="bl-cancel">닫기</button><button type="submit" class="btn btn--primary btn--small">저장</button></div></form>';
   }
+  function blRangeDays() { return ui.blRange === 'month' ? 30 : ui.blRange === 'week' ? 7 : 1; }
   function renderBabyLog() {
     var view = $('#view-babylog'); if (!view || ui.view !== 'babylog') return;
     var sp = sleepPairs();
-    var lf = lastOf('feed');
+    var lf = lastFeed();
     var hero = '<div class="bl-hero"><div><p class="mut">마지막 수유</p><b>' + (lf ? agoText(lf.t) : '아직 기록이 없어요') + '</b>' +
-      (sp.sleeping ? '<p class="bl-sleeping">😴 ' + durText(Date.now() - sp.sleeping.t) + '째 자는 중</p>' : '') + '</div>' +
-      (lf ? '<span class="bchip c-peach">' + timeStampOf(new Date(lf.t)) + (lf.detail ? ' · ' + escapeHtml(lf.detail) : '') + '</span>' : '') + '</div>';
-    var btn = function (kind, label, icon, extra) { return '<button type="button" class="bl-btn' + (extra || '') + '" data-action="bl-log" data-kind="' + kind + '"><i aria-hidden="true">' + icon + '</i>' + label + '</button>'; };
-    var buttons = '<div class="bl-btns">' + btn('feed', '수유', '🍼') + btn('diaper', '기저귀', '💧') + (sp.sleeping ? btn('wake', '깼어요', '🌤️', ' is-on') : btn('sleep', '잠', '😴')) + btn('memo', '메모', '📝') + '</div>';
+      (sp.sleeping ? '<p class="bl-sleeping">' + svgIcon('moon', 15) + ' ' + durText(Date.now() - sp.sleeping.t) + '째 자는 중</p>' : '') + '</div>' +
+      (lf ? '<span class="bchip bl-chip c-' + blKind(lf).chip + '">' + svgIcon(blKind(lf).icon, 14) + blKind(lf).label + ' ' + timeStampOf(new Date(lf.t)) + (lf.detail ? ' · ' + escapeHtml(blDetail(lf)) : '') + '</span>' : '') + '</div>';
+    var tab = ui.blTab === 'pattern' ? 'pattern' : 'log';
+    var tabs = '<div class="done-tabs bl-tabs" role="tablist" aria-label="육아 일지 보기">' +
+      [['log', '기록', 'pen'], ['pattern', '패턴 그래프', 'chart']].map(function (o) { var on = tab === o[0]; return '<button type="button" role="tab" class="done-tab' + (on ? ' is-active' : '') + '" data-action="bl-tab" data-tab="' + o[0] + '" data-focus-key="bl-tab:' + o[0] + '" aria-selected="' + on + '">' + svgIcon(o[2], 16) + o[1] + '</button>'; }).join('') + '</div>';
+    var btn = function (kind, extra, label) { var k = BL_KINDS[kind]; return '<button type="button" class="bl-btn bl-btn--' + k.chip + (extra || '') + '" data-action="bl-log" data-kind="' + kind + '"><i aria-hidden="true">' + svgIcon(k.icon, 26) + '</i>' + (label || k.label) + '</button>'; };
+    var buttons = '<div class="bl-btns">' + BL_BUTTONS.map(function (kind) { return kind === 'sleep' && sp.sleeping ? btn('wake', ' is-on', '깼어요') : btn(kind); }).join('') + '</div>';
+    var guide = '<button type="button" class="bl-guide-btn" data-action="bl-guide-open"><b>📲 앱 안 열고 기록하기</b><span>아이폰 홈 화면·잠금 화면 위젯 설정</span></button>';
+    if (tab === 'pattern') { $('#babylog-body').innerHTML = hero + tabs + blPatternHtml(sp); return; }
     var day = logDay(), isToday = day === todayStamp();
     var nav = '<div class="bl-day"><button type="button" class="bl-day__nav" data-action="bl-day" data-d="-1" aria-label="이전 날">‹</button><b>' + shortDate(day) + (isToday ? ' · 오늘' : '') + (ageText(day) ? ' <small>' + ageText(day) + '</small>' : '') + '</b>' +
       '<button type="button" class="bl-day__nav" data-action="bl-day" data-d="1" aria-label="다음 날"' + (isToday ? ' disabled' : '') + '>›</button></div>';
     var items = state.babyLog.filter(function (e) { return dayKey(e.t) === day && !(e.kind === 'wake' && sp.pairedWake[e.id]); }).sort(function (a, b) { return b.t - a.t; });
     var list = items.length ? '<ul class="bl-list card">' + items.map(function (e) {
       if (ui.blEdit === e.id) return '<li class="bl-li is-editing">' + blEditFormHtml(e) + '</li>';
-      var k = BL_KINDS[e.kind] || BL_KINDS.memo;
-      var detail = e.detail ? escapeHtml(e.detail) : '';
+      var k = blKind(e);
+      var detail = e.detail ? escapeHtml(blDetail(e)) : '';
       if (e.kind === 'sleep') { var end = sp.endOf[e.id]; detail = end ? '~ ' + timeStampOf(new Date(end.t)) + ' · ' + durText(end.t - e.t) : (sp.sleeping && sp.sleeping.id === e.id ? '자는 중' : ''); }
       return '<li class="bl-li"><button type="button" class="bl-row" data-action="bl-edit" data-id="' + escapeHtml(e.id) + '" data-focus-key="bl-row:' + escapeHtml(e.id) + '">' +
-        '<span class="bl-row__t">' + timeStampOf(new Date(e.t)) + '</span><span class="bchip c-' + k.chip + '">' + k.label + '</span>' +
+        '<span class="bl-row__t">' + timeStampOf(new Date(e.t)) + '</span>' + blChip(k) +
         '<span class="bl-row__d">' + (detail || '<span class="mut">눌러서 내용 추가</span>') + '</span><span class="bl-row__who">' + escapeHtml(e.who || '') + '</span></button></li>';
     }).join('') + '</ul>' : '<div class="card bl-empty mut">' + (isToday ? '위 버튼을 누르면 지금 시각으로 바로 기록돼요.' : '이날은 기록이 없어요.') + '</div>';
-    var guide = '<button type="button" class="bl-guide-btn" data-action="bl-guide-open"><b>📲 앱 안 열고 기록하기</b><span>아이폰 홈 화면·잠금 화면 위젯 설정</span></button>';
-    $('#babylog-body').innerHTML = hero + buttons + nav + list + guide;
+    $('#babylog-body').innerHTML = hero + tabs + buttons + nav + list + guide;
+  }
+
+  /* ---------- 육아 일지: 패턴 그래프 (일간 · 주간 · 월간) ---------- */
+  var BL_DAY_MS = 86400000;
+  var BL_METRICS = [['feed', '수유'], ['ml', '분유량'], ['sleep', '수면'], ['diaper', '기저귀']];
+  // 하루치 통계와 그 날 위에 그릴 표시(점·막대)
+  function blDayData(iso, sp) {
+    var start = dateOf(iso).getTime(), end = start + BL_DAY_MS, now = Date.now();
+    var st = { feed: 0, breast: 0, formula: 0, solid: 0, ml: 0, pee: 0, poop: 0, diaper: 0, sleepMs: 0, bath: 0, any: false };
+    var marks = [], sleeps = [];
+    state.babyLog.forEach(function (e) {
+      var k = blKind(e);
+      if (e.kind === 'sleep') {
+        var en = sp.endOf[e.id], stop = en ? en.t : (sp.sleeping && sp.sleeping.id === e.id ? now : 0);
+        if (!stop) { if (e.t >= start && e.t < end) { st.any = true; marks.push({ t: e.t, kind: 'sleep', grp: 'sleep' }); } return; }
+        var a = Math.max(e.t, start), b = Math.min(stop, end);
+        if (b > a) { st.sleepMs += b - a; st.any = true; sleeps.push({ a: a, b: b, open: !en }); }
+        return;
+      }
+      if (e.t < start || e.t >= end || e.kind === 'wake') return;
+      st.any = true;
+      if (k.grp === 'feed') { st.feed++; if (st[e.kind] !== undefined) st[e.kind]++; st.ml += blMl(e); }
+      else if (e.kind === 'pee') { st.pee++; st.diaper++; }
+      else if (e.kind === 'poop') { st.poop++; st.diaper++; }
+      else if (e.kind === 'diaper') { st.diaper++; if (/대변/.test(e.detail || '')) st.poop++; if (/소변/.test(e.detail || '') || !/대변/.test(e.detail || '')) st.pee++; }
+      else if (e.kind === 'bath') st.bath++;
+      marks.push({ t: e.t, kind: e.kind === 'feed' ? 'formula' : e.kind === 'diaper' ? (/대변/.test(e.detail || '') ? 'poop' : 'pee') : e.kind, grp: k.grp });
+    });
+    return { iso: iso, start: start, st: st, marks: marks, sleeps: sleeps };
+  }
+  function blPct(t, start) { return Math.max(0, Math.min(100, (t - start) / BL_DAY_MS * 100)); }
+  function blMarksHtml(d, lane) {
+    var html = '';
+    d.sleeps.forEach(function (s) { if (!lane || lane === 'sleep') html += '<span class="blp-sleep' + (s.open ? ' is-open' : '') + '" style="left:' + blPct(s.a, d.start).toFixed(2) + '%;width:' + Math.max(0.6, blPct(s.b, d.start) - blPct(s.a, d.start)).toFixed(2) + '%"></span>'; });
+    d.marks.forEach(function (m) {
+      if (lane && lane !== m.grp) return;
+      var cls = m.grp === 'diaper' ? 'blp-dot' : m.grp === 'sleep' ? 'blp-dot blp-dot--sleep' : 'blp-tick';
+      html += '<span class="' + cls + ' k-' + m.kind + '" style="left:' + blPct(m.t, d.start).toFixed(2) + '%" title="' + escapeHtml(BL_KINDS[m.kind] ? BL_KINDS[m.kind].label : '') + ' ' + timeStampOf(new Date(m.t)) + '"></span>';
+    });
+    return html;
+  }
+  function blNowLine(d) { var now = Date.now(); return now >= d.start && now < d.start + BL_DAY_MS ? '<span class="blp-now" style="left:' + blPct(now, d.start).toFixed(2) + '%"></span>' : ''; }
+  function blHours(ms) { var h = ms / 3600000; return h >= 10 ? Math.round(h) + '시간' : (Math.round(h * 10) / 10) + '시간'; }
+  function blNum(n) { return Math.round(n * 10) / 10; }
+  function blPatternHtml(sp) {
+    var range = ui.blRange === 'week' || ui.blRange === 'month' ? ui.blRange : 'day', n = blRangeDays();
+    var endIso = logDay(), today = todayStamp(), endD = dateOf(endIso), days = [];
+    for (var i = n - 1; i >= 0; i--) { var dd = new Date(endD.getFullYear(), endD.getMonth(), endD.getDate() - i); days.push(blDayData(isoOf(dd), sp)); }
+    var seg = '<div class="done-tabs blp-range" role="tablist" aria-label="기간">' + [['day', '일간'], ['week', '주간'], ['month', '월간']].map(function (o) { var on = range === o[0]; return '<button type="button" role="tab" class="done-tab' + (on ? ' is-active' : '') + '" data-action="bl-range" data-range="' + o[0] + '" data-focus-key="bl-range:' + o[0] + '" aria-selected="' + on + '">' + o[1] + '</button>'; }).join('') + '</div>';
+    var title = n === 1 ? shortDate(endIso) + (endIso === today ? ' · 오늘' : '') : shortDate(days[0].iso).replace(/ \(.\)$/, '') + ' ~ ' + shortDate(endIso).replace(/ \(.\)$/, '');
+    var nav = '<div class="bl-day"><button type="button" class="bl-day__nav" data-action="bl-day" data-d="-' + n + '" aria-label="이전 기간">‹</button><b>' + title + '</b>' +
+      '<button type="button" class="bl-day__nav" data-action="bl-day" data-d="' + n + '" aria-label="다음 기간"' + (endIso >= today ? ' disabled' : '') + '>›</button></div>';
+    // 합계(일간) 또는 기록한 날 기준 하루 평균(주간·월간)
+    var tot = { feed: 0, breast: 0, formula: 0, solid: 0, ml: 0, pee: 0, poop: 0, diaper: 0, sleepMs: 0, bath: 0 }, used = 0;
+    days.forEach(function (d) { if (!d.st.any) return; used++; Object.keys(tot).forEach(function (k) { tot[k] += d.st[k]; }); });
+    var div = n === 1 ? 1 : Math.max(1, used), avg = function (k) { return blNum(tot[k] / div); };
+    var stat = function (cls, icon, label, val, sub) { return '<div class="blp-stat blp-stat--' + cls + '"><i aria-hidden="true">' + svgIcon(icon, 18) + '</i><span>' + label + '</span><b>' + val + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>'; };
+    var feedSub = [['breast', '모유'], ['formula', '분유'], ['solid', '이유식']].filter(function (o) { return tot[o[0]]; }).map(function (o) { return o[1] + ' ' + avg(o[0]); }).join(' · ');
+    var stats = '<p class="blp-cap">' + (n === 1 ? '이날 합계' : '하루 평균' + (used ? ' <span class="mut">(기록한 ' + used + '일 기준)</span>' : '')) + '</p><div class="blp-stats">' +
+      stat('rose', 'breast', '수유', avg('feed') + '회', feedSub) +
+      stat('peach', 'bottle', '분유량', avg('ml') ? Math.round(tot.ml / div) + 'ml' : '-', '') +
+      stat('lav', 'moon', '수면', tot.sleepMs ? blHours(tot.sleepMs / div) : '-', '') +
+      stat('yel', 'drop', '기저귀', avg('diaper') + '회', tot.diaper ? '소변 ' + avg('pee') + ' · 대변 ' + avg('poop') : '') +
+      (n === 1 ? stat('sky', 'bath', '목욕', tot.bath ? tot.bath + '번' : '-', '') : stat('sky', 'bath', '목욕', tot.bath ? tot.bath + '번' : '-', '기간 합계')) + '</div>';
+    var axis = '<div class="blp-axis" aria-hidden="true"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>24시</span></div>';
+    var legend = '<div class="blp-legend" aria-hidden="true">' + [['breast', '모유'], ['formula', '분유'], ['solid', '이유식'], ['pee', '소변'], ['poop', '대변'], ['sleep', '수면'], ['bath', '목욕']].map(function (o) { return '<span><i class="k-' + o[0] + '"></i>' + o[1] + '</span>'; }).join('') + '</div>';
+    var chart;
+    if (n === 1) {
+      var d0 = days[0];
+      chart = '<div class="card blp-card"><p class="blp-cap">하루 패턴</p><div class="blp-lanes">' +
+        [['feed', '수유'], ['diaper', '기저귀'], ['sleep', '수면'], ['bath', '목욕']].map(function (l) { return '<div class="blp-lane"><span class="blp-lane__l">' + l[1] + '</span><div class="blp-track blp-track--lane">' + blMarksHtml(d0, l[0]) + blNowLine(d0) + '</div></div>'; }).join('') +
+        '<div class="blp-lane"><span class="blp-lane__l"></span>' + axis + '</div></div>' + legend + '</div>';
+    } else {
+      chart = '<div class="card blp-card"><p class="blp-cap">하루 패턴 <span class="mut">· 한 줄이 하루예요</span></p><div class="blp-rows' + (n > 7 ? ' blp-rows--month' : '') + '">' +
+        days.map(function (d) { var dt = dateOf(d.iso); var lab = n > 7 ? (dt.getDate() === 1 || d === days[0] ? (dt.getMonth() + 1) + '/' + dt.getDate() : String(dt.getDate())) : (dt.getMonth() + 1) + '/' + dt.getDate() + ' ' + WEEKDAYS[dt.getDay()]; return '<div class="blp-lane"><span class="blp-lane__l' + (dt.getDay() === 0 ? ' is-sun' : '') + '">' + lab + '</span><div class="blp-track">' + blMarksHtml(d) + blNowLine(d) + '</div></div>'; }).join('') +
+        '<div class="blp-lane"><span class="blp-lane__l"></span>' + axis + '</div></div>' + legend + '</div>';
+      var metric = BL_METRICS.some(function (m) { return m[0] === ui.blMetric; }) ? ui.blMetric : 'feed';
+      var valOf = function (d) { return metric === 'ml' ? d.st.ml : metric === 'sleep' ? d.st.sleepMs / 3600000 : metric === 'diaper' ? d.st.diaper : d.st.feed; };
+      var fmt = function (v) { return metric === 'ml' ? Math.round(v) + '' : metric === 'sleep' ? blNum(v) + '' : v + ''; };
+      var unit = metric === 'ml' ? 'ml' : metric === 'sleep' ? '시간' : '회';
+      var max = 0; days.forEach(function (d) { max = Math.max(max, valOf(d)); });
+      var bars = days.map(function (d) {
+        var v = valOf(d), h = max ? Math.max(v ? 4 : 0, v / max * 100) : 0, dt = dateOf(d.iso);
+        var lab = n > 7 ? ((days.length - 1 - days.indexOf(d)) % 5 === 0 ? (dt.getMonth() + 1) + '/' + dt.getDate() : '') : WEEKDAYS[dt.getDay()];
+        return '<div class="blp-bar" title="' + (dt.getMonth() + 1) + '/' + dt.getDate() + ' ' + fmt(v) + unit + '"><div class="blp-bar__col">' + (n <= 7 && v ? '<em>' + fmt(v) + '</em>' : '') + '<span class="m-' + metric + '" style="height:' + h.toFixed(1) + '%"></span></div><small>' + lab + '</small></div>';
+      }).join('');
+      chart += '<div class="card blp-card"><div class="blp-card__head"><p class="blp-cap">날짜별 <span class="mut">(' + unit + ')</span></p><div class="blp-metrics">' +
+        BL_METRICS.map(function (m) { return '<button type="button" class="bt-chip' + (metric === m[0] ? ' is-active' : '') + '" data-action="bl-metric" data-metric="' + m[0] + '" aria-pressed="' + (metric === m[0]) + '">' + m[1] + '</button>'; }).join('') + '</div></div>' +
+        '<div class="blp-bars' + (n > 7 ? ' blp-bars--month' : '') + '">' + bars + '</div></div>';
+    }
+    var empty = used ? '' : '<div class="card bl-empty mut">' + (n === 1 ? '이날은 기록이 없어요.' : '이 기간에는 기록이 없어요.') + ' ‘기록’ 탭에서 버튼을 누르면 그래프가 채워져요.</div>';
+    return seg + nav + (used ? stats + chart : empty);
   }
   function blLog(kind) {
     var e = { id: uid(), kind: kind, t: Date.now(), who: myName(), detail: '' };
@@ -4284,7 +4415,8 @@ datesSorted().forEach(function (d) {
     if (kind === 'memo') ui.blEdit = e.id;
     commit(); act('babylog', k.label + ' ' + timeStampOf(new Date(e.t)));
     if (kind === 'memo') { var f = document.querySelector('[data-focus-key="bl-detail:' + e.id + '"]'); if (f) f.focus(); return; }
-    showToast(k.icon + ' ' + k.label + ' ' + timeStampOf(new Date(e.t)) + ' 기록' + (kind === 'feed' || kind === 'diaper' ? ' · 내용은 목록에서 눌러 추가' : ''), function () {
+    var hint = kind === 'formula' ? ' · 양은 목록에서 눌러 추가' : kind === 'breast' || kind === 'solid' || kind === 'poop' ? ' · 내용은 목록에서 눌러 추가' : '';
+    showToast((kind === 'wake' ? '깼어요' : k.label) + ' ' + timeStampOf(new Date(e.t)) + ' 기록' + hint, function () {
       state.babyLog = state.babyLog.filter(function (x) { return x.id !== e.id; }); commit(); showToast('기록을 취소했어요.');
     });
   }
@@ -4294,6 +4426,7 @@ datesSorted().forEach(function (d) {
     if (!e) { ui.blEdit = null; render(); return; }
     var tm = form.elements.time.value;
     if (/^\d{2}:\d{2}$/.test(tm)) { var d = new Date(e.t); d.setHours(parseInt(tm.slice(0, 2), 10), parseInt(tm.slice(3), 10), 0, 0); e.t = d.getTime(); }
+    if (form.elements.kind && BL_KINDS[form.elements.kind.value]) e.kind = form.elements.kind.value;
     if (form.elements.detail) e.detail = String(form.elements.detail.value || '').trim().slice(0, 100);
     ui.blEdit = null; commit();
     var back = document.querySelector('[data-focus-key="bl-row:' + id + '"]'); if (back) back.focus();
@@ -4312,22 +4445,23 @@ datesSorted().forEach(function (d) {
   function openBlGuide() {
     var g = $('#bl-guide'); if (!g) return;
     var url = blShortcutUrl(), me = myName();
-    var kinds = [['feed', '🍼 수유'], ['diaper', '💧 기저귀'], ['sleep', '😴 잠'], ['wake', '🌤️ 깼어요']];
+    var kinds = [['breast', '모유수유'], ['formula', '분유'], ['solid', '이유식'], ['pee', '소변'], ['poop', '대변'], ['sleep', '수면'], ['wake', '깼어요'], ['bath', '목욕']];
     var body = url ? (
       '<ol class="bl-steps">' +
       '<li><b>단축어 앱</b>을 열고 오른쪽 위 <b>＋</b> → <b>동작 추가</b> → 검색에 ‘URL’ → <b>URL 콘텐츠 가져오기</b>를 고르세요.</li>' +
       '<li>파란 ‘URL’ 자리에 아래 주소를 붙여 넣으세요.<div class="bl-copy"><code>' + escapeHtml(url) + '</code><button type="button" class="btn btn--small btn--primary" data-action="bl-copy" data-text="' + escapeHtml(url) + '" data-label="주소">주소 복사</button></div></li>' +
       '<li>동작의 <b>›</b>를 눌러 펼치고 <b>방법: POST</b>, <b>요청 본문: JSON</b>으로 바꾸세요.</li>' +
-      '<li><b>새로운 필드 추가</b>로 3개를 넣으세요.<table class="bl-table"><tr><th>종류</th><th>키</th><th>값</th></tr>' +
-      '<tr><td>텍스트</td><td><code>kind</code></td><td><code>feed</code> <span class="mut">(수유)</span></td></tr>' +
+      '<li><b>새로운 필드 추가</b>로 3개를 넣으세요. <code>kind</code> 값은 아래 영어 한 단어만 정확히 적어야 해요.<table class="bl-table"><tr><th>종류</th><th>키</th><th>값</th></tr>' +
+      '<tr><td>텍스트</td><td><code>kind</code></td><td><code>formula</code></td></tr>' +
       '<tr><td>텍스트</td><td><code>who</code></td><td><code>' + escapeHtml(me) + '</code></td></tr>' +
       '<tr><td>사전</td><td><code>t</code></td><td>안에 텍스트 <code>.sv</code> = <code>timestamp</code></td></tr></table>' +
       '<div class="bl-copy-row"><button type="button" class="bt-chip" data-action="bl-copy" data-text="kind" data-label="kind">kind</button><button type="button" class="bt-chip" data-action="bl-copy" data-text="who" data-label="who">who</button><button type="button" class="bt-chip" data-action="bl-copy" data-text=".sv" data-label=".sv">.sv</button><button type="button" class="bt-chip" data-action="bl-copy" data-text="timestamp" data-label="timestamp">timestamp</button><button type="button" class="bt-chip" data-action="bl-copy" data-text="' + escapeHtml(me) + '" data-label="내 이름">' + escapeHtml(me) + '</button></div></li>' +
-      '<li>(선택) <b>알림 보기</b> 동작을 추가해 ‘🍼 수유 기록했어요’라고 적어 두면 눌렀을 때 확인돼요.</li>' +
-      '<li>맨 위 이름을 <b>🍼 수유</b>로 바꾸고 완료. 이 단축어를 길게 눌러 <b>복제</b>한 뒤 <code>kind</code> 값만 바꿔 나머지를 만드세요.<div class="bl-copy-row">' +
-        kinds.map(function (k) { return '<button type="button" class="bt-chip" data-action="bl-copy" data-text="' + k[0] + '" data-label="' + k[1] + ' 값">' + k[1] + ' <code>' + k[0] + '</code></button>'; }).join('') + '</div></li>' +
+      '<li>(선택) 누를 때 양·메모도 적고 싶다면: <b>입력 요청</b> 동작을 추가해 URL 동작 <b>위로</b> 옮기고, 본문에 <b>텍스트</b> <code>detail</code> = <b>제공된 입력</b>(변수)을 하나 더 넣으세요. 분유는 입력 유형을 숫자로 두면 <code>120</code>만 적어도 120ml로 보여요.</li>' +
+      '<li>(선택) <b>알림 보기</b> 동작을 추가해 ‘분유 기록했어요’라고 적어 두면 눌렀을 때 확인돼요.</li>' +
+      '<li>맨 위 이름을 <b>분유</b>로 바꾸고 완료. 이 단축어를 길게 눌러 <b>복제</b>한 뒤 <code>kind</code> 값만 바꿔 나머지를 만드세요.<div class="bl-copy-row">' +
+        kinds.map(function (k) { return '<button type="button" class="bt-chip" data-action="bl-copy" data-text="' + k[0] + '" data-label="' + k[1] + ' 값">' + k[1] + ' <code>' + k[0] + '</code></button>'; }).join('') + '</div><p class="mut" style="margin:6px 0 0;font-size:0.8rem">예전에 만든 <code>feed</code>(수유)·<code>diaper</code>(기저귀) 단축어도 그대로 기록돼요.</p></li>' +
       '<li><b>홈 화면</b> 빈 곳을 길게 누르기 → 왼쪽 위 <b>편집 → 위젯 추가</b> → <b>단축어</b> → 4칸 크기 추가 → 위젯을 길게 눌러 <b>위젯 편집</b>에서 만든 단축어를 고르세요. 잠금 화면 위젯, 동작 버튼(아이폰 15 Pro 이상), 뒷면 탭(설정 › 손쉬운 사용 › 터치 › 뒷면 탭)에도 연결할 수 있어요.</li>' +
-      '</ol><p class="bl-note">위젯으로 남긴 기록은 앱을 열면 바로 보이고 가족과 공유돼요. 분유 ml 같은 내용은 나중에 목록에서 눌러 추가하면 돼요.<br>이 주소는 우리 가족 방 주소라 다른 사람에게 보내지 마세요.</p>'
+      '</ol><p class="bl-note">위젯으로 남긴 기록은 앱을 열면 바로 보이고 가족과 공유돼요. 분유 ml 같은 내용은 나중에 목록에서 눌러 추가해도 돼요.<br>이 주소는 우리 가족 방 주소라 다른 사람에게 보내지 마세요.</p>'
     ) : '<p class="bl-note">가족 공유를 켜야 위젯을 쓸 수 있어요. 마미백 위쪽의 ‘가족 공유’를 먼저 켜 주세요.</p>';
     hideToast();
     g.querySelector('.bl-guide__body').innerHTML = body;
@@ -5688,7 +5822,19 @@ datesSorted().forEach(function (d) {
           case 'bl-log': blLog(b.dataset.kind); break;
           case 'bl-edit': ui.blEdit = b.dataset.id; renderBabyLog(); var df = document.querySelector('[data-focus-key="bl-detail:' + b.dataset.id + '"]'); if (df) df.focus(); break;
           case 'bl-cancel': { var was = ui.blEdit; ui.blEdit = null; renderBabyLog(); var bk = document.querySelector('[data-focus-key="bl-row:' + was + '"]'); if (bk) bk.focus(); break; }
-          case 'bl-quick': { var inp = b.closest('form').elements.detail; if (inp) { var cur = inp.value.replace(/^(분유\+모유|소변\+대변|분유|모유|소변|대변)\s*/, ''); inp.value = b.dataset.val + (cur ? ' ' + cur : ' '); inp.focus(); } break; }
+          case 'bl-quick': {
+            var qf = b.closest('form'), inp = qf.elements.detail, qk = BL_KINDS[qf.dataset.kind];
+            if (inp) {
+              var qs = (qk ? qk.quick : []).slice().sort(function (x, y) { return y.length - x.length; }).map(function (q) { return q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
+              var cur = qs.length ? inp.value.replace(new RegExp('^(' + qs.join('|') + ')\\s*'), '') : inp.value;
+              if (qf.dataset.kind === 'formula') cur = cur.replace(/^\d{1,4}\s*/, '');
+              inp.value = b.dataset.val + (cur ? ' ' + cur : ' '); inp.focus();
+            }
+            break;
+          }
+          case 'bl-tab': ui.blTab = b.dataset.tab === 'pattern' ? 'pattern' : 'log'; ui.blEdit = null; renderBabyLog(); { var tb = document.querySelector('[data-focus-key="bl-tab:' + ui.blTab + '"]'); if (tb) tb.focus(); } break;
+          case 'bl-range': ui.blRange = b.dataset.range; renderBabyLog(); { var rb = document.querySelector('[data-focus-key="bl-range:' + ui.blRange + '"]'); if (rb) rb.focus(); } break;
+          case 'bl-metric': ui.blMetric = b.dataset.metric; renderBabyLog(); break;
           case 'bl-del': {
             var id = ui.blEdit, ev = null; state.babyLog = state.babyLog.filter(function (x) { if (x.id === id) { ev = x; return false; } return true; });
             if (!ev) break; ui.blEdit = null; commit();
