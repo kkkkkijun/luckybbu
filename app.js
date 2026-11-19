@@ -20,12 +20,12 @@
   var SUPPORT_STAGES = ['now', 'birth', 'monthly', 'local'];
   var SUPPORT_STAGE_LABEL = { now: '지금 · 임신 중', birth: '출산 직후 · 60일 안', monthly: '매달 받는 것', local: '우리 지역 (서울 마포구)' };
   var SUPPORT_DUE_BASE = ['', 'due', 'birth'];
-  // 화면: portal(luckybbu 첫 화면) · ledger(가계부) · 나머지는 마미백 공간
+  // 화면: portal(luckybbu 첫 화면) · ledger(가계부) · 나머지는 이도로그 공간
   // 화면에서 숨긴 공간(데이터는 그대로 보관·동기화): 출산 당일 · 택일 · 작명
   var HIDDEN_VIEWS = ['birthday', 'picks', 'names'];
   function shownView(v) { return HIDDEN_VIEWS.indexOf(v) !== -1 ? 'home' : v; }
   var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'growth', 'babylog', 'vaccine'];
-  // 마미백 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
+  // 이도로그 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
   var GROUPS = ['birth', 'baby'];
   function defaultGroupFor(name) { var n = String(name || ''); if (/맞이|의류|출산|병원|조리원/.test(n)) return 'birth'; return /육아|이유식|예방접종|성장/i.test(n) ? 'baby' : 'birth'; }
   // 가계부
@@ -1004,9 +1004,9 @@
     var ptabsNav = $('#primary-tabs'); if (ptabsNav) ptabsNav.hidden = space !== 'mamibag';
     var back = $('#space-back'); if (back) back.hidden = space === 'portal';
     var titleText = $('#app-title-text');
-    if (titleText) titleText.textContent = space === 'ledger' ? '가계부' : space === 'settings' ? '설정' : '마미백';
+    if (titleText) titleText.textContent = space === 'ledger' ? '가계부' : space === 'settings' ? '설정' : '이도로그';
     var titleBtn = $('#app-title-btn');
-    if (titleBtn) { titleBtn.dataset.action = space === 'mamibag' ? 'go-home' : (space === 'ledger' ? 'go-ledger' : 'go-portal'); titleBtn.setAttribute('aria-label', space === 'mamibag' ? '마미백 홈으로' : titleText ? titleText.textContent : ''); }
+    if (titleBtn) { titleBtn.dataset.action = space === 'mamibag' ? 'go-home' : (space === 'ledger' ? 'go-ledger' : 'go-portal'); titleBtn.setAttribute('aria-label', space === 'mamibag' ? '이도로그 홈으로' : titleText ? titleText.textContent : ''); }
     var vh = $('#view-home');
     if (vh) vh.hidden = ui.view !== 'home';
     var vs = $('#view-settings'); if (vs) vs.hidden = ui.view !== 'settings';
@@ -1222,7 +1222,7 @@
       });
       html += '<button type="button" class="icon-presets__btn icon-presets__btn--none' + (!cat.icon ? ' is-active' : '') + '" data-action="pick-icon" data-icon="" aria-pressed="' + (!cat.icon ? 'true' : 'false') + '">없음</button>';
       html += '<label class="cat-opt"><input type="checkbox" data-action="toggle-done-tabs" data-focus-key="cat-dt:' + escapeHtml(cat.id) + '"' + (cat.doneTabs ? ' checked' : '') + '> 완료/미완료 탭 표시</label>';
-      html += '<label class="cat-opt">마미백 홈 묶음 <select data-action="set-group" data-focus-key="cat-group:' + escapeHtml(cat.id) + '"><option value="birth"' + (cat.group === 'birth' ? ' selected' : '') + '>출산</option><option value="baby"' + (cat.group === 'baby' ? ' selected' : '') + '>육아</option></select></label>';
+      html += '<label class="cat-opt">이도로그 홈 묶음 <select data-action="set-group" data-focus-key="cat-group:' + escapeHtml(cat.id) + '"><option value="birth"' + (cat.group === 'birth' ? ' selected' : '') + '>출산</option><option value="baby"' + (cat.group === 'baby' ? ' selected' : '') + '>육아</option></select></label>';
     } else {
       html += '<h2 id="' + titleId + '" class="category__title">';
       html += '<button type="button" class="category__toggle" data-action="toggle-collapse" data-focus-key="cat-toggle:' + escapeHtml(cat.id) + '" aria-expanded="' + (collapsed ? 'false' : 'true') + '" aria-controls="' + bodyId + '">';
@@ -2211,7 +2211,7 @@ datesSorted().forEach(function (d) {
     return '<svg class="ico" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + SVG_PATHS[name] + '</svg>';
   }
 
-  /* ---------- 마미백 홈: 출산 · 육아 아이콘 묶음 ---------- */
+  /* ---------- 이도로그 홈: 출산 · 육아 아이콘 묶음 ---------- */
   // 분류 타일은 이모지 대신 선 아이콘: 이름 → 이모지 → 기본(가방) 순으로 고른다
   var CAT_ICON_RULES = [
     [/병원|캐리어|출산\s*가방|입원/, 'suitcase'], [/조리원|산후/, 'bed'], [/수유|젖병|분유/, 'bottle'],
@@ -4511,7 +4511,7 @@ datesSorted().forEach(function (d) {
         kinds.map(function (k) { return '<button type="button" class="bt-chip" data-action="bl-copy" data-text="' + k[0] + '" data-label="' + k[1] + ' 값">' + k[1] + ' <code>' + k[0] + '</code></button>'; }).join('') + '</div><p class="mut" style="margin:6px 0 0;font-size:0.8rem">예전에 만든 <code>feed</code>(수유)·<code>diaper</code>(기저귀) 단축어도 그대로 기록돼요.</p></li>' +
       '<li><b>홈 화면</b> 빈 곳을 길게 누르기 → 왼쪽 위 <b>편집 → 위젯 추가</b> → <b>단축어</b> → 4칸 크기 추가 → 위젯을 길게 눌러 <b>위젯 편집</b>에서 만든 단축어를 고르세요. 잠금 화면 위젯, 동작 버튼(아이폰 15 Pro 이상), 뒷면 탭(설정 › 손쉬운 사용 › 터치 › 뒷면 탭)에도 연결할 수 있어요.</li>' +
       '</ol><p class="bl-note">위젯으로 남긴 기록은 앱을 열면 바로 보이고 가족과 공유돼요. 분유 ml 같은 내용은 나중에 목록에서 눌러 추가해도 돼요.<br>이 주소는 우리 가족 방 주소라 다른 사람에게 보내지 마세요.</p>'
-    ) : '<p class="bl-note">가족 공유를 켜야 위젯을 쓸 수 있어요. 마미백 위쪽의 ‘가족 공유’를 먼저 켜 주세요.</p>';
+    ) : '<p class="bl-note">가족 공유를 켜야 위젯을 쓸 수 있어요. 이도로그 위쪽의 ‘가족 공유’를 먼저 켜 주세요.</p>';
     hideToast();
     g.querySelector('.bl-guide__body').innerHTML = body;
     g.hidden = false; document.body.classList.add('has-sheet');

@@ -1,7 +1,7 @@
 {
   "name": "luckybbu · 우리 가족 포털",
   "short_name": "luckybbu",
-  "description": "마미백(출산·육아 준비)과 가계부를 한곳에서 쓰는 우리 가족 포털",
+  "description": "이도로그(출산·육아 준비)과 가계부를 한곳에서 쓰는 우리 가족 포털",
   "lang": "ko",
   "start_url": "./",
   "scope": "./",

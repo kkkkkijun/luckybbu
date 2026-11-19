@@ -1159,7 +1159,7 @@ body { padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding
 .portal__settings { display: inline-flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); font: inherit; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
 .portal__sync { max-width: none; }
 
-/* ---------- 마미백 홈: 출산 · 육아 ---------- */
+/* ---------- 이도로그 홈: 출산 · 육아 ---------- */
 .mb-group { margin-top: 18px; }
 .mb-group__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .mb-group__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.05rem; }
