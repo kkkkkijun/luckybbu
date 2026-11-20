@@ -3978,9 +3978,10 @@ datesSorted().forEach(function (d) {
   /* ---------- 아기 공통 ---------- */
   function isoOf(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
   function addMonthsIso(iso, m) { var d = dateOf(iso), t = new Date(d.getFullYear(), d.getMonth() + m, d.getDate()); if (t.getDate() !== d.getDate()) t = new Date(d.getFullYear(), d.getMonth() + m + 1, 0); return isoOf(t); }
-  // 태어난 날을 1일이 아닌 0일로 센다(생후 N일)
+  // ageDays는 태어난 날을 0일로 센다(검진·접종 시기 계산용)
   function ageDays(iso) { return state.birthDate ? Math.round((dateOf(iso) - dateOf(state.birthDate)) / 86400000) : null; }
-  function ageText(iso) { var n = ageDays(iso); if (n === null || n < 0) return ''; return n === 0 ? '출생' : '생후 ' + n + '일'; }
+  // 화면의 '생후 N일'은 태어난 날을 1일로 센다(디데이 D+N과 같게)
+  function ageText(iso) { var n = ageDays(iso); if (n === null || n < 0) return ''; return '생후 ' + (n + 1) + '일'; }
   function mdText(iso) { var d = dateOf(iso); return (d.getMonth() + 1) + '/' + d.getDate(); }
   function birthDateCardHtml(cls) {
     return '<form class="bl-birth ' + (cls || '') + '" data-birth-form><div><b>축복이가 태어난 날</b><p class="mut">넣으면 생후 일수와 검진 시기를 알려 드려요. 가족과 공유돼요.</p></div>' +
