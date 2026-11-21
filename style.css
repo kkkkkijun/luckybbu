@@ -1876,3 +1876,6 @@ a.care-link { display: inline-flex; align-items: center; text-decoration: none; 
 .sq-f select { min-height: 44px; border: 1px solid var(--border); border-radius: 10px; padding: 0 10px; font: inherit; background: #fff; max-width: 100%; }
 .sq-f small { font-size: 0.74rem; color: var(--mint-ink); word-break: break-all; }
 .sq-f--row { grid-template-columns: minmax(0, 1fr) 140px; align-items: center; margin-top: 6px; }
+.lg-imp__range { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.86rem; }
+.lg-imp__range span { color: var(--muted); margin-right: 2px; }
+.lg-imp__range input { min-height: 40px; border: 1px solid var(--border); border-radius: 10px; padding: 0 8px; font: inherit; flex: 1 1 130px; min-width: 0; }
