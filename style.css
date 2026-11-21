@@ -1948,3 +1948,5 @@ a.care-link { display: inline-flex; align-items: center; text-decoration: none; 
 .cb-add-form input { flex: 1 1 110px; width: auto; }
 .lc-btn { white-space: nowrap; padding: 0 8px; }
 #ledger-root { padding-bottom: 84px; }
+.seg--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.seg--4 .seg__btn { font-size: 0.8rem; letter-spacing: -0.03em; }

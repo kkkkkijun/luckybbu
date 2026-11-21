@@ -464,7 +464,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerFavs: [], ledgerRecs: [], ledgerInst: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {} };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerWho: [], ledgerFavs: [], ledgerRecs: [], ledgerInst: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {} };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -618,6 +618,7 @@
     var ledgerFavs = normalizeLedgerFavs(raw.ledgerFavs);
     var ledgerRecs = normalizeLedgerRecs(raw.ledgerRecs);
     var ledgerInst = normalizeLedgerInst(raw.ledgerInst);
+    var ledgerWho = Array.isArray(raw.ledgerWho) ? raw.ledgerWho.filter(function (t) { return typeof t === 'string' && t.trim(); }).map(function (t) { return t.trim().slice(0, 12); }).filter(function (t, i, a) { return a.indexOf(t) === i && t !== '함께'; }).slice(0, 10) : [];
     var ledgerPays = Array.isArray(raw.ledgerPays) ? raw.ledgerPays.filter(function (t) { return typeof t === 'string' && t.trim(); }).map(function (t) { return t.trim().slice(0, LP_NAME_MAX); }).filter(function (t, i, a) { return a.indexOf(t) === i; }).slice(0, 20) : [];
     var budget = typeof raw.budget === 'number' && isFinite(raw.budget) && raw.budget > 0 ? Math.min(Math.round(raw.budget), PRICE_MAX) : 0;
     var memo = typeof raw.memo === 'string' ? raw.memo.replace(/\r\n?/g, '\n').slice(0, MEMO_MAX) : '';
@@ -722,7 +723,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerFavs: ledgerFavs, ledgerRecs: ledgerRecs, ledgerInst: ledgerInst, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerWho: ledgerWho, ledgerFavs: ledgerFavs, ledgerRecs: ledgerRecs, ledgerInst: ledgerInst, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates } };
   }
 
   /* ---------- storage ---------- */
@@ -2784,7 +2785,8 @@ datesSorted().forEach(function (d) {
   }
 
   /* ---------- 가계부 ---------- */
-  var LEDGER_WHO = TAG_NAMES.slice(0, 2);
+  var LEDGER_WHO_DEFAULTS = TAG_NAMES.slice(0, 2).concat(['이도']);
+  function ledgerWho() { return state.ledgerWho && state.ledgerWho.length ? state.ledgerWho : LEDGER_WHO_DEFAULTS; }
   // 달력 빨간 날(공휴일·대체공휴일)
   var KR_HOLIDAYS = {
     '2025-01-01': 1, '2025-01-27': 1, '2025-01-28': 1, '2025-01-29': 1, '2025-01-30': 1, '2025-03-01': 1, '2025-03-03': 1, '2025-05-05': 1, '2025-05-06': 1, '2025-06-03': 1, '2025-06-06': 1,
@@ -2928,7 +2930,7 @@ datesSorted().forEach(function (d) {
     } else {
       var q = String(ui.ledgerQuery || '').trim();
       html += '<div class="lg-tools"><label class="visually-hidden" for="ledger-search">내역 검색</label><input type="search" id="ledger-search" class="lg-search" placeholder="검색: 내용·분류·카드·금액 (전체 기간)" value="' + escapeHtml(q) + '" autocomplete="off" data-focus-key="ledger-search" enterkeyhint="search">' +
-        '<button type="button" class="btn btn--small" data-action="lc-open">분류·결제 편집</button><button type="button" class="btn btn--small" data-action="ledger-import">CSV·SQLite 가져오기</button></div>' +
+        '<button type="button" class="btn btn--small" data-action="lc-open">분류·결제·누가 편집</button><button type="button" class="btn btn--small" data-action="ledger-import">CSV·SQLite 가져오기</button></div>' +
         '<div id="lg-results">' + ledgerResultsHtml(m) + '</div>';
     }
     root.innerHTML = html;
@@ -3232,7 +3234,9 @@ datesSorted().forEach(function (d) {
     var d = ui.ledgerDraft && ui.ledgerDraft.form === ui.ledgerForm ? ui.ledgerDraft : null;
     var tab = d ? d.tab : e ? (e.type === 'in' ? 'in' : isMove(e) ? 'move' : 'out') : (ui.ledgerType || 'out');
     var me = myName();
-    var who = d ? d.who : e ? e.who : (LEDGER_WHO.indexOf(me) !== -1 ? me : '');
+    var whos = ledgerWho().slice();
+    var who = d ? d.who : e ? e.who : (whos.indexOf(me) !== -1 ? me : '');
+    if (who && whos.indexOf(who) === -1) whos.push(who);
     var m = ledgerMonth();
     var date = d ? d.date : e ? e.date : (ui.ledgerNewDate || (m === currentMonth() ? todayStamp() : m + '-01'));
     var pays = ledgerPays().slice();
@@ -3251,7 +3255,8 @@ datesSorted().forEach(function (d) {
       '<fieldset class="chips-field"><legend>분류 <small class="mut">길게 누르면 고치기</small></legend><div class="lc-grid" id="ledger-cat-grid">' + ledgerCatGrid(tab, d ? d.cat : e ? e.cat : '') + '</div></fieldset>' +
       '<div class="sheet__two"><fieldset class="chips-field"><legend>결제</legend><div class="choices" id="ledger-pay-chips">' + ledgerChips('pay', pays, pay) +
         '<button type="button" class="choice-add" data-action="lp-add" aria-label="결제수단 추가">＋</button></div></fieldset>' +
-      '<fieldset class="chips-field"><legend>누가</legend><div class="choices">' + ledgerChips('who', LEDGER_WHO.concat([{ value: '', label: '함께' }]), who) + '</div></fieldset></div>' +
+      '<fieldset class="chips-field"><legend>누가</legend><div class="choices" id="ledger-who-chips">' + ledgerChips('who', whos.concat([{ value: '', label: '함께' }]), who) +
+        '<button type="button" class="choice-add" data-action="lp-add" data-kind="who" aria-label="사람 추가">＋</button></div></fieldset></div>' +
       '<div class="field"><label for="ledger-date">날짜</label><input type="date" id="ledger-date" value="' + date + '" required></div>' +
       (e ? (e.rec ? '<p class="lc-note mut">반복으로 만든 기록이에요. 앞으로의 금액·날짜는 ‘반복·할부’ 탭에서 고쳐요.</p>' : e.inst ? '<p class="lc-note mut">할부로 나눠 만든 기록이에요. ‘반복·할부’ 탭에서 모아 볼 수 있어요.</p>' : '') :
         '<div class="sheet__two lg-plan"><div class="field"><label for="ledger-inst">할부</label><select id="ledger-inst"' + (tab === 'out' ? '' : ' disabled') + '><option value="1">일시불</option>' + [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24].map(function (k) { return '<option value="' + k + '">' + k + '개월</option>'; }).join('') + '</select></div>' +
@@ -3304,7 +3309,7 @@ datesSorted().forEach(function (d) {
     var type = f.tab === 'in' ? 'in' : 'out';
     var cats = catsForTab(f.tab);
     var cat = cats.some(function (c) { return c.name === f.cat; }) ? f.cat : (cats.length ? cats[0].name : '기타');
-    var who = LEDGER_WHO.indexOf(f.who) !== -1 ? f.who : '';
+    var who = String(f.who || '').slice(0, 12);
     var pay = String(f.pay || '').slice(0, LP_NAME_MAX);
     var e = ui.ledgerForm === 'new' ? null : findEntry(ui.ledgerForm);
     var repEl = $('#ledger-rep'), instEl = $('#ledger-inst');
@@ -3403,23 +3408,23 @@ datesSorted().forEach(function (d) {
       '<div class="bt-form__actions"><button type="button" class="btn btn--small" data-action="lc-cancel">취소</button><button type="submit" class="btn btn--primary btn--small">' + (isNew ? '추가' : '저장') + '</button></div></form>';
   }
   function lcEditorHtml() {
-    var tab = ui.lcTab === 'in' || ui.lcTab === 'pay' ? ui.lcTab : 'out';
+    var tab = ['in', 'pay', 'who'].indexOf(ui.lcTab) !== -1 ? ui.lcTab : 'out';
     var head = '<div class="sheet__panel lc-editor" role="dialog" aria-modal="true" aria-labelledby="lc-title"><span class="sheet__handle" aria-hidden="true"></span>' +
       '<div class="sheet__head">' + (ui.ledgerReturn ? '<button type="button" class="icon-btn" data-action="lc-back" aria-label="입력으로 돌아가기">' + svgIcon('back', 20) + '</button>' : '') +
-      '<h2 id="lc-title" tabindex="-1">분류·결제 편집</h2><button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>' +
-      '<div class="seg seg--3">' + [['out', '지출 ' + catsOf('out').length], ['in', '수입 ' + catsOf('in').length], ['pay', '결제 ' + ledgerPays().length]].map(function (t) {
+      '<h2 id="lc-title" tabindex="-1">분류·결제·누가 편집</h2><button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>' +
+      '<div class="seg seg--4">' + [['out', '지출 ' + catsOf('out').length], ['in', '수입 ' + catsOf('in').length], ['pay', '결제 ' + ledgerPays().length], ['who', '누가 ' + ledgerWho().length]].map(function (t) {
         return '<button type="button" class="seg__btn' + (tab === t[0] ? ' is-on' : '') + '" data-action="lc-tab" data-tab="' + t[0] + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>';
       }).join('') + '</div>';
     var body = '';
-    if (tab === 'pay') {
-      var pays = ledgerPays();
-      body = '<p class="lc-note mut">카드 이름을 넣으면 카드별로 모아 볼 수 있어요. 이름을 바꾸면 이미 적힌 기록도 같이 바뀌어요.</p><ul class="lc-list">' + pays.map(function (p, i) {
+    if (tab === 'pay' || tab === 'who') {
+      var pays = tab === 'who' ? ledgerWho() : ledgerPays(), kd = ' data-kind="' + tab + '"';
+      body = '<p class="lc-note mut">' + (tab === 'who' ? '기록할 때 고르는 사람이에요. ‘함께’는 항상 있어요. 이름을 바꾸면 이미 적힌 기록도 같이 바뀌어요.' : '카드 이름을 넣으면 카드별로 모아 볼 수 있어요. 이름을 바꾸면 이미 적힌 기록도 같이 바뀌어요.') + '</p><ul class="lc-list">' + pays.map(function (p, i) {
         return '<li class="lc-row"><span class="lc-row__name">' + escapeHtml(p) + '</span>' +
-          '<button type="button" class="lc-btn" data-action="lp-move" data-i="' + i + '" data-by="-1" aria-label="' + escapeHtml(p) + ' 위로"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
-          '<button type="button" class="lc-btn" data-action="lp-move" data-i="' + i + '" data-by="1" aria-label="' + escapeHtml(p) + ' 아래로"' + (i === pays.length - 1 ? ' disabled' : '') + '>▼</button>' +
-          '<button type="button" class="lc-btn" data-action="lp-rename" data-i="' + i + '" aria-label="' + escapeHtml(p) + ' 이름 바꾸기">✎</button>' +
-          '<button type="button" class="lc-btn lc-btn--del" data-action="lp-del" data-i="' + i + '" aria-label="' + escapeHtml(p) + ' 삭제"' + (pays.length < 2 ? ' disabled' : '') + '>🗑</button></li>';
-      }).join('') + '</ul><button type="button" class="lc-add" data-action="lp-add">＋ 결제수단 추가</button>';
+          '<button type="button" class="lc-btn" data-action="lp-move"' + kd + ' data-i="' + i + '" data-by="-1" aria-label="' + escapeHtml(p) + ' 위로"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+          '<button type="button" class="lc-btn" data-action="lp-move"' + kd + ' data-i="' + i + '" data-by="1" aria-label="' + escapeHtml(p) + ' 아래로"' + (i === pays.length - 1 ? ' disabled' : '') + '>▼</button>' +
+          '<button type="button" class="lc-btn" data-action="lp-rename"' + kd + ' data-i="' + i + '" aria-label="' + escapeHtml(p) + ' 이름 바꾸기">✎</button>' +
+          '<button type="button" class="lc-btn lc-btn--del" data-action="lp-del"' + kd + ' data-i="' + i + '" aria-label="' + escapeHtml(p) + ' 삭제"' + (tab === 'pay' && pays.length < 2 ? ' disabled' : '') + '>🗑</button></li>';
+      }).join('') + '</ul><button type="button" class="lc-add" data-action="lp-add"' + kd + '>＋ ' + (tab === 'who' ? '사람' : '결제수단') + ' 추가</button>';
     } else {
       var cats = catsOf(tab);
       body = '<p class="lc-note mut">이름을 바꾸면 이미 적힌 기록도 같이 바뀌어요. ▲▼로 순서를 바꿔요.</p><ul class="lc-list">' + cats.map(function (c, i) {
@@ -3513,31 +3518,35 @@ datesSorted().forEach(function (d) {
       commit(); if (ui.ledgerForm === 'cats') lcRerender(); showToast('되돌렸어요.');
     });
   }
-  function lpAdd() {
-    var name = window.prompt('결제수단 이름 (예: 현대카드 M, 신한체크)', '');
-    name = String(name || '').trim().slice(0, LP_NAME_MAX); if (!name) return null;
-    var pays = ledgerPays().slice();
-    if (pays.indexOf(name) === -1) { pays.push(name); state.ledgerPays = pays; commit(); act('ledger', '결제수단 추가: ' + name); }
+  // 결제수단(pay)과 누가(who) 목록은 같은 방식으로 고친다
+  function lpList(kind) { return (kind === 'who' ? ledgerWho() : ledgerPays()).slice(); }
+  function lpSet(kind, arr) { if (kind === 'who') state.ledgerWho = arr; else state.ledgerPays = arr; }
+  function lpAdd(kind) {
+    var isWho = kind === 'who', max = isWho ? 12 : LP_NAME_MAX;
+    var name = String(window.prompt(isWho ? '사람 이름 (예: 이도, 할머니)' : '결제수단 이름 (예: 현대카드 M, 신한체크)', '') || '').trim().slice(0, max);
+    if (!name || (isWho && name === '함께')) return null;
+    var list = lpList(kind);
+    if (isWho && list.length >= 10) { showToast('누가는 10명까지예요.'); return null; }
+    if (list.indexOf(name) === -1) { list.push(name); lpSet(kind, list); commit(); act('ledger', (isWho ? '누가 추가: ' : '결제수단 추가: ') + name); }
     return name;
   }
-  function lpRename(i) {
-    var pays = ledgerPays().slice(), old = pays[i]; if (!old) return;
-    var name = String(window.prompt('결제수단 이름', old) || '').trim().slice(0, LP_NAME_MAX);
-    if (!name || name === old) return;
-    if (pays.indexOf(name) !== -1) { showToast('같은 이름이 이미 있어요.'); return; }
-    pays[i] = name; state.ledgerPays = pays;
-    state.ledger.forEach(function (e) { if (e.pay === old) e.pay = name; });
-    (state.ledgerFavs || []).forEach(function (f) { if (f.pay === old) f.pay = name; });
+  function lpRename(kind, i) {
+    var list = lpList(kind), old = list[i], field = kind === 'who' ? 'who' : 'pay'; if (!old) return;
+    var name = String(window.prompt(kind === 'who' ? '사람 이름' : '결제수단 이름', old) || '').trim().slice(0, kind === 'who' ? 12 : LP_NAME_MAX);
+    if (!name || name === old || name === '함께') return;
+    if (list.indexOf(name) !== -1) { showToast('같은 이름이 이미 있어요.'); return; }
+    list[i] = name; lpSet(kind, list);
+    [state.ledger, state.ledgerFavs || [], state.ledgerRecs || [], state.ledgerInst || []].forEach(function (arr) { arr.forEach(function (x) { if (x[field] === old) x[field] = name; }); });
     commit(); lcRerender('#lc-title');
   }
-  function lpDel(i) {
-    var before = ledgerPays().slice(), pays = before.slice(), p = pays.splice(i, 1)[0]; if (!p) return;
-    state.ledgerPays = pays; commit(); lcRerender('#lc-title');
-    showToast('‘' + p + '’를 목록에서 뺐어요. 이미 적힌 기록은 그대로예요.', function () { state.ledgerPays = before; commit(); if (ui.ledgerForm === 'cats') lcRerender(); });
+  function lpDel(kind, i) {
+    var before = lpList(kind), list = before.slice(), p = list.splice(i, 1)[0]; if (!p) return;
+    lpSet(kind, list); commit(); lcRerender('#lc-title');
+    showToast('‘' + p + '’를 목록에서 뺐어요. 이미 적힌 기록은 그대로예요.', function () { lpSet(kind, before); commit(); if (ui.ledgerForm === 'cats') lcRerender(); });
   }
-  function lpMove(i, by) {
-    var pays = ledgerPays().slice(), j = i + by; if (j < 0 || j >= pays.length) return;
-    var t = pays[i]; pays[i] = pays[j]; pays[j] = t; state.ledgerPays = pays; commit(); lcRerender('[data-action="lp-move"][data-i="' + j + '"][data-by="' + by + '"]');
+  function lpMove(kind, i, by) {
+    var list = lpList(kind), j = i + by; if (j < 0 || j >= list.length) return;
+    var t = list[i]; list[i] = list[j]; list[j] = t; lpSet(kind, list); commit(); lcRerender('[data-action="lp-move"][data-kind="' + kind + '"][data-i="' + j + '"][data-by="' + by + '"]');
   }
 
   /* ---------- CSV 가져오기 (위플 등 다른 가계부의 내보내기 파일) ---------- */
@@ -3677,7 +3686,7 @@ datesSorted().forEach(function (d) {
       html += '<fieldset class="chips-field"><legend>없는 분류 ' + newOut.length + '개: ' + newOut.map(function (c) { return escapeHtml(c.name) + '(' + c.n + ')'; }).join(', ') + '</legend><div class="choices">' +
         ledgerChips('impcat', [{ value: 'etc', label: '기타로 넣기 (원래 분류는 내용에)' }, { value: 'new', label: '새 분류로 만들기' }], imp.catMode || 'etc') + '</div></fieldset>';
     }
-    html += '<fieldset class="chips-field"><legend>누가 쓴 기록인가요?</legend><div class="choices">' + ledgerChips('impwho', LEDGER_WHO.concat([{ value: '', label: '함께' }]), imp.who || '') + '</div></fieldset>';
+    html += '<fieldset class="chips-field"><legend>누가 쓴 기록인가요?</legend><div class="choices">' + ledgerChips('impwho', ledgerWho().concat([{ value: '', label: '함께' }]), imp.who || '') + '</div></fieldset>';
     html += '<div class="lg-imp__prev"><p class="mut">미리 보기 (앞의 5건)</p><ul class="ledger-list">' + imp.rows.slice(0, 5).map(function (x) {
       return '<li class="lg-imp__row"><span>' + x.date.slice(2).replace(/-/g, '.') + '</span><span>' + escapeHtml(x.cat || '기타') + '</span><span class="lg-imp__tx">' + escapeHtml(x.text) + '</span><b>' + (x.kind === 'in' ? '+' : '−') + formatNumber(x.amount) + '</b></li>';
     }).join('') + '</ul></div>';
@@ -3944,7 +3953,7 @@ datesSorted().forEach(function (d) {
     var panel = $('#ledger-sheet');
     var mode = ((panel.querySelector('input[name="impcat"]:checked') || {}).value) || 'new';
     var who = ((panel.querySelector('input[name="impwho"]:checked') || {}).value) || '';
-    if (LEDGER_WHO.indexOf(who) === -1) who = '';
+    if (ledgerWho().indexOf(who) === -1) who = '';
     if (state.ledger.length + imp.rows.length > LEDGER_MAX) { showToast('가계부에는 ' + formatNumber(LEDGER_MAX) + '건까지 넣을 수 있어요.'); return; }
     var src = 'csv' + Date.now().toString(36);
     var catsBefore = state.ledgerCats && state.ledgerCats.length ? JSON.parse(JSON.stringify(state.ledgerCats)) : [];
@@ -6251,6 +6260,7 @@ datesSorted().forEach(function (d) {
       ledger: state.ledger,
       ledgerCats: state.ledgerCats,
       ledgerPays: state.ledgerPays,
+      ledgerWho: state.ledgerWho,
       ledgerFavs: state.ledgerFavs,
       ledgerRecs: state.ledgerRecs,
       ledgerInst: state.ledgerInst,
@@ -6783,16 +6793,18 @@ datesSorted().forEach(function (d) {
           case 'lc-del-cancel': ui.lcDel = null; lcRerender('#lc-title'); break;
           case 'lc-del-go': lcDelete(b.dataset.id, $('#lc-del-to').value); break;
           case 'lp-add': {
-            var pn = lpAdd();
+            var kind = b.dataset.kind === 'who' ? 'who' : 'pay', pn = lpAdd(kind);
             if (pn && $('#ledger-form')) {
-              var chips = $('#ledger-pay-chips'), ex = chips.querySelector('input[name="pay"][value="' + cssEsc(pn) + '"]');
-              if (ex) ex.checked = true; else b.insertAdjacentHTML('beforebegin', ledgerChips('pay', [pn], pn));
+              var chips = $(kind === 'who' ? '#ledger-who-chips' : '#ledger-pay-chips'), ex = chips.querySelector('input[name="' + kind + '"][value="' + cssEsc(pn) + '"]');
+              if (ex) ex.checked = true;
+              else if (kind === 'who') { var together = chips.querySelector('input[name="who"][value=""]'); (together ? together.closest('label') : b).insertAdjacentHTML('beforebegin', ledgerChips('who', [pn], pn)); }
+              else b.insertAdjacentHTML('beforebegin', ledgerChips('pay', [pn], pn));
             } else if (ui.ledgerForm === 'cats') lcRerender('#lc-title');
             break;
           }
-          case 'lp-rename': lpRename(parseInt(b.dataset.i, 10)); break;
-          case 'lp-del': lpDel(parseInt(b.dataset.i, 10)); break;
-          case 'lp-move': lpMove(parseInt(b.dataset.i, 10), parseInt(b.dataset.by, 10)); break;
+          case 'lp-rename': lpRename(b.dataset.kind, parseInt(b.dataset.i, 10)); break;
+          case 'lp-del': lpDel(b.dataset.kind, parseInt(b.dataset.i, 10)); break;
+          case 'lp-move': lpMove(b.dataset.kind, parseInt(b.dataset.i, 10), parseInt(b.dataset.by, 10)); break;
           // CSV 가져오기
           case 'ledger-import': openImport(); break;
           case 'imp-go': runImport(); break;

@@ -157,6 +157,7 @@
     doc.ledgerFavs = {};
     (s.ledgerFavs || []).forEach(function (f, i) { doc.ledgerFavs[f.id] = { text: f.text || '', amount: f.amount || 0, type: f.type || 'out', cat: f.cat || '', pay: f.pay || '', order: i }; });
     doc.ledgerPays = (s.ledgerPays && s.ledgerPays.length) ? s.ledgerPays.slice() : null;
+    doc.ledgerWho = (s.ledgerWho && s.ledgerWho.length) ? s.ledgerWho.slice() : null;
     doc.memo = s.memo || '';
     doc.spendTags = (s.spendTags && s.spendTags.length) ? s.spendTags.slice() : null;
     doc.memos = {};
@@ -219,6 +220,7 @@
       ledgerCats: sortedEntries(doc.ledgerCats).map(function (c) { return { id: c.id, name: c.name, type: c.type, icon: c.icon || '', color: c.color || '', excl: c.excl === true, budget: typeof c.budget === 'number' ? c.budget : 0 }; }),
       ledgerFavs: sortedEntries(doc.ledgerFavs).map(function (f) { return { id: f.id, text: f.text || '', amount: typeof f.amount === 'number' ? f.amount : 0, type: f.type || 'out', cat: f.cat || '', pay: f.pay || '' }; }),
       ledgerPays: asArr(doc.ledgerPays).filter(function (t) { return typeof t === 'string'; }),
+      ledgerWho: asArr(doc.ledgerWho).filter(function (t) { return typeof t === 'string'; }),
       memo: typeof doc.memo === 'string' ? doc.memo : '',
       spendTags: asArr(doc.spendTags).filter(function (t) { return typeof t === 'string'; }),
       memos: sortedEntries(doc.memos).map(function (m) { return { id: m.id, text: m.text || '', updated: typeof m.updated === 'number' ? m.updated : 0, who: m.who || '', fav: m.fav === true, likes: m.likes || [], comments: m.comments || [], tables: m.tables || [] }; }),
@@ -255,6 +257,7 @@
     if ((prev.memo || '') !== (next.memo || '')) updates.memo = next.memo || '';
     if (JSON.stringify(prev.spendTags || null) !== JSON.stringify(next.spendTags || null)) updates.spendTags = next.spendTags || null;
     if (JSON.stringify(prev.ledgerPays || null) !== JSON.stringify(next.ledgerPays || null)) updates.ledgerPays = next.ledgerPays || null;
+    if (JSON.stringify(prev.ledgerWho || null) !== JSON.stringify(next.ledgerWho || null)) updates.ledgerWho = next.ledgerWho || null;
     if (JSON.stringify(prev.picks || {}) !== JSON.stringify(next.picks || {})) updates.picks = next.picks || { gpt: '', claude: '' };
     if (prev.version !== next.version) updates.version = next.version;
     return updates;
