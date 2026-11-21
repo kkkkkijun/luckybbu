@@ -99,7 +99,8 @@
       out.push({ id: id, date: date, type: type, amount: amount, cat: cat || '기타',
         text: typeof e.text === 'string' ? e.text.trim().slice(0, LEDGER_TEXT_MAX) : '',
         who: typeof e.who === 'string' ? e.who.trim().slice(0, 12) : '',
-        pay: pay, t: typeof e.t === 'number' ? e.t : 0, src: typeof e.src === 'string' ? e.src.slice(0, 24) : '' });
+        pay: pay, t: typeof e.t === 'number' ? e.t : 0, src: typeof e.src === 'string' ? e.src.slice(0, 24) : '',
+        rec: typeof e.rec === 'string' ? e.rec.slice(0, 40) : '', inst: typeof e.inst === 'string' ? e.inst.slice(0, 40) : '' });
     });
     // 기기·서버가 같은 순서를 갖도록 적은 시각 → id 순으로 둔다
     out.sort(function (a, b) { return (a.t - b.t) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
@@ -115,9 +116,41 @@
       if (!id || seen[id] || !name || names[type + ':' + name]) return;
       seen[id] = true; names[type + ':' + name] = true;
       out.push({ id: id, name: name, type: type, icon: LC_ICONS[c.icon] ? c.icon : 'tag',
-        color: typeof c.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(c.color) ? c.color : '#BDBDBD', excl: type === 'out' && c.excl === true });
+        color: typeof c.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(c.color) ? c.color : '#BDBDBD', excl: type === 'out' && c.excl === true,
+        budget: typeof c.budget === 'number' && c.budget > 0 && isFinite(c.budget) ? Math.min(Math.round(c.budget), PRICE_MAX) : 0 });
     });
     return out.slice(0, 80);
+  }
+  function normalizeLedgerRecs(raw) {
+    var out = [], seen = {};
+    listOf(raw).forEach(function (r) {
+      if (!r || typeof r !== 'object') return;
+      var id = typeof r.id === 'string' ? r.id.trim().replace(/[.#$\[\]\/]/g, '_') : '';
+      var amount = typeof r.amount === 'number' && isFinite(r.amount) ? Math.round(r.amount) : 0;
+      var start = typeof r.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.start) ? r.start : '';
+      if (!id || seen[id] || !(amount > 0) || amount > PRICE_MAX || !start) return;
+      seen[id] = true;
+      out.push({ id: id, text: typeof r.text === 'string' ? r.text.trim().slice(0, LEDGER_TEXT_MAX) : '', amount: amount, type: r.type === 'in' ? 'in' : 'out',
+        cat: typeof r.cat === 'string' ? r.cat.trim().slice(0, LC_NAME_MAX) : '기타', pay: typeof r.pay === 'string' ? r.pay.slice(0, LP_NAME_MAX) : '', who: typeof r.who === 'string' ? r.who.slice(0, 12) : '',
+        freq: r.freq === 'w' || r.freq === 'y' ? r.freq : 'm', start: start, end: typeof r.end === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.end) ? r.end : '',
+        n: typeof r.n === 'number' && r.n >= 0 ? Math.floor(r.n) : 0, gen: typeof r.gen === 'number' && r.gen >= 0 ? Math.floor(r.gen) : 0 });
+    });
+    return out.slice(0, 60);
+  }
+  function normalizeLedgerInst(raw) {
+    var out = [], seen = {};
+    listOf(raw).forEach(function (p) {
+      if (!p || typeof p !== 'object') return;
+      var id = typeof p.id === 'string' ? p.id.trim().replace(/[.#$\[\]\/]/g, '_') : '';
+      var total = typeof p.total === 'number' && isFinite(p.total) ? Math.round(p.total) : 0, months = typeof p.months === 'number' ? Math.floor(p.months) : 0;
+      var start = typeof p.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.start) ? p.start : '';
+      if (!id || seen[id] || !(total > 0) || total > PRICE_MAX || months < 2 || months > 36 || !start) return;
+      seen[id] = true;
+      out.push({ id: id, text: typeof p.text === 'string' ? p.text.trim().slice(0, LEDGER_TEXT_MAX) : '', total: total, months: months,
+        cat: typeof p.cat === 'string' ? p.cat.trim().slice(0, LC_NAME_MAX) : '기타', pay: typeof p.pay === 'string' ? p.pay.slice(0, LP_NAME_MAX) : '', who: typeof p.who === 'string' ? p.who.slice(0, 12) : '',
+        start: start, n: typeof p.n === 'number' && p.n >= 0 ? Math.min(Math.floor(p.n), months) : 0, closed: p.closed === true });
+    });
+    return out.slice(0, 60);
   }
   function normalizeLedgerFavs(raw) {
     var out = [], seen = {};
@@ -431,7 +464,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerFavs: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {} };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerFavs: [], ledgerRecs: [], ledgerInst: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {} };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -583,6 +616,8 @@
     var ledger = normalizeLedger(raw.ledger);
     var ledgerCats = normalizeLedgerCats(raw.ledgerCats);
     var ledgerFavs = normalizeLedgerFavs(raw.ledgerFavs);
+    var ledgerRecs = normalizeLedgerRecs(raw.ledgerRecs);
+    var ledgerInst = normalizeLedgerInst(raw.ledgerInst);
     var ledgerPays = Array.isArray(raw.ledgerPays) ? raw.ledgerPays.filter(function (t) { return typeof t === 'string' && t.trim(); }).map(function (t) { return t.trim().slice(0, LP_NAME_MAX); }).filter(function (t, i, a) { return a.indexOf(t) === i; }).slice(0, 20) : [];
     var budget = typeof raw.budget === 'number' && isFinite(raw.budget) && raw.budget > 0 ? Math.min(Math.round(raw.budget), PRICE_MAX) : 0;
     var memo = typeof raw.memo === 'string' ? raw.memo.replace(/\r\n?/g, '\n').slice(0, MEMO_MAX) : '';
@@ -687,7 +722,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerFavs: ledgerFavs, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerFavs: ledgerFavs, ledgerRecs: ledgerRecs, ledgerInst: ledgerInst, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates } };
   }
 
   /* ---------- storage ---------- */
@@ -2777,7 +2812,7 @@ datesSorted().forEach(function (d) {
   // 분류를 한 번도 고치지 않았으면 기본(위플과 같은) 분류를 쓴다. 고칠 때 처음으로 가족 데이터에 저장한다.
   function ledgerCats() { return state.ledgerCats && state.ledgerCats.length ? state.ledgerCats : LC_DEFAULT_LIST; }
   function ownCats() {
-    if (!state.ledgerCats || !state.ledgerCats.length) state.ledgerCats = LC_DEFAULT_LIST.map(function (c) { return { id: c.id, name: c.name, type: c.type, icon: c.icon, color: c.color, excl: c.excl }; });
+    if (!state.ledgerCats || !state.ledgerCats.length) state.ledgerCats = LC_DEFAULT_LIST.map(function (c) { return { id: c.id, name: c.name, type: c.type, icon: c.icon, color: c.color, excl: c.excl, budget: 0 }; });
     return state.ledgerCats;
   }
   function catsOf(type) { return ledgerCats().filter(function (c) { return c.type === type; }); }
@@ -2793,7 +2828,7 @@ datesSorted().forEach(function (d) {
   function entryIcon(e) { return lcIcon(catOf(e.cat, e.type) || { color: '#D9DEDB', icon: 'tag' }); }
   function shortWon(n) { return n >= 1000000 ? formatNumber(Math.round(n / 10000)) + '만' : formatNumber(n); }
   function ledgerRowHtml(e) {
-    var meta = [e.cat, e.who, e.pay].filter(Boolean).join(' · ');
+    var meta = [e.cat, e.who, e.pay, e.rec ? '반복' : ''].filter(Boolean).join(' · ');
     return '<li><button type="button" class="ledger-row" data-action="ledger-edit" data-id="' + escapeHtml(e.id) + '" data-focus-key="ledger:' + escapeHtml(e.id) + '">' + entryIcon(e) +
       '<span class="ledger-row__body"><span class="ledger-row__text">' + escapeHtml(e.text || e.cat) + '</span>' + (meta ? '<span class="ledger-row__meta">' + escapeHtml(meta) + '</span>' : '') + '</span>' +
       '<span class="ledger-row__amt' + (e.type === 'in' ? ' is-in' : isMove(e) ? ' is-move' : '') + '">' + signedWon(e) + '</span></button></li>';
@@ -2843,13 +2878,13 @@ datesSorted().forEach(function (d) {
       else if (isMove(e)) moved += e.amount;
       else { out += e.amount; byCat[e.cat] = (byCat[e.cat] || 0) + e.amount; }
     });
-    var tab = ui.ledgerTab === 'list' || ui.ledgerTab === 'report' ? ui.ledgerTab : 'cal';
+    var tab = ['list', 'plan', 'report'].indexOf(ui.ledgerTab) !== -1 ? ui.ledgerTab : 'cal';
     var html = '<div class="ledger-month">' +
       '<button type="button" class="icon-btn" data-action="ledger-month" data-by="-1" aria-label="이전 달">' + svgIcon('back', 18) + '</button>' +
       '<h2 class="ledger-month__label" aria-live="polite">' + monthLabel(m) + '</h2>' +
       '<button type="button" class="icon-btn" data-action="ledger-month" data-by="1" aria-label="다음 달">' + svgIcon('next', 18) + '</button>' +
       (m !== currentMonth() ? '<button type="button" class="btn btn--small ledger-month__today" data-action="ledger-month" data-by="0">이번 달</button>' : '') + '</div>';
-    html += '<div class="lg-tabs" role="tablist">' + [['cal', '달력'], ['list', '내역'], ['report', '리포트']].map(function (t) {
+    html += '<div class="lg-tabs" role="tablist">' + [['cal', '달력'], ['list', '내역'], ['plan', '반복·할부'], ['report', '리포트']].map(function (t) {
       return '<button type="button" role="tab" class="lg-tab' + (tab === t[0] ? ' is-active' : '') + '" data-action="ledger-tab" data-tab="' + t[0] + '" aria-selected="' + (tab === t[0]) + '">' + t[1] + '</button>';
     }).join('') + '</div>';
 
@@ -2879,6 +2914,7 @@ datesSorted().forEach(function (d) {
       (moved ? '<p class="ledger-sum__budget">저축·카드대금 등 ' + formatNumber(moved) + '원은 지출에서 뺐어요</p>' : '') + '</section>';
 
     if (tab === 'report') { html = html.slice(0, sumStart) + ledgerReportHtml(m); }
+    else if (tab === 'plan') { html += ledgerPlanHtml(m); }
     else if (tab === 'cal') {
       html += ledgerCalHtml(m, list);
       var sel = ledgerDay(m);
@@ -3016,6 +3052,141 @@ datesSorted().forEach(function (d) {
     return html;
   }
 
+  /* ---------- 반복·구독 · 할부: 날짜가 되면 기록을 자동으로 만든다 ---------- */
+  // 기록 id는 규칙 id + 회차로 정해져서, 두 기기가 동시에 만들어도 같은 기록 하나가 된다
+  var REC_FREQ = { m: '매달', w: '매주', y: '매년' };
+  function addDaysIso(iso, n) { var d = dateOf(iso); d.setDate(d.getDate() + n); return isoOf(d); }
+  function recOcc(r, k) { return r.freq === 'w' ? addDaysIso(r.start, 7 * k) : addMonthsIso(r.start, (r.freq === 'y' ? 12 : 1) * k); }
+  function instPart(p, k) { var base = Math.floor(p.total / p.months); return k === 0 ? p.total - base * (p.months - 1) : base; }
+  function noonOf(iso) { var d = dateOf(iso); d.setHours(12, 0, 0, 0); return d.getTime(); }
+  function runLedgerAuto() {
+    var today = todayStamp(), have = {}, added = 0, changed = false;
+    state.ledger.forEach(function (e) { have[e.id] = true; });
+    (state.ledgerRecs || []).forEach(function (r) {
+      var guard = 0;
+      while (guard++ < 400) {
+        var d = recOcc(r, r.n);
+        if (d > today || (r.end && d > r.end)) break;
+        var id = 'r' + r.id + '_' + (r.gen || 0) + '_' + r.n; // gen: 날짜를 고친 횟수(고친 뒤 회차가 0부터 다시 시작)
+        if (!have[id]) { state.ledger.push({ id: id, date: d, type: r.type, amount: r.amount, cat: r.cat, text: r.text, who: r.who, pay: r.pay, t: noonOf(d), src: '', rec: r.id, inst: '' }); have[id] = true; added++; }
+        r.n++; changed = true;
+      }
+    });
+    (state.ledgerInst || []).forEach(function (p) {
+      while (!p.closed && p.n < p.months) {
+        var d = addMonthsIso(p.start, p.n);
+        if (d > today) break;
+        var id = 'i' + p.id + '_' + p.n;
+        if (!have[id]) { state.ledger.push({ id: id, date: d, type: 'out', amount: instPart(p, p.n), cat: p.cat, text: (p.text + ' (' + (p.n + 1) + '/' + p.months + ')').slice(0, LEDGER_TEXT_MAX), who: p.who, pay: p.pay, t: noonOf(d), src: '', rec: '', inst: p.id }); have[id] = true; added++; }
+        p.n++; changed = true;
+      }
+    });
+    if (changed) commit();
+    return added;
+  }
+  var ledgerAutoQueued = false;
+  function scheduleLedgerAuto() {
+    if (ledgerAutoQueued || !(state.ledgerRecs || []).length && !(state.ledgerInst || []).length) return;
+    ledgerAutoQueued = true;
+    setTimeout(function () { ledgerAutoQueued = false; if (isTyping()) return; runLedgerAuto(); }, 0);
+  }
+  function recDesc(r) {
+    var d = dateOf(r.start);
+    return REC_FREQ[r.freq] + ' ' + (r.freq === 'w' ? WEEKDAYS[d.getDay()] + '요일' : r.freq === 'y' ? (d.getMonth() + 1) + '월 ' + d.getDate() + '일' : d.getDate() + '일');
+  }
+  function recMonthly(r) { return r.freq === 'w' ? r.amount * 52 / 12 : r.freq === 'y' ? r.amount / 12 : r.amount; }
+  function catSelect(name, type, sel, withMove) {
+    var cats = type === 'in' ? catsOf('in') : catsOf('out').filter(function (c) { return withMove || !c.excl; });
+    if (sel && !cats.some(function (c) { return c.name === sel; })) cats = cats.concat([{ name: sel }]);
+    return '<select name="' + name + '">' + cats.map(function (c) { return '<option value="' + escapeHtml(c.name) + '"' + (c.name === sel ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>'; }).join('') + '</select>';
+  }
+  function paySelect(sel) {
+    var pays = ledgerPays().slice(); if (sel && pays.indexOf(sel) === -1) pays.push(sel);
+    return '<select name="pay"><option value="">없음</option>' + pays.map(function (p) { return '<option value="' + escapeHtml(p) + '"' + (p === sel ? ' selected' : '') + '>' + escapeHtml(p) + '</option>'; }).join('') + '</select>';
+  }
+  function recFormHtml(r) {
+    var id = escapeHtml(r.id);
+    return '<form class="rec-form" data-rec-form="' + id + '">' +
+      '<div class="rec-form__g"><label>내용<input type="text" name="text" maxlength="' + LEDGER_TEXT_MAX + '" value="' + escapeHtml(r.text) + '" autocomplete="off"></label>' +
+      '<label>금액<input type="text" name="amount" inputmode="numeric" data-price-input value="' + formatNumber(r.amount) + '" autocomplete="off"></label>' +
+      '<label>분류' + catSelect('cat', r.type, r.cat, true) + '</label><label>결제' + paySelect(r.pay) + '</label>' +
+      '<label>주기<select name="freq">' + Object.keys(REC_FREQ).map(function (k) { return '<option value="' + k + '"' + (k === r.freq ? ' selected' : '') + '>' + REC_FREQ[k] + '</option>'; }).join('') + '</select></label>' +
+      '<label>다음 날짜<input type="date" name="next" value="' + recOcc(r, r.n) + '"></label></div>' +
+      '<div class="bt-form__actions"><button type="button" class="btn btn--small" data-action="rec-cancel">취소</button><button type="submit" class="btn btn--primary btn--small">저장</button></div></form>';
+  }
+  function ledgerPlanHtml(m) {
+    var html = '', today = todayStamp();
+    // 반복·구독
+    var recs = state.ledgerRecs || [], outM = 0;
+    recs.forEach(function (r) { if (r.type === 'out') outM += recMonthly(r); });
+    html += '<section class="ledger-card pl"><h3 class="ledger-card__title pl-h"><span>반복·구독</span>' + (outM ? '<span class="notes__count">나가는 돈 매달 약 ' + formatNumber(Math.round(outM)) + '원 · 1년 ' + formatNumber(Math.round(outM * 12)) + '원</span>' : '') + '</h3>';
+    if (recs.length) {
+      html += '<ul class="pl-list">' + recs.map(function (r) {
+        if (ui.recEdit === r.id) return '<li class="pl-row is-editing">' + recFormHtml(r) + '</li>';
+        var c = catOf(r.cat, r.type) || { color: '#D9DEDB', icon: 'tag' };
+        return '<li class="pl-row">' + lcIcon(c, 34) + '<div class="pl-row__b"><b>' + escapeHtml(r.text || r.cat) + '</b><small>' + recDesc(r) + ' · 다음 ' + mdText(recOcc(r, r.n)) + ' · ' + escapeHtml(r.cat) + (r.pay ? ' · ' + escapeHtml(r.pay) : '') + '</small></div>' +
+          '<b class="pl-row__amt' + (r.type === 'in' ? ' is-in' : '') + '">' + (r.type === 'in' ? '+' : '') + formatNumber(r.amount) + '</b>' +
+          '<button type="button" class="lc-btn" data-action="rec-edit" data-id="' + escapeHtml(r.id) + '" aria-label="' + escapeHtml(r.text) + ' 고치기">✎</button>' +
+          '<button type="button" class="lc-btn" data-action="rec-del" data-id="' + escapeHtml(r.id) + '" aria-label="' + escapeHtml(r.text) + ' 반복 그만하기">🗑</button></li>';
+      }).join('') + '</ul>';
+    } else html += '<p class="ledger-empty">관리비·통신비·넷플릭스·적금처럼 정해진 날 나가는 돈을 등록하면 그날 자동으로 기록돼요.</p>';
+    html += '<button type="button" class="lc-add" data-action="rec-add">＋ 반복 추가</button></section>';
+    // 할부
+    var plans = state.ledgerInst || [];
+    var monthInst = 0; state.ledger.forEach(function (e) { if (e.inst && e.date.slice(0, 7) === m) monthInst += e.amount; });
+    html += '<section class="ledger-card pl"><h3 class="ledger-card__title pl-h"><span>할부</span>' + (monthInst ? '<span class="notes__count">' + parseInt(m.slice(5, 7), 10) + '월 ' + formatNumber(monthInst) + '원</span>' : '') + '</h3>';
+    if (plans.length) {
+      html += '<ul class="pl-list">' + plans.slice().sort(function (a, b) { return (a.closed || a.n >= a.months) - (b.closed || b.n >= b.months); }).map(function (p) {
+        var done = p.closed || p.n >= p.months, c = catOf(p.cat, 'out') || { color: '#D9DEDB', icon: 'tag' };
+        var paid = 0; state.ledger.forEach(function (e) { if (e.inst === p.id) paid += e.amount; });
+        var endM = addMonthsIso(p.start, p.months - 1);
+        return '<li class="pl-row' + (done ? ' is-done' : '') + '">' + lcIcon(c, 34) + '<div class="pl-row__b"><b>' + escapeHtml(p.text) + ' <small>' + formatNumber(p.total) + '원</small></b>' +
+          '<small>' + p.months + '개월 · ' + Math.min(p.n, p.months) + '/' + p.months + '회 · ' + (done ? (p.closed ? '한 번에 갚고 끝' : '끝') : endM.slice(0, 4) + '년 ' + parseInt(endM.slice(5, 7), 10) + '월 끝 · 남은 ' + formatNumber(Math.max(0, p.total - paid)) + '원') + '</small>' +
+          '<div class="rp-bar"><span style="width:' + Math.min(100, Math.round(paid / p.total * 100)) + '%;background:' + c.color + '"></span></div></div>' +
+          '<b class="pl-row__amt">' + formatNumber(instPart(p, 1)) + '</b>' +
+          (done ? '' : '<button type="button" class="lc-btn" data-action="inst-payoff" data-id="' + escapeHtml(p.id) + '" aria-label="' + escapeHtml(p.text) + ' 남은 금액 한 번에">완납</button>') +
+          '<button type="button" class="lc-btn" data-action="inst-del" data-id="' + escapeHtml(p.id) + '" aria-label="' + escapeHtml(p.text) + ' 할부 지우기">🗑</button></li>';
+      }).join('') + '</ul>';
+    } else html += '<p class="ledger-empty">기록할 때 ‘할부’에서 개월 수를 고르면 매달 나눠서 자동으로 기록돼요.</p>';
+    html += '</section>';
+    // 분류별 예산
+    var spent = {}; state.ledger.forEach(function (e) { if (e.type === 'out' && !isMove(e) && e.date.slice(0, 7) === m) spent[e.cat] = (spent[e.cat] || 0) + e.amount; });
+    var withB = catsOf('out').filter(function (c) { return !c.excl && c.budget > 0; }), sumB = 0;
+    withB.forEach(function (c) { sumB += c.budget; });
+    html += '<section class="ledger-card pl"><h3 class="ledger-card__title pl-h"><span>분류별 예산</span><span class="notes__count">' + parseInt(m.slice(5, 7), 10) + '월 · 합 ' + formatNumber(sumB) + '원' + (state.budget ? ' / 전체 ' + formatNumber(state.budget) + '원' : '') + '</span></h3>';
+    if (withB.length) html += '<ul class="pl-list">' + withB.map(function (c) {
+      var used = spent[c.name] || 0, pct = Math.round(used / c.budget * 100), over = used > c.budget;
+      if (ui.cbEdit === c.id) return '<li class="pl-row is-editing"><form class="cb-form" data-cb-form="' + escapeHtml(c.id) + '">' + lcIcon(c, 30) + '<label class="visually-hidden" for="cb-in">' + escapeHtml(c.name) + ' 예산</label><input type="text" id="cb-in" name="amount" inputmode="numeric" data-price-input value="' + formatNumber(c.budget) + '" autocomplete="off"><button type="submit" class="btn btn--primary btn--small">저장</button><button type="button" class="btn btn--small" data-action="cb-clear" data-id="' + escapeHtml(c.id) + '">없애기</button><button type="button" class="btn btn--small" data-action="cb-cancel">취소</button></form></li>';
+      return '<li class="pl-row">' + lcIcon(c, 34) + '<div class="pl-row__b"><b>' + escapeHtml(c.name) + '</b><small>' + formatNumber(c.budget) + '원 중 ' + pct + '% · ' + (over ? '<span class="is-up">' + formatNumber(used - c.budget) + '원 넘음</span>' : formatNumber(c.budget - used) + '원 남음') + '</small>' +
+        '<div class="rp-bar"><span style="width:' + Math.min(100, pct) + '%;background:' + (over ? '#E36B6B' : c.color) + '"></span></div></div><b class="pl-row__amt">' + formatNumber(used) + '</b>' +
+        '<button type="button" class="lc-btn" data-action="cb-edit" data-id="' + escapeHtml(c.id) + '" aria-label="' + escapeHtml(c.name) + ' 예산 고치기">✎</button></li>';
+    }).join('') + '</ul>';
+    var noB = catsOf('out').filter(function (c) { return !c.excl && !(c.budget > 0); });
+    if (noB.length) html += '<form class="cb-add-form"><label class="visually-hidden" for="cb-add-cat">분류</label><select id="cb-add-cat" name="cat">' + noB.map(function (c) { return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>'; }).join('') + '</select>' +
+      '<label class="visually-hidden" for="cb-add-amt">예산</label><input type="text" id="cb-add-amt" name="amount" inputmode="numeric" data-price-input placeholder="예: 300,000" autocomplete="off"><button type="submit" class="btn btn--small btn--primary">예산 추가</button></form>';
+    return html + '</section>';
+  }
+  function submitRecForm(form) {
+    var r = (state.ledgerRecs || []).filter(function (x) { return x.id === form.dataset.recForm; })[0]; if (!r) return;
+    var pp = parsePrice(form.elements.amount.value);
+    if (!pp.ok || !pp.value) { showToast('금액을 숫자로 적어 주세요.'); form.elements.amount.focus(); return; }
+    var next = form.elements.next.value, freq = REC_FREQ[form.elements.freq.value] ? form.elements.freq.value : 'm';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) { showToast('다음 날짜를 골라 주세요.'); return; }
+    r.text = String(form.elements.text.value || '').trim().slice(0, LEDGER_TEXT_MAX); r.amount = pp.value;
+    r.cat = form.elements.cat.value; r.pay = form.elements.pay.value;
+    // 다음 날짜를 새 기준으로: 이미 만든 회차는 그대로 두고, 앞으로의 날짜만 바뀐다
+    if (freq !== r.freq || next !== recOcc(r, r.n)) { r.freq = freq; r.start = next; r.n = 0; r.gen = (r.gen || 0) + 1; }
+    ui.recEdit = null; commit(); runLedgerAuto();
+    act('ledger', '반복 수정: ' + r.text); showToast('반복을 고쳤어요. 앞으로의 기록부터 바뀌어요.');
+  }
+  function addRecFromForm(f, amount, text, cat, who, pay, freq) {
+    var type = f.tab === 'in' ? 'in' : 'out';
+    state.ledgerRecs = (state.ledgerRecs || []).concat([{ id: uid(), text: text || cat, amount: amount, type: type, cat: cat, pay: pay, who: who, freq: freq, start: f.date, end: '', n: 0, gen: 0 }]);
+  }
+  function addInstFromForm(f, amount, text, cat, who, pay, months) {
+    state.ledgerInst = (state.ledgerInst || []).concat([{ id: uid(), text: text || cat, total: amount, months: months, cat: cat, pay: pay, who: who, start: f.date, n: 0, closed: false }]);
+  }
+
   /* ---------- 가계부 입력 시트 ---------- */
   function ledgerChips(name, options, selected) {
     return options.map(function (o) {
@@ -3082,6 +3253,9 @@ datesSorted().forEach(function (d) {
         '<button type="button" class="choice-add" data-action="lp-add" aria-label="결제수단 추가">＋</button></div></fieldset>' +
       '<fieldset class="chips-field"><legend>누가</legend><div class="choices">' + ledgerChips('who', LEDGER_WHO.concat([{ value: '', label: '함께' }]), who) + '</div></fieldset></div>' +
       '<div class="field"><label for="ledger-date">날짜</label><input type="date" id="ledger-date" value="' + date + '" required></div>' +
+      (e ? (e.rec ? '<p class="lc-note mut">반복으로 만든 기록이에요. 앞으로의 금액·날짜는 ‘반복·할부’ 탭에서 고쳐요.</p>' : e.inst ? '<p class="lc-note mut">할부로 나눠 만든 기록이에요. ‘반복·할부’ 탭에서 모아 볼 수 있어요.</p>' : '') :
+        '<div class="sheet__two lg-plan"><div class="field"><label for="ledger-inst">할부</label><select id="ledger-inst"' + (tab === 'out' ? '' : ' disabled') + '><option value="1">일시불</option>' + [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24].map(function (k) { return '<option value="' + k + '">' + k + '개월</option>'; }).join('') + '</select></div>' +
+        '<div class="field"><label for="ledger-rep">반복</label><select id="ledger-rep"><option value="">안 함</option>' + Object.keys(REC_FREQ).map(function (k) { return '<option value="' + k + '"' + (ui.ledgerPresetRep === k ? ' selected' : '') + '>' + REC_FREQ[k] + '</option>'; }).join('') + '</select></div></div>') +
       '<div class="sheet__actions"><button type="submit" class="btn btn--primary">저장</button>' +
       (e ? '<button type="button" class="btn btn--danger" data-action="ledger-delete">삭제</button>' : '') + '</div></form>';
     sheet.hidden = false;
@@ -3093,7 +3267,7 @@ datesSorted().forEach(function (d) {
     ui.ledgerForm = id || 'new';
     ui.ledgerNewDate = !id && date ? date : '';
     ui.lfEdit = false;
-    if (!id) ui.ledgerType = 'out';
+    if (!id) ui.ledgerType = ui.ledgerPresetRep ? ui.ledgerType || 'out' : 'out';
     // 뒤로 가기(안드로이드 버튼·스와이프)로 입력 창만 닫히도록 기록을 하나 쌓는다
     try { window.history.pushState({ view: 'ledger', sheet: true }, ''); } catch (e) { /* ignore */ }
     renderLedgerSheet();
@@ -3107,7 +3281,7 @@ datesSorted().forEach(function (d) {
     // 입력 중에 분류 편집을 열었다면 닫기는 입력 화면으로 돌아간다
     if (ui.ledgerForm === 'cats' && ui.ledgerReturn) { lcBack(); return; }
     var back = ui.ledgerForm && ['new', 'cats', 'import'].indexOf(ui.ledgerForm) === -1 ? ui.ledgerForm : null;
-    ui.ledgerForm = null; ui.ledgerReturn = null; ui.ledgerDraft = null; ui.lcEdit = null; ui.lcDel = null; ui.imp = null;
+    ui.ledgerForm = null; ui.ledgerReturn = null; ui.ledgerDraft = null; ui.lcEdit = null; ui.lcDel = null; ui.imp = null; ui.ledgerPresetRep = '';
     if (!fromHistory) dropSheetHistory();
     renderLedgerSheet();
     var target = back ? document.querySelector('[data-focus-key="ledger:' + back + '"]') : $('#ledger-fab');
@@ -3133,7 +3307,18 @@ datesSorted().forEach(function (d) {
     var who = LEDGER_WHO.indexOf(f.who) !== -1 ? f.who : '';
     var pay = String(f.pay || '').slice(0, LP_NAME_MAX);
     var e = ui.ledgerForm === 'new' ? null : findEntry(ui.ledgerForm);
-    var data = { id: e ? e.id : uid(), date: date, type: type, amount: amount, cat: cat, text: text.slice(0, LEDGER_TEXT_MAX), who: who, pay: pay, t: e ? e.t : Date.now(), src: e ? e.src || '' : '' };
+    var repEl = $('#ledger-rep'), instEl = $('#ledger-inst');
+    var repF = !e && repEl ? repEl.value : '', months = !e && instEl && !instEl.disabled ? parseInt(instEl.value, 10) || 1 : 1;
+    if (repF || months > 1) {
+      f.date = date;
+      if (repF) addRecFromForm(f, amount, text, cat, who, pay, repF); else addInstFromForm(f, amount, text, cat, who, pay, months);
+      ui.ledgerForm = null; ui.ledgerPresetRep = '';
+      dropSheetHistory(); commit(); runLedgerAuto();
+      act('ledger', '가계부 ' + (repF ? REC_FREQ[repF] + ' 반복' : months + '개월 할부') + ': ' + (text || cat) + ' ' + formatWon(amount));
+      showToast(repF ? REC_FREQ[repF] + ' 반복으로 등록했어요. 날짜가 되면 자동으로 기록돼요.' : months + '개월 할부로 등록했어요. 매달 ' + formatWon(Math.floor(amount / months)) + '씩 기록돼요.');
+      return;
+    }
+    var data = { id: e ? e.id : uid(), date: date, type: type, amount: amount, cat: cat, text: text.slice(0, LEDGER_TEXT_MAX), who: who, pay: pay, t: e ? e.t : Date.now(), src: e ? e.src || '' : '', rec: e ? e.rec || '' : '', inst: e ? e.inst || '' : '' };
     if (e) Object.keys(data).forEach(function (k) { e[k] = data[k]; });
     else state.ledger.push(data);
     ui.ledgerForm = null;
@@ -6067,6 +6252,8 @@ datesSorted().forEach(function (d) {
       ledgerCats: state.ledgerCats,
       ledgerPays: state.ledgerPays,
       ledgerFavs: state.ledgerFavs,
+      ledgerRecs: state.ledgerRecs,
+      ledgerInst: state.ledgerInst,
       budget: state.budget
     }, null, pretty ? 2 : 0);
   }
@@ -6168,7 +6355,7 @@ datesSorted().forEach(function (d) {
     if (el.readOnly || el.disabled) return false; // readonly share-link etc. must not block sync
     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'button') return false;
     // Only editable fields inside an item/note/highlights editor should defer a remote update.
-    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .gr-form, .bl-form, .bl-birth, .vx-form, .sp-spend, .care-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form, .lc-editor, .lg-imp, .lg-search, #goal-form');
+    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .gr-form, .bl-form, .bl-birth, .vx-form, .sp-spend, .care-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form, .lc-editor, .lg-imp, .lg-search, .rec-form, .cb-form, .cb-add-form, #goal-form');
   }
 
   var migrationsQueued = false;
@@ -6182,7 +6369,7 @@ datesSorted().forEach(function (d) {
     var result = normalizeState(remoteState);
     if (!result.ok) return false;
     // 서버와 내용이 같아도(이미 동기화된 기기) 한 번짜리 자동 정리는 실행되어야 한다
-    if (JSON.stringify(result.data) === JSON.stringify(state)) { scheduleOneTimeMigrations(); return false; }
+    if (JSON.stringify(result.data) === JSON.stringify(state)) { scheduleOneTimeMigrations(); scheduleLedgerAuto(); return false; }
     if (isTyping()) { pendingRemote = remoteState; return false; } // apply after the field is left
     pendingRemote = null;
     applyingRemote = true;
@@ -6203,6 +6390,7 @@ datesSorted().forEach(function (d) {
     }
     // 방 참여 직후에는 구독(attach)이 applyRemote 뒤에 붙으므로, 비우기(=변경 전파)는 한 틱 뒤에 실행한다.
     scheduleOneTimeMigrations();
+    scheduleLedgerAuto();
     return true;
   }
 
@@ -6519,6 +6707,39 @@ datesSorted().forEach(function (d) {
             break;
           }
           case 'ledger-tab': ui.ledgerTab = b.dataset.tab; renderLedger(); var tb = ledgerView.querySelector('[data-action="ledger-tab"][data-tab="' + b.dataset.tab + '"]'); if (tb) tb.focus({ preventScroll: true }); break;
+          case 'rec-add': ui.ledgerPresetRep = 'm'; openLedgerForm(null); break;
+          case 'rec-edit': ui.recEdit = b.dataset.id; renderLedger(); var rf = ledgerView.querySelector('.rec-form input[name="text"]'); if (rf) rf.focus(); break;
+          case 'rec-cancel': ui.recEdit = null; renderLedger(); break;
+          case 'rec-del': {
+            var rid = b.dataset.id, beforeR = (state.ledgerRecs || []).slice(), rr = beforeR.filter(function (x) { return x.id === rid; })[0];
+            if (!rr || !window.confirm('‘' + (rr.text || rr.cat) + '’ 반복을 그만할까요? 이미 기록된 것은 그대로 남아요.')) break;
+            state.ledgerRecs = beforeR.filter(function (x) { return x.id !== rid; }); commit();
+            act('ledger', '반복 그만: ' + (rr.text || rr.cat));
+            showToast('반복을 그만했어요.', function () { state.ledgerRecs = beforeR; commit(); });
+            break;
+          }
+          case 'inst-payoff': {
+            var ip = (state.ledgerInst || []).filter(function (x) { return x.id === b.dataset.id; })[0]; if (!ip) break;
+            var paidI = 0; state.ledger.forEach(function (x) { if (x.inst === ip.id) paidI += x.amount; });
+            var restI = ip.total - paidI;
+            if (restI <= 0 || !window.confirm('남은 ' + formatWon(restI) + '을 오늘 한 번에 갚은 것으로 기록할까요?')) break;
+            state.ledger.push({ id: 'i' + ip.id + '_end', date: todayStamp(), type: 'out', amount: restI, cat: ip.cat, text: (ip.text + ' (남은 할부 한 번에)').slice(0, LEDGER_TEXT_MAX), who: ip.who, pay: ip.pay, t: Date.now(), src: '', rec: '', inst: ip.id });
+            ip.closed = true; commit(); act('ledger', '할부 완납: ' + ip.text); showToast('남은 할부를 기록하고 끝냈어요.');
+            break;
+          }
+          case 'inst-del': {
+            var dp = (state.ledgerInst || []).filter(function (x) { return x.id === b.dataset.id; })[0]; if (!dp) break;
+            var nI = state.ledger.filter(function (x) { return x.inst === dp.id; }).length;
+            if (!window.confirm('‘' + dp.text + '’ 할부를 지울까요?' + (nI ? ' 이미 기록된 ' + nI + '건도 같이 지워요.' : ''))) break;
+            var beforeI = state.ledgerInst.slice(), removedI = state.ledger.filter(function (x) { return x.inst === dp.id; });
+            state.ledgerInst = beforeI.filter(function (x) { return x !== dp; }); state.ledger = state.ledger.filter(function (x) { return x.inst !== dp.id; });
+            commit(); act('ledger', '할부 삭제: ' + dp.text);
+            showToast('할부를 지웠어요.', function () { state.ledgerInst = beforeI; state.ledger = state.ledger.concat(removedI); commit(); });
+            break;
+          }
+          case 'cb-edit': ui.cbEdit = b.dataset.id; renderLedger(); var ci = $('#cb-in'); if (ci) ci.focus(); break;
+          case 'cb-cancel': ui.cbEdit = null; renderLedger(); break;
+          case 'cb-clear': { var cc = ownCats().filter(function (x) { return x.id === b.dataset.id; })[0]; if (cc) { cc.budget = 0; ui.cbEdit = null; commit(); showToast('‘' + cc.name + '’ 예산을 없앴어요.'); } break; }
           case 'rp-allcats': ui.rpAllCats = !ui.rpAllCats; renderLedger(); break;
           case 'ledger-goto': ui.ledgerMonth = b.dataset.month; renderLedger(); var gb = ledgerView.querySelector('[data-action="ledger-goto"][data-month="' + b.dataset.month + '"]'); if (gb) gb.focus({ preventScroll: true }); break;
           case 'ledger-day': ui.ledgerDay = b.dataset.date; renderLedger(); var db = ledgerView.querySelector('[data-action="ledger-day"][data-date="' + b.dataset.date + '"]'); if (db) db.focus({ preventScroll: true }); break;
@@ -6584,6 +6805,14 @@ datesSorted().forEach(function (d) {
       ledgerView.addEventListener('submit', function (e) {
         if (e.target.id === 'ledger-form') { e.preventDefault(); submitLedgerForm(e.target); }
         else if (e.target.matches('.lc-form')) { e.preventDefault(); submitLcForm(e.target); }
+        else if (e.target.matches('.rec-form')) { e.preventDefault(); submitRecForm(e.target); }
+        else if (e.target.matches('.cb-form, .cb-add-form')) {
+          e.preventDefault();
+          var fm = e.target, cid = fm.dataset.cbForm || fm.elements.cat.value, pb = parsePrice(fm.elements.amount.value);
+          if (!pb.ok || !pb.value) { showToast('예산을 숫자로 적어 주세요.'); fm.elements.amount.focus(); return; }
+          var cb = ownCats().filter(function (x) { return x.id === cid; })[0]; if (!cb) return;
+          cb.budget = pb.value; ui.cbEdit = null; commit(); act('ledger', '분류 예산: ' + cb.name + ' ' + formatWon(pb.value)); showToast('‘' + cb.name + '’ 한 달 예산 ' + formatWon(pb.value));
+        }
         else if (e.target.dataset.action === 'ledger-budget') { e.preventDefault(); saveBudget(); }
       });
       ledgerView.addEventListener('change', function (e) {
@@ -6600,8 +6829,11 @@ datesSorted().forEach(function (d) {
         }
         if (ui.imp && e.target.name === 'impcat') { ui.imp.catMode = e.target.value; return; }
         if (ui.imp && e.target.name === 'impwho') { ui.imp.who = e.target.value; return; }
+        if (e.target.id === 'ledger-rep' && e.target.value) { var ie = $('#ledger-inst'); if (ie) ie.value = '1'; return; }
+        if (e.target.id === 'ledger-inst' && e.target.value !== '1') { var re2 = $('#ledger-rep'); if (re2) re2.value = ''; return; }
         if (e.target.name !== 'type' || !e.target.closest('#ledger-form')) return;
         ui.ledgerType = e.target.value;
+        var ie2 = $('#ledger-inst'); if (ie2) { ie2.disabled = ui.ledgerType !== 'out'; if (ie2.disabled) ie2.value = '1'; }
         var grid = $('#ledger-cat-grid');
         if (grid) grid.innerHTML = ledgerCatGrid(ui.ledgerType, '');
       });
@@ -7611,7 +7843,9 @@ datesSorted().forEach(function (d) {
     });
     // 앱을 켜 둔 채 날짜가 바뀌면(밤새 백그라운드) 다시 열 때 디데이를 새로 계산한다
     var shownDay = todayStamp();
-    var refreshDay = function () { if (document.visibilityState === 'visible' && todayStamp() !== shownDay) { shownDay = todayStamp(); render(); } };
+    var refreshDay = function () { if (document.visibilityState === 'visible' && todayStamp() !== shownDay) { shownDay = todayStamp(); render(); scheduleLedgerAuto(); } };
+    // 가족 공유 중이면 서버 기록을 받은 뒤(applyRemote)에 만든다: 오래된 기기 기록으로 지운 회차를 되살리지 않게
+    if (!storedRoom && !/[?&]room=/.test(window.location.search)) scheduleLedgerAuto();
     document.addEventListener('visibilitychange', refreshDay);
     window.addEventListener('pageshow', refreshDay);
     // sync.js is loaded after app.js; bind once it has had a chance to run.

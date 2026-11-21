@@ -147,9 +147,13 @@
     doc.anniversary = s.anniversary || '';
     doc.budget = typeof s.budget === 'number' ? s.budget : 0;
     doc.ledger = {};
-    (s.ledger || []).forEach(function (e) { var d = { date: e.date, type: e.type, amount: e.amount, cat: e.cat || '', text: e.text || '', who: e.who || '', pay: e.pay || '', t: e.t || 0 }; if (e.src) d.src = e.src; doc.ledger[e.id] = d; });
+    (s.ledger || []).forEach(function (e) { var d = { date: e.date, type: e.type, amount: e.amount, cat: e.cat || '', text: e.text || '', who: e.who || '', pay: e.pay || '', t: e.t || 0 }; if (e.src) d.src = e.src; if (e.rec) d.rec = e.rec; if (e.inst) d.inst = e.inst; doc.ledger[e.id] = d; });
+    doc.ledgerRecs = {};
+    (s.ledgerRecs || []).forEach(function (r, i) { doc.ledgerRecs[r.id] = { text: r.text || '', amount: r.amount, type: r.type, cat: r.cat || '', pay: r.pay || '', who: r.who || '', freq: r.freq, start: r.start, end: r.end || '', n: r.n || 0, gen: r.gen || 0, order: i }; });
+    doc.ledgerInst = {};
+    (s.ledgerInst || []).forEach(function (p, i) { doc.ledgerInst[p.id] = { text: p.text || '', total: p.total, months: p.months, cat: p.cat || '', pay: p.pay || '', who: p.who || '', start: p.start, n: p.n || 0, closed: !!p.closed, order: i }; });
     doc.ledgerCats = {};
-    (s.ledgerCats || []).forEach(function (c, i) { doc.ledgerCats[c.id] = { name: c.name, type: c.type, icon: c.icon || '', color: c.color || '', excl: !!c.excl, order: i }; });
+    (s.ledgerCats || []).forEach(function (c, i) { doc.ledgerCats[c.id] = { name: c.name, type: c.type, icon: c.icon || '', color: c.color || '', excl: !!c.excl, budget: c.budget || 0, order: i }; });
     doc.ledgerFavs = {};
     (s.ledgerFavs || []).forEach(function (f, i) { doc.ledgerFavs[f.id] = { text: f.text || '', amount: f.amount || 0, type: f.type || 'out', cat: f.cat || '', pay: f.pay || '', order: i }; });
     doc.ledgerPays = (s.ledgerPays && s.ledgerPays.length) ? s.ledgerPays.slice() : null;
@@ -209,8 +213,10 @@
       babyLog: Object.keys(doc.babyLog || {}).map(function (id) { var e = doc.babyLog[id] || {}; return { id: id, kind: e.kind || '', t: typeof e.t === 'number' ? e.t : 0, who: e.who || '', detail: e.detail || '' }; }),
       anniversary: typeof doc.anniversary === 'string' ? doc.anniversary : '',
       budget: typeof doc.budget === 'number' ? doc.budget : 0,
-      ledger: Object.keys(doc.ledger || {}).map(function (id) { var e = doc.ledger[id] || {}; return { id: id, date: e.date, type: e.type, amount: e.amount, cat: e.cat, text: e.text || '', who: e.who || '', pay: e.pay || '', t: typeof e.t === 'number' ? e.t : 0, src: e.src || '' }; }),
-      ledgerCats: sortedEntries(doc.ledgerCats).map(function (c) { return { id: c.id, name: c.name, type: c.type, icon: c.icon || '', color: c.color || '', excl: c.excl === true }; }),
+      ledger: Object.keys(doc.ledger || {}).map(function (id) { var e = doc.ledger[id] || {}; return { id: id, date: e.date, type: e.type, amount: e.amount, cat: e.cat, text: e.text || '', who: e.who || '', pay: e.pay || '', t: typeof e.t === 'number' ? e.t : 0, src: e.src || '', rec: e.rec || '', inst: e.inst || '' }; }),
+      ledgerRecs: sortedEntries(doc.ledgerRecs).map(function (r) { return { id: r.id, text: r.text || '', amount: r.amount, type: r.type, cat: r.cat || '', pay: r.pay || '', who: r.who || '', freq: r.freq, start: r.start, end: r.end || '', n: r.n || 0, gen: r.gen || 0 }; }),
+      ledgerInst: sortedEntries(doc.ledgerInst).map(function (p) { return { id: p.id, text: p.text || '', total: p.total, months: p.months, cat: p.cat || '', pay: p.pay || '', who: p.who || '', start: p.start, n: p.n || 0, closed: p.closed === true }; }),
+      ledgerCats: sortedEntries(doc.ledgerCats).map(function (c) { return { id: c.id, name: c.name, type: c.type, icon: c.icon || '', color: c.color || '', excl: c.excl === true, budget: typeof c.budget === 'number' ? c.budget : 0 }; }),
       ledgerFavs: sortedEntries(doc.ledgerFavs).map(function (f) { return { id: f.id, text: f.text || '', amount: typeof f.amount === 'number' ? f.amount : 0, type: f.type || 'out', cat: f.cat || '', pay: f.pay || '' }; }),
       ledgerPays: asArr(doc.ledgerPays).filter(function (t) { return typeof t === 'string'; }),
       memo: typeof doc.memo === 'string' ? doc.memo : '',
@@ -230,7 +236,7 @@
   function diff(prev, next) {
     var updates = {};
     prev = prev || { categories: {}, items: {}, notes: {}, highlights: '' };
-    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'ledgerCats', 'ledgerFavs', 'birthTasks', 'growth', 'babyLog', 'vaccines', 'careTasks'].forEach(function (group) {
+    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'ledgerCats', 'ledgerFavs', 'ledgerRecs', 'ledgerInst', 'birthTasks', 'growth', 'babyLog', 'vaccines', 'careTasks'].forEach(function (group) {
       var a = prev[group] || {}, b = next[group] || {};
       Object.keys(b).forEach(function (id) {
         if (!a[id] || JSON.stringify(a[id]) !== JSON.stringify(b[id])) updates[group + '/' + id] = b[id];

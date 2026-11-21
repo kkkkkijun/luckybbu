@@ -1783,7 +1783,7 @@ a.care-link { display: inline-flex; align-items: center; text-decoration: none; 
 .goal-tool--month[hidden] { display: none; }
 .goal-tool--add { border: 1px dashed #E2D9D1; background: #fff; color: var(--muted); }
 /* ---------- 가계부: 달력 · 분류 아이콘 · 분류 편집 · CSV 가져오기 ---------- */
-.lg-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #F1EEEA; margin-bottom: 10px; }
+.lg-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: #F1EEEA; margin-bottom: 10px; }
 .lg-tab { min-height: 38px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 0.9rem; font-weight: 600; color: var(--muted); cursor: pointer; }
 .lg-tab.is-active { background: #fff; color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 .lc-ic { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
@@ -1921,3 +1921,30 @@ a.care-link { display: inline-flex; align-items: center; text-decoration: none; 
 .rp-alarm summary { cursor: pointer; font-size: 0.88rem; font-weight: 600; }
 .rp-alarm ol { margin: 10px 0 0; padding-left: 18px; font-size: 0.84rem; line-height: 1.55; display: grid; gap: 4px; }
 .rp + .rp, .rp-head + .rp { margin-top: 12px; }
+/* 가계부 반복·할부·분류 예산 */
+.lg-tab { font-size: 0.84rem; letter-spacing: -0.02em; }
+.pl + .pl { margin-top: 12px; }
+.pl-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pl-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.pl-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #F4F1EE; }
+.pl-row.is-editing { display: block; }
+.pl-row.is-done { opacity: 0.55; }
+.pl-row__b { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+.pl-row__b b { font-size: 0.92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-row__b b small { font-weight: 400; color: var(--muted); }
+.pl-row__b > small { font-size: 0.74rem; color: var(--muted); }
+.pl-row__amt { font-variant-numeric: tabular-nums; font-size: 0.9rem; flex-shrink: 0; }
+.pl-row__amt.is-in { color: var(--mint-ink); }
+.pl .is-up { color: #C0392B; }
+.rec-form { display: grid; gap: 8px; }
+.rec-form__g { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rec-form label { display: grid; gap: 3px; font-size: 0.76rem; color: var(--muted); }
+.rec-form input, .rec-form select, .cb-form input, .cb-add-form input, .cb-add-form select, .lg-plan select { min-height: 42px; border: 1px solid var(--border); border-radius: 10px; padding: 0 8px; font: inherit; font-size: 0.92rem; background: #fff; color: var(--text); min-width: 0; width: 100%; }
+.lg-plan select:disabled { opacity: 0.45; }
+.cb-form { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cb-form input { flex: 1 1 110px; width: auto; }
+.cb-add-form { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.cb-add-form select { flex: 1 1 110px; width: auto; }
+.cb-add-form input { flex: 1 1 110px; width: auto; }
+.lc-btn { white-space: nowrap; padding: 0 8px; }
+#ledger-root { padding-bottom: 84px; }
