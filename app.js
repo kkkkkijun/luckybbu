@@ -2843,16 +2843,17 @@ datesSorted().forEach(function (d) {
       else if (isMove(e)) moved += e.amount;
       else { out += e.amount; byCat[e.cat] = (byCat[e.cat] || 0) + e.amount; }
     });
-    var tab = ui.ledgerTab === 'list' ? 'list' : 'cal';
+    var tab = ui.ledgerTab === 'list' || ui.ledgerTab === 'report' ? ui.ledgerTab : 'cal';
     var html = '<div class="ledger-month">' +
       '<button type="button" class="icon-btn" data-action="ledger-month" data-by="-1" aria-label="이전 달">' + svgIcon('back', 18) + '</button>' +
       '<h2 class="ledger-month__label" aria-live="polite">' + monthLabel(m) + '</h2>' +
       '<button type="button" class="icon-btn" data-action="ledger-month" data-by="1" aria-label="다음 달">' + svgIcon('next', 18) + '</button>' +
       (m !== currentMonth() ? '<button type="button" class="btn btn--small ledger-month__today" data-action="ledger-month" data-by="0">이번 달</button>' : '') + '</div>';
-    html += '<div class="lg-tabs" role="tablist">' + [['cal', '달력'], ['list', '내역']].map(function (t) {
+    html += '<div class="lg-tabs" role="tablist">' + [['cal', '달력'], ['list', '내역'], ['report', '리포트']].map(function (t) {
       return '<button type="button" role="tab" class="lg-tab' + (tab === t[0] ? ' is-active' : '') + '" data-action="ledger-tab" data-tab="' + t[0] + '" aria-selected="' + (tab === t[0]) + '">' + t[1] + '</button>';
     }).join('') + '</div>';
 
+    var sumStart = html.length;
     html += '<section class="ledger-sum" aria-labelledby="ledger-sum-title">' +
       '<h3 class="ledger-sum__label" id="ledger-sum-title">' + mo + '월 지출</h3>' +
       '<p class="ledger-sum__num">' + formatNumber(out) + '원</p>';
@@ -2877,7 +2878,8 @@ datesSorted().forEach(function (d) {
       '<div><span>수입 − 지출</span><strong>' + (net > 0 ? '+' : net < 0 ? '−' : '') + formatNumber(Math.abs(net)) + '원</strong></div></div>' +
       (moved ? '<p class="ledger-sum__budget">저축·카드대금 등 ' + formatNumber(moved) + '원은 지출에서 뺐어요</p>' : '') + '</section>';
 
-    if (tab === 'cal') {
+    if (tab === 'report') { html = html.slice(0, sumStart) + ledgerReportHtml(m); }
+    else if (tab === 'cal') {
       html += ledgerCalHtml(m, list);
       var sel = ledgerDay(m);
       if (sel) {
@@ -2923,6 +2925,94 @@ datesSorted().forEach(function (d) {
         html += '<section class="ledger-card" aria-labelledby="ledger-list-title"><h3 class="ledger-card__title" id="ledger-list-title">내역 <span class="notes__count">' + (list.length ? list.length + '건' : '') + '</span></h3>' +
           (list.length ? ledgerListHtml(list) : '<p class="ledger-empty">' + (state.ledger.length ? mo + '월에는 기록이 없어요.' : '아직 기록이 없어요. 아래 ‘기록’을 누르거나 ‘CSV·SQLite 가져오기’로 예전 기록을 넣어 보세요.') + '</p>') + '</section>';
       }
+    return html;
+  }
+
+  /* ---------- 가계부 월별 리포트 (기록에서 바로 계산) ---------- */
+  function ledgerAgg(list, upto) {
+    var a = { out: 0, inn: 0, moved: 0, n: 0, byCat: {}, byPay: {}, byWho: {}, byText: {}, byDay: {} };
+    list.forEach(function (e) {
+      if (upto && parseInt(e.date.slice(8, 10), 10) > upto) return;
+      if (e.type === 'in') { a.inn += e.amount; return; }
+      if (isMove(e)) { a.moved += e.amount; return; }
+      a.out += e.amount; a.n++;
+      a.byCat[e.cat] = (a.byCat[e.cat] || 0) + e.amount;
+      var p = e.pay || '결제수단 없음'; a.byPay[p] = (a.byPay[p] || 0) + e.amount;
+      var w = e.who || '함께'; a.byWho[w] = (a.byWho[w] || 0) + e.amount;
+      var t = String(e.text || '').replace(/\s*\(.*\)\s*$/, '').trim() || e.cat;
+      var x = a.byText[t] || (a.byText[t] = { n: 0, sum: 0 }); x.n++; x.sum += e.amount;
+      a.byDay[e.date] = (a.byDay[e.date] || 0) + e.amount;
+    });
+    return a;
+  }
+  function wonDiff(n) { return (n > 0 ? '+' : n < 0 ? '−' : '') + formatNumber(Math.abs(n)) + '원'; }
+  function ledgerReportHtml(m) {
+    var y = parseInt(m.slice(0, 4), 10), mo = parseInt(m.slice(5, 7), 10), days = new Date(y, mo, 0).getDate();
+    var isCur = m === currentMonth(), future = m > currentMonth(), upto = isCur ? new Date().getDate() : days;
+    var list = entriesOfMonth(m), pm = shiftMonth(m, -1), pmo = parseInt(pm.slice(5, 7), 10);
+    var cur = ledgerAgg(list), prev = ledgerAgg(entriesOfMonth(pm), isCur ? upto : 0);
+    if (!list.length) return '<section class="ledger-card rp"><p class="ledger-empty">' + (future ? '아직 오지 않은 달이에요.' : mo + '월에는 기록이 없어서 리포트를 만들 수 없어요.') + '</p></section>';
+    var html = '';
+    // 머리: 지출 · 지난달 비교 · 수입 · 저축
+    var d = cur.out - prev.out, pct = prev.out ? Math.round(Math.abs(d) / prev.out * 100) : 0;
+    var cmpLabel = isCur ? '지난달 같은 기간(1~' + upto + '일)보다' : pmo + '월보다';
+    html += '<section class="rp-head" aria-label="' + mo + '월 리포트 요약"><p class="rp-head__t">' + mo + '월 리포트' + (isCur ? ' <span>' + upto + '일까지 · 말일에 완성</span>' : '') + '</p>' +
+      '<p class="rp-head__lbl">지출</p><p class="rp-head__num">' + formatNumber(cur.out) + '원</p>' +
+      (prev.out ? '<p class="rp-head__cmp ' + (d > 0 ? 'is-up' : 'is-down') + '">' + cmpLabel + ' ' + wonDiff(d) + (pct ? ' (' + pct + '% ' + (d > 0 ? '늘었어요' : '줄었어요') + ')' : '') + '</p>' : '<p class="rp-head__cmp">' + pmo + '월 기록이 없어 비교하지 않아요</p>') +
+      '<div class="rp-head__row"><div><span>수입</span><b>' + formatNumber(cur.inn) + '원</b></div><div><span>수입 − 지출</span><b>' + wonDiff(cur.inn - cur.out) + '</b></div>' + (cur.moved ? '<div><span>저축·이체</span><b>' + formatNumber(cur.moved) + '원</b></div>' : '') + '</div>' +
+      (state.budget ? '<p class="rp-head__budget">예산 ' + formatNumber(state.budget) + '원 중 ' + Math.round(cur.out / state.budget * 100) + '% ' + (cur.out > state.budget ? '· ' + formatNumber(cur.out - state.budget) + '원 넘었어요' : '썼어요') + '</p>' : '') + '</section>';
+    // 한 줄 요약
+    var tips = [], cats = Object.keys(cur.byCat).concat(Object.keys(prev.byCat)).filter(function (c, i, arr) { return arr.indexOf(c) === i; });
+    var diffs = cats.map(function (c) { return { c: c, d: (cur.byCat[c] || 0) - (prev.byCat[c] || 0) }; });
+    if (prev.out) {
+      var up = diffs.slice().sort(function (a, b) { return b.d - a.d; })[0], dn = diffs.slice().sort(function (a, b) { return a.d - b.d; })[0];
+      if (up && up.d > 0) tips.push('‘' + escapeHtml(up.c) + '’ 지출이 가장 많이 늘었어요 <b class="is-up">' + wonDiff(up.d) + '</b>');
+      if (dn && dn.d < 0) tips.push('‘' + escapeHtml(dn.c) + '’ 지출은 줄었어요 <b class="is-down">' + wonDiff(dn.d) + '</b>');
+    }
+    var dayKeys = Object.keys(cur.byDay), topDay = dayKeys.sort(function (a, b) { return cur.byDay[b] - cur.byDay[a]; })[0];
+    if (topDay) {
+      var big = list.filter(function (e) { return e.date === topDay && e.type === 'out' && !isMove(e); }).sort(function (a, b) { return b.amount - a.amount; })[0];
+      tips.push('하루 평균 <b>' + formatNumber(Math.round(cur.out / upto)) + '원</b> · 가장 많이 쓴 날은 ' + mdText(topDay) + ' <b>' + formatNumber(cur.byDay[topDay]) + '원</b>' + (big ? ' (' + escapeHtml(big.text || big.cat) + ')' : ''));
+    }
+    var we = 0, wd = 0, nwe = 0, nwd = 0;
+    for (var i = 1; i <= upto; i++) {
+      var iso = m + '-' + (i < 10 ? '0' : '') + i, dow = new Date(y, mo - 1, i).getDay(), v = cur.byDay[iso] || 0;
+      if (dow === 0 || dow === 6 || KR_HOLIDAYS[iso]) { we += v; nwe++; } else { wd += v; nwd++; }
+    }
+    if (nwe && nwd && wd && we) { var ratio = (we / nwe) / (wd / nwd); if (ratio >= 1.2 || ratio <= 0.8) tips.push('주말·공휴일 하루 지출이 평일의 <b>' + ratio.toFixed(1) + '배</b>예요'); }
+    var zero = upto - dayKeys.length;
+    if (zero > 0) tips.push('돈을 안 쓴 날 <b>' + zero + '일</b>');
+    if (tips.length) html += '<section class="ledger-card rp"><h3 class="ledger-card__title">한눈에</h3><ul class="rp-tips">' + tips.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul></section>';
+    // 분류별 (지난달 대비)
+    var catList = Object.keys(cur.byCat).sort(function (a, b) { return cur.byCat[b] - cur.byCat[a]; });
+    if (catList.length) {
+      var maxC = cur.byCat[catList[0]], shown = ui.rpAllCats ? catList : catList.slice(0, 5);
+      html += '<section class="ledger-card rp"><h3 class="ledger-card__title">분류별 지출 <span class="notes__count">' + (prev.out ? (isCur ? '지난달 같은 기간 대비' : pmo + '월 대비') : '') + '</span></h3><ul class="rp-bars">' + shown.map(function (c) {
+        var v = cur.byCat[c], dc = v - (prev.byCat[c] || 0), cat = catOf(c, 'out') || { color: '#D9DEDB', icon: 'tag' };
+        return '<li>' + lcIcon(cat, 30) + '<div class="rp-bars__b"><div class="rp-bars__top"><span>' + escapeHtml(c) + ' <small>' + Math.round(v / cur.out * 100) + '%</small></span><b>' + formatNumber(v) + '</b></div>' +
+          '<div class="rp-bar"><span style="width:' + Math.max(2, Math.round(v / maxC * 100)) + '%;background:' + cat.color + '"></span></div></div>' +
+          (prev.out ? '<small class="rp-bars__d ' + (dc > 0 ? 'is-up' : dc < 0 ? 'is-down' : '') + '">' + (dc ? wonDiff(dc).replace('원', '') : '0') + '</small>' : '') + '</li>';
+      }).join('') + '</ul>' + (catList.length > 5 ? '<button type="button" class="link-btn" data-action="rp-allcats">' + (ui.rpAllCats ? '접기' : catList.length + '개 모두 보기') + '</button>' : '') + '</section>';
+    }
+    // 결제수단 · 많이 쓴 곳 · 누가
+    var pays = Object.keys(cur.byPay).sort(function (a, b) { return cur.byPay[b] - cur.byPay[a]; });
+    var places = Object.keys(cur.byText).sort(function (a, b) { return cur.byText[b].sum - cur.byText[a].sum; }).slice(0, 5);
+    var whos = Object.keys(cur.byWho);
+    html += '<section class="ledger-card rp"><h3 class="ledger-card__title">결제수단별</h3><ul class="rp-kv">' + pays.map(function (p) { return '<li><span>' + escapeHtml(p) + '</span><b>' + formatNumber(cur.byPay[p]) + '원</b></li>'; }).join('') + '</ul>' +
+      '<h3 class="ledger-card__title rp-sub">많이 쓴 곳 TOP 5</h3><ol class="rp-kv rp-kv--ol">' + places.map(function (t) { return '<li><span>' + escapeHtml(t) + ' <small>' + cur.byText[t].n + '번</small></span><b>' + formatNumber(cur.byText[t].sum) + '원</b></li>'; }).join('') + '</ol>' +
+      (whos.length > 1 ? '<h3 class="ledger-card__title rp-sub">누가</h3><ul class="rp-kv">' + whos.sort(function (a, b) { return cur.byWho[b] - cur.byWho[a]; }).map(function (w) { return '<li><span>' + escapeHtml(w) + '</span><b>' + formatNumber(cur.byWho[w]) + '원</b></li>'; }).join('') + '</ul>' : '') + '</section>';
+    // 최근 6달 지출
+    var months = []; for (var k = 5; k >= 0; k--) months.push(shiftMonth(m, -k));
+    var totals = months.map(function (mm) { return ledgerAgg(entriesOfMonth(mm)).out; }), maxT = Math.max.apply(null, totals) || 1;
+    html += '<section class="ledger-card rp"><h3 class="ledger-card__title">최근 6달 지출</h3><div class="rp-trend" role="list">' + months.map(function (mm, i) {
+      var t = totals[i];
+      return '<button type="button" role="listitem" class="rp-trend__c' + (mm === m ? ' is-on' : '') + '" data-action="ledger-goto" data-month="' + mm + '" aria-label="' + monthLabel(mm) + ' 지출 ' + formatNumber(t) + '원"><small>' + (t ? shortWon(t) : '') + '</small><span style="height:' + Math.max(t ? 4 : 0, Math.round(t / maxT * 100)) + '%"></span><b>' + parseInt(mm.slice(5, 7), 10) + '월</b></button>';
+    }).join('') + '</div></section>';
+    html += '<details class="ledger-card rp-alarm"><summary>말일에 ‘리포트 보세요’ 알림 받기 (아이폰)</summary><ol>' +
+      '<li><b>단축어</b> 앱 › 아래 <b>자동화</b> › ＋ › <b>특정 시간</b> › 오후 9시 · <b>매일</b> › <b>즉시 실행</b>.</li>' +
+      '<li>동작 추가: <b>현재 날짜</b> → <b>날짜 조정</b>(1일 더하기) → <b>날짜 형식</b>(사용자화, 형식 <code>d</code>).</li>' +
+      '<li><b>만약</b> 결과가 <code>1</code>이면 → <b>알림 보기</b> ‘이번 달 가계부 리포트가 완성됐어요’.</li>' +
+      '<li>알림이 오면 luckybbu › 가계부 › 리포트에서 확인하세요.</li></ol></details>';
     return html;
   }
 
@@ -6429,6 +6519,8 @@ datesSorted().forEach(function (d) {
             break;
           }
           case 'ledger-tab': ui.ledgerTab = b.dataset.tab; renderLedger(); var tb = ledgerView.querySelector('[data-action="ledger-tab"][data-tab="' + b.dataset.tab + '"]'); if (tb) tb.focus({ preventScroll: true }); break;
+          case 'rp-allcats': ui.rpAllCats = !ui.rpAllCats; renderLedger(); break;
+          case 'ledger-goto': ui.ledgerMonth = b.dataset.month; renderLedger(); var gb = ledgerView.querySelector('[data-action="ledger-goto"][data-month="' + b.dataset.month + '"]'); if (gb) gb.focus({ preventScroll: true }); break;
           case 'ledger-day': ui.ledgerDay = b.dataset.date; renderLedger(); var db = ledgerView.querySelector('[data-action="ledger-day"][data-date="' + b.dataset.date + '"]'); if (db) db.focus({ preventScroll: true }); break;
           case 'ledger-new': openLedgerForm(null, b.dataset.date); break;
           case 'ledger-edit': openLedgerForm(b.dataset.id); break;
