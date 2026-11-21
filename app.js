@@ -29,10 +29,61 @@
   var GROUPS = ['birth', 'baby'];
   function defaultGroupFor(name) { var n = String(name || ''); if (/맞이|의류|출산|병원|조리원/.test(n)) return 'birth'; return /육아|이유식|예방접종|성장/i.test(n) ? 'baby' : 'birth'; }
   // 가계부
-  var LEDGER_OUT_CATS = ['식비', '생활', '육아·출산', '교통', '의료', '쇼핑', '기타'];
-  var LEDGER_IN_CATS = ['급여', '부수입', '기타'];
-  var LEDGER_PAYS = { card: '카드', cash: '현금', bank: '계좌' };
-  var LEDGER_TEXT_MAX = 60, LEDGER_MAX = 5000;
+  var LEDGER_PAYS = { card: '카드', cash: '현금', bank: '계좌' }; // 예전 결제 값 → 이름
+  var LEDGER_TEXT_MAX = 60, LEDGER_MAX = 30000, LC_NAME_MAX = 12, LP_NAME_MAX = 20;
+  // 분류 아이콘(선 아이콘, 24px 기준)
+  var LC_ICONS = {
+    utensils: 'M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7',
+    cake: 'M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1M2 21h20M7 8v3M12 8v3M17 8v3',
+    cart: 'M8 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM19 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM2 2h2l2.7 12.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 1.9-1.6L22 7H5.1',
+    coffee: 'M10 2v2M14 2v2M6 2v2M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1',
+    music: 'M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+    heart: 'M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z',
+    bus: 'M8 6v6M15 6v6M2 12h19.6M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2s-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3M7 18h7M9 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM18 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z',
+    scissors: 'M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12',
+    home: 'M3 10l9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM9 22V12h6v10',
+    gift: 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7ZM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7Z',
+    mail: 'M3 6h18v12H3zM3 6l9 7 9-7',
+    med: 'M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 7h18v13H3zM12 10.5v6M9 13.5h6',
+    brief: 'M3 7h18v13H3zM8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18',
+    phone: 'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2ZM11 18h2',
+    plane: 'M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z',
+    book: 'M2 4h7a3 3 0 0 1 3 3v14a2 2 0 0 0-2-2H2zM22 4h-7a3 3 0 0 0-3 3v14a2 2 0 0 1 2-2h8z',
+    laptop: 'M4 5h16v10H4zM2 19h20',
+    card: 'M2 6h20v12H2zM2 10h20M6 14.5h4',
+    piggy: 'M19 9.5c-.6-2.5-3.3-4.5-7-4.5-4.4 0-7 2.7-7 5.5 0 1.7.8 3 2 4V18h3v-2h4v2h3v-3.2c.9-.6 1.6-1.4 1.9-2.3H21v-3zM15.5 9.5h.01M2 9a2 2 0 0 0 3 1.5',
+    receipt: 'M4 2v20l3-2 3 2 3-2 3 2 3-2V2l-3 2-3-2-3 2-3-2-3 2ZM8 9h8M8 13h6',
+    user: 'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+    apple: 'M12 6.5C10 5 6 5.5 5 9c-1 3.5 1 9 3.5 11 1.5 1 2.5 0 3.5 0s2 1 3.5 0c2.5-2 4.5-7.5 3.5-11-1-3.5-5-4-7-2.5ZM12 6.5c0-2 1-3.5 3-4',
+    wallet: 'M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4',
+    coin: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM15 9h-4.5a1.5 1.5 0 0 0 0 3h3a1.5 1.5 0 0 1 0 3H9M12 7v10',
+    car: 'M3 13l2-6h14l2 6v4H3zM6 17v2M18 17v2M7 13.5h.01M17 13.5h.01',
+    smile: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01',
+    baby: 'M9 12h.01M15 12h.01M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1',
+    paw: 'M11 5.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM17 5.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM21 10.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM7 10.5a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM8.5 14.5c1-2 2-3 3.5-3s2.5 1 3.5 3c1 2 1.5 3 0 4.5s-2.5 0-3.5 0-2 1.5-3.5 0 -1-2.5 0-4.5Z',
+    shirt: 'M20.4 3.5 16 2a4 4 0 0 1-8 0L3.6 3.5a2 2 0 0 0-1.3 2.2l.6 3.5a1 1 0 0 0 1 .8H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.2a1 1 0 0 0 1-.8l.6-3.5a2 2 0 0 0-1.4-2.2Z',
+    beer: 'M17 11h1a3 3 0 0 1 0 6h-1M9 12v6M13 12v6M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8M5 8a2.5 2.5 0 0 1 0-5c1 0 1.5.5 2.5.5S9.5 2 11 2s2 1.5 3 1.5 1.5-.5 2.5-.5a2.5 2.5 0 0 1 0 5Z',
+    church: 'M12 2v4M10 4h4M6 22V12l6-5 6 5v10M10 22v-5h4v5M3 22h18',
+    tag: 'M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4ZM7.5 7.5h.01'
+  };
+  var LC_COLORS = ['#86CF98', '#A3DA6C', '#5DC6A2', '#7DBB8C', '#58C3D3', '#5B9BD3', '#4F86AE', '#7AA0AB', '#78ABB1', '#A2A2E8', '#977E9C', '#C287C1', '#D9798F', '#EE979C', '#E06B6B', '#CF605D', '#C25F78', '#E1925F', '#C08876', '#E3CC72', '#E3D477', '#BDBDBD'];
+  // 기본 분류: 위플 가계부와 같은 이름·순서·색 [이름, 아이콘, 색, 종류, 지출 합계에서 빼기]
+  var LC_DEFAULTS = [
+    ['식비', 'utensils', '#86CF98'], ['간식비', 'cake', '#4F86AE'], ['생필품', 'cart', '#E1925F'], ['카페', 'coffee', '#7AA0AB'], ['문화생활', 'music', '#D9798F'],
+    ['가족', 'heart', '#A3DA6C'], ['교통비', 'bus', '#E06B6B'], ['미용', 'scissors', '#5DC6A2'], ['주거비', 'home', '#C08876'], ['품위유지', 'gift', '#A2A2E8'],
+    ['경조사', 'mail', '#5DC6A2'], ['의료/건강', 'med', '#7DBB8C'], ['회사', 'brief', '#E3D477'], ['통신비', 'phone', '#E3D477'], ['여행', 'plane', '#5B9BD3'],
+    ['자기계발', 'book', '#977E9C'], ['구독료', 'laptop', '#C287C1'], ['기타', 'card', '#E1925F'], ['저축', 'piggy', '#E3CC72', 'out', true], ['잔액조정', 'receipt', '#CF605D', 'out', true],
+    ['카드대금', 'card', '#C25F78', 'out', true], ['오빠', 'user', '#78ABB1'], ['축복이', 'heart', '#58C3D3'], ['윤서', 'apple', '#EE979C'],
+    ['월급', 'wallet', '#5B9BD3', 'in'], ['용돈', 'coin', '#E3CC72', 'in']
+  ];
+  var LC_DEFAULT_LIST = (function () {
+    var n = { out: 0, 'in': 0 };
+    return LC_DEFAULTS.map(function (d) {
+      var type = d[3] || 'out'; n[type] += 1;
+      return { id: (type === 'in' ? 'i' : 'o') + (n[type] < 10 ? '0' : '') + n[type], name: d[0], type: type, icon: d[1], color: d[2], excl: !!d[4] };
+    });
+  })();
+  var LP_DEFAULTS = ['현대카드', '현금', '계좌'];
   function normalizeLedger(raw) {
     var out = [], seen = {};
     listOf(raw).forEach(function (e) {
@@ -43,15 +94,44 @@
       if (!id || seen[id] || !date || !(amount > 0) || amount > PRICE_MAX) return; // broken entries are dropped
       seen[id] = true;
       var type = e.type === 'in' ? 'in' : 'out';
-      var cats = type === 'in' ? LEDGER_IN_CATS : LEDGER_OUT_CATS;
-      out.push({ id: id, date: date, type: type, amount: amount, cat: cats.indexOf(e.cat) !== -1 ? e.cat : '기타',
+      var cat = typeof e.cat === 'string' ? e.cat.trim().slice(0, LC_NAME_MAX) : '';
+      var pay = typeof e.pay === 'string' ? (LEDGER_PAYS[e.pay] || e.pay.trim().slice(0, LP_NAME_MAX)) : '';
+      out.push({ id: id, date: date, type: type, amount: amount, cat: cat || '기타',
         text: typeof e.text === 'string' ? e.text.trim().slice(0, LEDGER_TEXT_MAX) : '',
         who: typeof e.who === 'string' ? e.who.trim().slice(0, 12) : '',
-        pay: LEDGER_PAYS[e.pay] ? e.pay : '', t: typeof e.t === 'number' ? e.t : 0 });
+        pay: pay, t: typeof e.t === 'number' ? e.t : 0, src: typeof e.src === 'string' ? e.src.slice(0, 24) : '' });
     });
     // 기기·서버가 같은 순서를 갖도록 적은 시각 → id 순으로 둔다
     out.sort(function (a, b) { return (a.t - b.t) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
     return out.slice(0, LEDGER_MAX);
+  }
+  function normalizeLedgerCats(raw) {
+    var out = [], seen = {}, names = {};
+    listOf(raw).forEach(function (c) {
+      if (!c || typeof c !== 'object') return;
+      var id = typeof c.id === 'string' ? c.id.trim().replace(/[.#$\[\]\/]/g, '_') : '';
+      var type = c.type === 'in' ? 'in' : 'out';
+      var name = typeof c.name === 'string' ? c.name.trim().slice(0, LC_NAME_MAX) : '';
+      if (!id || seen[id] || !name || names[type + ':' + name]) return;
+      seen[id] = true; names[type + ':' + name] = true;
+      out.push({ id: id, name: name, type: type, icon: LC_ICONS[c.icon] ? c.icon : 'tag',
+        color: typeof c.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(c.color) ? c.color : '#BDBDBD', excl: type === 'out' && c.excl === true });
+    });
+    return out.slice(0, 80);
+  }
+  function normalizeLedgerFavs(raw) {
+    var out = [], seen = {};
+    listOf(raw).forEach(function (f) {
+      if (!f || typeof f !== 'object') return;
+      var id = typeof f.id === 'string' ? f.id.trim().replace(/[.#$\[\]\/]/g, '_') : '';
+      var amount = typeof f.amount === 'number' && isFinite(f.amount) && f.amount > 0 ? Math.min(Math.round(f.amount), PRICE_MAX) : 0;
+      var text = typeof f.text === 'string' ? f.text.trim().slice(0, LEDGER_TEXT_MAX) : '';
+      if (!id || seen[id] || (!text && !amount)) return;
+      seen[id] = true;
+      out.push({ id: id, text: text, amount: amount, type: f.type === 'in' ? 'in' : 'out',
+        cat: typeof f.cat === 'string' ? f.cat.trim().slice(0, LC_NAME_MAX) : '', pay: typeof f.pay === 'string' ? f.pay.trim().slice(0, LP_NAME_MAX) : '' });
+    });
+    return out.slice(0, 20);
   }
   function asArray(v) {
     if (Array.isArray(v)) return v;
@@ -351,7 +431,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {} };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerFavs: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {} };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -501,6 +581,9 @@
     var goal = normalizeGoal(raw.goal);
     var hospDoneAt = typeof raw.hospDoneAt === 'number' && raw.hospDoneAt > 0 ? raw.hospDoneAt : 0;
     var ledger = normalizeLedger(raw.ledger);
+    var ledgerCats = normalizeLedgerCats(raw.ledgerCats);
+    var ledgerFavs = normalizeLedgerFavs(raw.ledgerFavs);
+    var ledgerPays = Array.isArray(raw.ledgerPays) ? raw.ledgerPays.filter(function (t) { return typeof t === 'string' && t.trim(); }).map(function (t) { return t.trim().slice(0, LP_NAME_MAX); }).filter(function (t, i, a) { return a.indexOf(t) === i; }).slice(0, 20) : [];
     var budget = typeof raw.budget === 'number' && isFinite(raw.budget) && raw.budget > 0 ? Math.min(Math.round(raw.budget), PRICE_MAX) : 0;
     var memo = typeof raw.memo === 'string' ? raw.memo.replace(/\r\n?/g, '\n').slice(0, MEMO_MAX) : '';
     var memos = [];
@@ -604,7 +687,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerFavs: ledgerFavs, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates } };
   }
 
   /* ---------- storage ---------- */
@@ -2666,8 +2749,16 @@ datesSorted().forEach(function (d) {
   }
 
   /* ---------- 가계부 ---------- */
-  var LEDGER_COLORS = { '식비': '#7FD6AE', '생활': '#8DB9FF', '육아·출산': '#FFA48C', '교통': '#FFD966', '의료': '#C9B8FF', '쇼핑': '#FFB3C8', '기타': '#D9DEDB', '급여': '#7FD6AE', '부수입': '#8DB9FF' };
   var LEDGER_WHO = TAG_NAMES.slice(0, 2);
+  // 달력 빨간 날(공휴일·대체공휴일)
+  var KR_HOLIDAYS = {
+    '2025-01-01': 1, '2025-01-27': 1, '2025-01-28': 1, '2025-01-29': 1, '2025-01-30': 1, '2025-03-01': 1, '2025-03-03': 1, '2025-05-05': 1, '2025-05-06': 1, '2025-06-03': 1, '2025-06-06': 1,
+    '2025-08-15': 1, '2025-10-03': 1, '2025-10-05': 1, '2025-10-06': 1, '2025-10-07': 1, '2025-10-08': 1, '2025-10-09': 1, '2025-12-25': 1,
+    '2026-01-01': 1, '2026-02-16': 1, '2026-02-17': 1, '2026-02-18': 1, '2026-03-01': 1, '2026-03-02': 1, '2026-05-05': 1, '2026-05-24': 1, '2026-05-25': 1, '2026-06-03': 1, '2026-06-06': 1,
+    '2026-08-15': 1, '2026-08-17': 1, '2026-09-24': 1, '2026-09-25': 1, '2026-09-26': 1, '2026-10-03': 1, '2026-10-05': 1, '2026-10-09': 1, '2026-12-25': 1,
+    '2027-01-01': 1, '2027-02-06': 1, '2027-02-07': 1, '2027-02-08': 1, '2027-02-09': 1, '2027-03-01': 1, '2027-05-05': 1, '2027-05-13': 1, '2027-06-06': 1, '2027-08-15': 1, '2027-08-16': 1,
+    '2027-09-14': 1, '2027-09-15': 1, '2027-09-16': 1, '2027-10-03': 1, '2027-10-04': 1, '2027-10-09': 1, '2027-10-11': 1, '2027-12-25': 1, '2027-12-27': 1
+  };
   function currentMonth() { return todayStamp().slice(0, 7); }
   function ledgerMonth() { return /^\d{4}-\d{2}$/.test(ui.ledgerMonth) ? ui.ledgerMonth : currentMonth(); }
   function shiftMonth(m, by) {
@@ -2677,25 +2768,90 @@ datesSorted().forEach(function (d) {
   function monthLabel(m) { return m.slice(0, 4) + '년 ' + parseInt(m.slice(5, 7), 10) + '월'; }
   function findEntry(id) { for (var i = 0; i < state.ledger.length; i++) if (state.ledger[i].id === id) return state.ledger[i]; return null; }
   function signedWon(e) { return (e.type === 'in' ? '+' : '−') + formatNumber(e.amount); }
-  function entriesOfMonth(m) {
-    return state.ledger.filter(function (e) { return e.date.slice(0, 7) === m; })
-      .sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.t || 0) - (a.t || 0); });
+  function sortEntries(list) {
+    return list.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.t || 0) - (a.t || 0); });
+  }
+  function entriesOfMonth(m) { return sortEntries(state.ledger.filter(function (e) { return e.date.slice(0, 7) === m; })); }
+
+  /* ---------- 가계부 분류 · 결제수단 · 자주 쓰는 내역 ---------- */
+  // 분류를 한 번도 고치지 않았으면 기본(위플과 같은) 분류를 쓴다. 고칠 때 처음으로 가족 데이터에 저장한다.
+  function ledgerCats() { return state.ledgerCats && state.ledgerCats.length ? state.ledgerCats : LC_DEFAULT_LIST; }
+  function ownCats() {
+    if (!state.ledgerCats || !state.ledgerCats.length) state.ledgerCats = LC_DEFAULT_LIST.map(function (c) { return { id: c.id, name: c.name, type: c.type, icon: c.icon, color: c.color, excl: c.excl }; });
+    return state.ledgerCats;
+  }
+  function catsOf(type) { return ledgerCats().filter(function (c) { return c.type === type; }); }
+  function catOf(name, type) { var l = ledgerCats(); for (var i = 0; i < l.length; i++) if (l[i].name === name && l[i].type === type) return l[i]; return null; }
+  function catColor(e) { var c = catOf(e.cat, e.type); return c ? c.color : '#D9DEDB'; }
+  // 저축·잔액조정·카드대금처럼 '지출 합계에서 빼기'인 분류의 기록
+  function isMove(e) { if (e.type !== 'out') return false; var c = catOf(e.cat, 'out'); return !!(c && c.excl); }
+  function ledgerPays() { return state.ledgerPays && state.ledgerPays.length ? state.ledgerPays : LP_DEFAULTS; }
+  function lcIcon(c, size) {
+    var color = c ? c.color : '#D9DEDB', path = LC_ICONS[c && c.icon] || LC_ICONS.tag;
+    return '<span class="lc-ic" style="background:' + color + (size ? ';width:' + size + 'px;height:' + size + 'px' : '') + '" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="' + path + '"/></svg></span>';
+  }
+  function entryIcon(e) { return lcIcon(catOf(e.cat, e.type) || { color: '#D9DEDB', icon: 'tag' }); }
+  function shortWon(n) { return n >= 1000000 ? formatNumber(Math.round(n / 10000)) + '만' : formatNumber(n); }
+  function ledgerRowHtml(e) {
+    var meta = [e.cat, e.who, e.pay].filter(Boolean).join(' · ');
+    return '<li><button type="button" class="ledger-row" data-action="ledger-edit" data-id="' + escapeHtml(e.id) + '" data-focus-key="ledger:' + escapeHtml(e.id) + '">' + entryIcon(e) +
+      '<span class="ledger-row__body"><span class="ledger-row__text">' + escapeHtml(e.text || e.cat) + '</span>' + (meta ? '<span class="ledger-row__meta">' + escapeHtml(meta) + '</span>' : '') + '</span>' +
+      '<span class="ledger-row__amt' + (e.type === 'in' ? ' is-in' : isMove(e) ? ' is-move' : '') + '">' + signedWon(e) + '</span></button></li>';
+  }
+  function ledgerListHtml(list) {
+    var html = '', day = '';
+    list.forEach(function (e) {
+      if (e.date !== day) {
+        if (day) html += '</ul>';
+        day = e.date;
+        var dayOut = 0; list.forEach(function (x) { if (x.date === day && x.type === 'out' && !isMove(x)) dayOut += x.amount; });
+        html += '<p class="ledger-day">' + escapeHtml(shortDate(day)) + (dayOut ? '<span>−' + formatNumber(dayOut) + '원</span>' : '') + '</p><ul class="ledger-list">';
+      }
+      html += ledgerRowHtml(e);
+    });
+    return html + (day ? '</ul>' : '');
+  }
+  function ledgerCalHtml(m, list) {
+    var y = parseInt(m.slice(0, 4), 10), mo = parseInt(m.slice(5, 7), 10);
+    var start = new Date(y, mo - 1, 1).getDay(), days = new Date(y, mo, 0).getDate(), today = todayStamp();
+    var out = {}, inn = {};
+    list.forEach(function (e) { if (e.type === 'in') inn[e.date] = (inn[e.date] || 0) + e.amount; else if (!isMove(e)) out[e.date] = (out[e.date] || 0) + e.amount; });
+    var sel = ledgerDay(m);
+    var html = '<div class="lg-cal" role="grid" aria-label="' + monthLabel(m) + ' 달력">' + WEEKDAYS.map(function (w, i) { return '<span class="lg-cal__h' + (i === 0 ? ' is-sun' : i === 6 ? ' is-sat' : '') + '">' + w + '</span>'; }).join('');
+    for (var b = 0; b < start; b++) html += '<span class="lg-cal__blank"></span>';
+    for (var d = 1; d <= days; d++) {
+      var iso = m + '-' + (d < 10 ? '0' : '') + d, dow = (start + d - 1) % 7;
+      var cls = 'lg-cal__c' + (dow === 0 || KR_HOLIDAYS[iso] ? ' is-red' : dow === 6 ? ' is-sat' : '') + (iso === today ? ' is-today' : '') + (iso === sel ? ' is-sel' : '') + (iso > today ? ' is-future' : '');
+      var label = (mo + '월 ' + d + '일') + (out[iso] ? ' 지출 ' + formatNumber(out[iso]) + '원' : '') + (inn[iso] ? ' 수입 ' + formatNumber(inn[iso]) + '원' : '');
+      html += '<button type="button" class="' + cls + '" data-action="ledger-day" data-date="' + iso + '" aria-label="' + label + '" aria-pressed="' + (iso === sel) + '"><b>' + d + '</b>' +
+        (out[iso] ? '<small class="is-out">−' + shortWon(out[iso]) + '</small>' : '') + (inn[iso] ? '<small class="is-in">+' + shortWon(inn[iso]) + '</small>' : '') + '</button>';
+    }
+    return html + '</div>';
+  }
+  function ledgerDay(m) {
+    if (ui.ledgerDay && ui.ledgerDay.slice(0, 7) === m) return ui.ledgerDay;
+    return todayStamp().slice(0, 7) === m ? todayStamp() : '';
   }
   function renderLedger() {
     var root = $('#ledger-root');
     if (!root) return;
     var m = ledgerMonth(), mo = parseInt(m.slice(5, 7), 10);
     var list = entriesOfMonth(m);
-    var out = 0, inn = 0, byCat = {};
+    var out = 0, inn = 0, moved = 0, byCat = {};
     list.forEach(function (e) {
       if (e.type === 'in') inn += e.amount;
+      else if (isMove(e)) moved += e.amount;
       else { out += e.amount; byCat[e.cat] = (byCat[e.cat] || 0) + e.amount; }
     });
+    var tab = ui.ledgerTab === 'list' ? 'list' : 'cal';
     var html = '<div class="ledger-month">' +
       '<button type="button" class="icon-btn" data-action="ledger-month" data-by="-1" aria-label="이전 달">' + svgIcon('back', 18) + '</button>' +
       '<h2 class="ledger-month__label" aria-live="polite">' + monthLabel(m) + '</h2>' +
       '<button type="button" class="icon-btn" data-action="ledger-month" data-by="1" aria-label="다음 달">' + svgIcon('next', 18) + '</button>' +
       (m !== currentMonth() ? '<button type="button" class="btn btn--small ledger-month__today" data-action="ledger-month" data-by="0">이번 달</button>' : '') + '</div>';
+    html += '<div class="lg-tabs" role="tablist">' + [['cal', '달력'], ['list', '내역']].map(function (t) {
+      return '<button type="button" role="tab" class="lg-tab' + (tab === t[0] ? ' is-active' : '') + '" data-action="ledger-tab" data-tab="' + t[0] + '" aria-selected="' + (tab === t[0]) + '">' + t[1] + '</button>';
+    }).join('') + '</div>';
 
     html += '<section class="ledger-sum" aria-labelledby="ledger-sum-title">' +
       '<h3 class="ledger-sum__label" id="ledger-sum-title">' + mo + '월 지출</h3>' +
@@ -2708,58 +2864,98 @@ datesSorted().forEach(function (d) {
         '<button type="button" class="btn btn--small" data-action="ledger-budget-cancel">취소</button></form>';
     } else if (state.budget) {
       var pct = Math.round(out / state.budget * 100), left = state.budget - out;
+      var daysLeft = m === currentMonth() ? new Date(parseInt(m.slice(0, 4), 10), mo, 0).getDate() - new Date().getDate() + 1 : 0;
       html += '<div class="ledger-bar" role="progressbar" aria-label="예산 사용" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.min(100, pct) + '"><span style="width:' + Math.min(100, pct) + '%"' + (left < 0 ? ' class="is-over"' : '') + '></span></div>' +
         '<p class="ledger-sum__budget">예산 ' + formatNumber(state.budget) + '원 중 ' + pct + '% · ' + (left >= 0 ? '남은 예산 <strong>' + formatNumber(left) + '원</strong>' : '<strong>' + formatNumber(-left) + '원</strong> 넘었어요') +
+        (left > 0 && daysLeft > 0 ? ' · 남은 ' + daysLeft + '일 하루 <strong>' + formatNumber(Math.floor(left / daysLeft)) + '원</strong>' : '') +
         ' <button type="button" class="link-btn" data-action="ledger-budget-edit">예산 수정</button></p>';
     } else {
       html += '<p class="ledger-sum__budget"><button type="button" class="link-btn" data-action="ledger-budget-edit">한 달 예산 정하기</button></p>';
     }
     var net = inn - out;
     html += '<div class="ledger-sum__row"><div><span>수입</span><strong>' + formatNumber(inn) + '원</strong></div>' +
-      '<div><span>수입 − 지출</span><strong>' + (net > 0 ? '+' : net < 0 ? '−' : '') + formatNumber(Math.abs(net)) + '원</strong></div></div></section>';
+      '<div><span>수입 − 지출</span><strong>' + (net > 0 ? '+' : net < 0 ? '−' : '') + formatNumber(Math.abs(net)) + '원</strong></div></div>' +
+      (moved ? '<p class="ledger-sum__budget">저축·카드대금 등 ' + formatNumber(moved) + '원은 지출에서 뺐어요</p>' : '') + '</section>';
 
-    if (out > 0) {
-      var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
-      html += '<section class="ledger-card" aria-labelledby="ledger-cat-title"><h3 class="ledger-card__title" id="ledger-cat-title">분류별 지출</h3>' +
-        '<div class="ledger-stack" role="img" aria-label="' + escapeHtml(cats.map(function (c) { return c + ' ' + Math.round(byCat[c] / out * 100) + '%'; }).join(', ')) + '">' +
-        cats.map(function (c) { return '<span style="width:' + (byCat[c] / out * 100) + '%;background:' + LEDGER_COLORS[c] + '"></span>'; }).join('') + '</div>' +
-        '<ul class="ledger-legend">' + cats.map(function (c) {
-          return '<li><span class="ledger-legend__dot" style="background:' + LEDGER_COLORS[c] + '"></span><span class="ledger-legend__name">' + escapeHtml(c) + '</span><strong>' + formatNumber(byCat[c]) + '</strong></li>';
-        }).join('') + '</ul></section>';
-    }
-
-    html += '<section class="ledger-card" aria-labelledby="ledger-list-title"><h3 class="ledger-card__title" id="ledger-list-title">내역 <span class="notes__count">' + (list.length ? list.length + '건' : '') + '</span></h3>';
-    if (!list.length) {
-      html += '<p class="ledger-empty">' + (state.ledger.length ? mo + '월에는 기록이 없어요.' : '아직 기록이 없어요. 아래 ‘기록’을 눌러 첫 지출이나 수입을 적어 보세요.') + '</p>';
+    if (tab === 'cal') {
+      html += ledgerCalHtml(m, list);
+      var sel = ledgerDay(m);
+      if (sel) {
+        var dl = list.filter(function (e) { return e.date === sel; });
+        var dOut = 0; dl.forEach(function (e) { if (e.type === 'out' && !isMove(e)) dOut += e.amount; });
+        html += '<section class="ledger-card lg-dayc" aria-label="' + shortDate(sel) + ' 내역"><h3 class="ledger-card__title lg-dayc__t"><span>' + shortDate(sel) + (sel === todayStamp() ? ' · 오늘' : '') + '</span>' + (dOut ? '<span>−' + formatNumber(dOut) + '원</span>' : '') + '</h3>' +
+          (dl.length ? '<ul class="ledger-list">' + dl.map(ledgerRowHtml).join('') + '</ul>' : '<p class="ledger-empty">이날은 기록이 없어요.</p>') +
+          '<button type="button" class="link-btn lg-dayc__add" data-action="ledger-new" data-date="' + sel + '">＋ 이날 기록</button></section>';
+      }
     } else {
-      var day = '';
-      list.forEach(function (e) {
-        if (e.date !== day) {
-          if (day) html += '</ul>';
-          day = e.date;
-          var dayOut = 0; list.forEach(function (x) { if (x.date === day && x.type === 'out') dayOut += x.amount; });
-          html += '<p class="ledger-day">' + escapeHtml(shortDate(day)) + (dayOut ? '<span>−' + formatNumber(dayOut) + '원</span>' : '') + '</p><ul class="ledger-list">';
-        }
-        var meta = [e.who, LEDGER_PAYS[e.pay] || ''].filter(Boolean).join(' · ');
-        html += '<li><button type="button" class="ledger-row" data-action="ledger-edit" data-id="' + escapeHtml(e.id) + '" data-focus-key="ledger:' + escapeHtml(e.id) + '">' +
-          '<span class="ledger-row__cat" style="background:' + LEDGER_COLORS[e.cat] + '">' + escapeHtml(e.cat.replace('·출산', '')) + '</span>' +
-          '<span class="ledger-row__body"><span class="ledger-row__text">' + escapeHtml(e.text || e.cat) + '</span>' + (meta ? '<span class="ledger-row__meta">' + escapeHtml(meta) + '</span>' : '') + '</span>' +
-          '<span class="ledger-row__amt' + (e.type === 'in' ? ' is-in' : '') + '">' + signedWon(e) + '</span></button></li>';
-      });
-      html += '</ul>';
+      var q = String(ui.ledgerQuery || '').trim();
+      html += '<div class="lg-tools"><label class="visually-hidden" for="ledger-search">내역 검색</label><input type="search" id="ledger-search" class="lg-search" placeholder="검색: 내용·분류·카드·금액 (전체 기간)" value="' + escapeHtml(q) + '" autocomplete="off" data-focus-key="ledger-search" enterkeyhint="search">' +
+        '<button type="button" class="btn btn--small" data-action="lc-open">분류·결제 편집</button><button type="button" class="btn btn--small" data-action="ledger-import">CSV 가져오기</button></div>' +
+        '<div id="lg-results">' + ledgerResultsHtml(m) + '</div>';
     }
-    html += '</section>';
     root.innerHTML = html;
     renderLedgerSheet();
   }
+  // 내역 탭의 검색 결과·분류별 지출·목록(검색 칸은 다시 그리지 않아 한글 입력이 끊기지 않는다)
+  function ledgerResultsHtml(m) {
+    var mo = parseInt(m.slice(5, 7), 10), list = entriesOfMonth(m), out = 0, byCat = {}, html = '';
+    list.forEach(function (e) { if (e.type === 'out' && !isMove(e)) { out += e.amount; byCat[e.cat] = (byCat[e.cat] || 0) + e.amount; } });
+    var q = String(ui.ledgerQuery || '').trim();
+      if (q) {
+        var ql = q.toLowerCase(), qn = q.replace(/[,원\s]/g, '');
+        var found = sortEntries(state.ledger.filter(function (e) {
+          return (e.text + ' ' + e.cat + ' ' + e.pay + ' ' + e.who).toLowerCase().indexOf(ql) !== -1 || (/^\d+$/.test(qn) && String(e.amount).indexOf(qn) !== -1);
+        }));
+        var fOut = 0; found.forEach(function (e) { if (e.type === 'out' && !isMove(e)) fOut += e.amount; });
+        html += '<section class="ledger-card"><h3 class="ledger-card__title">‘' + escapeHtml(q) + '’ 검색 <span class="notes__count">' + found.length + '건' + (fOut ? ' · 지출 ' + formatNumber(fOut) + '원' : '') + '</span></h3>' +
+          (found.length ? ledgerListHtml(found.slice(0, 300)) + (found.length > 300 ? '<p class="ledger-empty">앞의 300건만 보여요. 검색어를 더 자세히 적어 보세요.</p>' : '') : '<p class="ledger-empty">찾는 기록이 없어요.</p>') + '</section>';
+      } else {
+        if (out > 0) {
+          var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
+          var colorOf = function (c) { var x = catOf(c, 'out'); return x ? x.color : '#D9DEDB'; };
+          html += '<section class="ledger-card" aria-labelledby="ledger-cat-title"><h3 class="ledger-card__title" id="ledger-cat-title">분류별 지출</h3>' +
+            '<div class="ledger-stack" role="img" aria-label="' + escapeHtml(cats.map(function (c) { return c + ' ' + Math.round(byCat[c] / out * 100) + '%'; }).join(', ')) + '">' +
+            cats.map(function (c) { return '<span style="width:' + (byCat[c] / out * 100) + '%;background:' + colorOf(c) + '"></span>'; }).join('') + '</div>' +
+            '<ul class="ledger-legend">' + cats.map(function (c) {
+              return '<li><span class="ledger-legend__dot" style="background:' + colorOf(c) + '"></span><span class="ledger-legend__name">' + escapeHtml(c) + '</span><strong>' + formatNumber(byCat[c]) + '</strong></li>';
+            }).join('') + '</ul></section>';
+        }
+        html += '<section class="ledger-card" aria-labelledby="ledger-list-title"><h3 class="ledger-card__title" id="ledger-list-title">내역 <span class="notes__count">' + (list.length ? list.length + '건' : '') + '</span></h3>' +
+          (list.length ? ledgerListHtml(list) : '<p class="ledger-empty">' + (state.ledger.length ? mo + '월에는 기록이 없어요.' : '아직 기록이 없어요. 아래 ‘기록’을 누르거나 ‘CSV 가져오기’로 예전 기록을 넣어 보세요.') + '</p>') + '</section>';
+      }
+    return html;
+  }
 
+  /* ---------- 가계부 입력 시트 ---------- */
   function ledgerChips(name, options, selected) {
     return options.map(function (o) {
       var val = typeof o === 'string' ? o : o.value, label = typeof o === 'string' ? o : o.label;
       return '<label class="choice"><input type="radio" name="' + name + '" value="' + escapeHtml(val) + '"' + (val === selected ? ' checked' : '') + '><span>' + escapeHtml(label) + '</span></label>';
     }).join('');
   }
-  function renderLedgerSheet() {
+  // 입력 탭: out(지출) · in(수입) · move(이체: 저축·카드대금 등 지출 합계에서 빼는 분류). 저장은 out/in 두 가지.
+  function catsForTab(tab) { return tab === 'in' ? catsOf('in') : catsOf('out').filter(function (c) { return tab === 'move' ? c.excl : !c.excl; }); }
+  function ledgerCatGrid(tab, selected) {
+    var cats = catsForTab(tab);
+    if (!cats.some(function (c) { return c.name === selected; })) selected = cats.length ? cats[0].name : '';
+    return cats.map(function (c) {
+      return '<label class="lc-opt" data-cat-id="' + escapeHtml(c.id) + '"><input type="radio" name="cat" value="' + escapeHtml(c.name) + '"' + (c.name === selected ? ' checked' : '') + '>' + lcIcon(c) + '<span>' + escapeHtml(c.name) + '</span></label>';
+    }).join('') +
+      '<button type="button" class="lc-opt lc-opt--tool" data-action="lc-open" data-new="1">' + lcIcon({ color: '#fff', icon: 'tag' }).replace('<path d="' + LC_ICONS.tag + '"/>', '<path d="M12 5v14M5 12h14"/>') + '<span>추가</span></button>' +
+      '<button type="button" class="lc-opt lc-opt--tool" data-action="lc-open">' + lcIcon({ color: '#fff', icon: 'tag' }).replace('<path d="' + LC_ICONS.tag + '"/>', '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>') + '<span>편집</span></button>';
+  }
+  function ledgerFavRow() {
+    var favs = state.ledgerFavs || [];
+    return '<div class="lf-head"><span>⭐ 자주 쓰는 내역</span>' + (favs.length ? '<button type="button" class="link-btn" data-action="lf-edit">' + (ui.lfEdit ? '완료' : '편집') + '</button>' : '') + '</div>' +
+      '<div class="lf-row">' + favs.map(function (f) {
+        return '<button type="button" class="lf-chip" data-action="' + (ui.lfEdit ? 'lf-del' : 'lf-use') + '" data-id="' + escapeHtml(f.id) + '">' + (ui.lfEdit ? '✕ ' : '') + escapeHtml(f.text || f.cat) + (f.amount ? ' ' + formatNumber(f.amount) : '') + '</button>';
+      }).join('') + (ui.lfEdit ? '' : '<button type="button" class="lf-chip lf-chip--add" data-action="lf-save">＋ 지금 입력 저장</button>') + '</div>';
+  }
+  function readLedgerForm(form) {
+    var val = function (name) { var c = form.querySelector('input[name="' + name + '"]:checked'); return c ? c.value : ''; };
+    return { tab: val('type') || 'out', text: $('#ledger-text').value, amount: $('#ledger-amount').value, cat: val('cat'), who: val('who'), pay: val('pay'), date: $('#ledger-date').value };
+  }
+  function renderLedgerSheet(force) {
     var sheet = $('#ledger-sheet');
     if (!sheet) return;
     var open = ui.view === 'ledger' && !!ui.ledgerForm;
@@ -2767,35 +2963,46 @@ datesSorted().forEach(function (d) {
     // 시트가 열린 동안 뒤 화면은 탭·스크린리더가 닿지 않게 한다
     ['.app-header', '#ledger-root', '#ledger-fab'].forEach(function (sel) { var n = $(sel); if (n) { if (open) n.setAttribute('inert', ''); else n.removeAttribute('inert'); } });
     if (!open) { sheet.hidden = true; sheet.innerHTML = ''; return; }
-    if (!sheet.hidden && sheet.dataset.form === ui.ledgerForm) return; // 이미 열린 폼은 입력 중인 값을 지키려고 다시 그리지 않는다
-    var e = ui.ledgerForm === 'new' ? null : findEntry(ui.ledgerForm);
-    var type = e ? e.type : ui.ledgerType;
-    var me = myName();
-    var who = e ? e.who : (LEDGER_WHO.indexOf(me) !== -1 ? me : '');
-    var m = ledgerMonth();
-    var date = e ? e.date : (m === currentMonth() ? todayStamp() : m + '-01');
+    if (!force && !sheet.hidden && sheet.dataset.form === ui.ledgerForm) return; // 이미 열린 폼은 입력 중인 값을 지키려고 다시 그리지 않는다
     sheet.dataset.form = ui.ledgerForm;
+    if (ui.ledgerForm === 'cats') { sheet.innerHTML = '<div class="sheet__backdrop" data-action="ledger-close"></div>' + lcEditorHtml(); sheet.hidden = false; return; }
+    if (ui.ledgerForm === 'import') { sheet.innerHTML = '<div class="sheet__backdrop" data-action="ledger-close"></div>' + importPanelHtml(); sheet.hidden = false; return; }
+    var e = ui.ledgerForm === 'new' ? null : findEntry(ui.ledgerForm);
+    var d = ui.ledgerDraft && ui.ledgerDraft.form === ui.ledgerForm ? ui.ledgerDraft : null;
+    var tab = d ? d.tab : e ? (e.type === 'in' ? 'in' : isMove(e) ? 'move' : 'out') : (ui.ledgerType || 'out');
+    var me = myName();
+    var who = d ? d.who : e ? e.who : (LEDGER_WHO.indexOf(me) !== -1 ? me : '');
+    var m = ledgerMonth();
+    var date = d ? d.date : e ? e.date : (ui.ledgerNewDate || (m === currentMonth() ? todayStamp() : m + '-01'));
+    var pays = ledgerPays().slice();
+    var pay = d ? d.pay : e ? e.pay : pays[0];
+    if (pay && pays.indexOf(pay) === -1) pays.push(pay);
+    ui.ledgerDraft = null;
     sheet.innerHTML = '<div class="sheet__backdrop" data-action="ledger-close"></div>' +
       '<form class="sheet__panel" id="ledger-form" role="dialog" aria-modal="true" aria-labelledby="ledger-form-title" novalidate>' +
       '<span class="sheet__handle" aria-hidden="true"></span>' +
       '<div class="sheet__head"><h2 id="ledger-form-title" tabindex="-1">' + (e ? '기록 수정' : '기록 추가') + '</h2>' +
       '<button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>' +
-      '<div class="seg" role="radiogroup" aria-label="종류">' + ledgerChips('type', [{ value: 'out', label: '지출' }, { value: 'in', label: '수입' }], type) + '</div>' +
-      '<div class="field"><label for="ledger-text">내용</label><input type="text" id="ledger-text" maxlength="' + LEDGER_TEXT_MAX + '" autocomplete="off" value="' + escapeHtml(e ? e.text : '') + '" placeholder="예: 점심 국밥 9천원"></div>' +
-      '<div class="field"><label for="ledger-amount">금액</label><input type="text" id="ledger-amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (e ? formatNumber(e.amount) : '') + '" placeholder="내용에 ‘9천원’처럼 적어도 돼요"></div>' +
-      '<fieldset class="chips-field"><legend>분류</legend><div class="choices" id="ledger-cat-chips">' + ledgerChips('cat', type === 'in' ? LEDGER_IN_CATS : LEDGER_OUT_CATS, e ? e.cat : (type === 'in' ? '급여' : '식비')) + '</div></fieldset>' +
-      '<div class="sheet__two"><fieldset class="chips-field"><legend>누가</legend><div class="choices">' + ledgerChips('who', LEDGER_WHO.concat([{ value: '', label: '함께' }]), who) + '</div></fieldset>' +
-      '<fieldset class="chips-field"><legend>결제</legend><div class="choices">' + ledgerChips('pay', Object.keys(LEDGER_PAYS).map(function (k) { return { value: k, label: LEDGER_PAYS[k] }; }), e ? e.pay : 'card') + '</div></fieldset></div>' +
+      '<div class="seg seg--3" role="radiogroup" aria-label="종류">' + ledgerChips('type', [{ value: 'out', label: '지출' }, { value: 'in', label: '수입' }, { value: 'move', label: '이체·저축' }], tab) + '</div>' +
+      '<div class="field lg-amt"><label for="ledger-amount">금액</label><input type="text" id="ledger-amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (d ? escapeHtml(d.amount) : e ? formatNumber(e.amount) : '') + '" placeholder="0"><span aria-hidden="true">원</span></div>' +
+      '<div class="field"><label for="ledger-text">내용</label><input type="text" id="ledger-text" maxlength="' + LEDGER_TEXT_MAX + '" autocomplete="off" value="' + escapeHtml(d ? d.text : e ? e.text : '') + '" placeholder="예: 스타벅스 · 점심 국밥 9천원"></div>' +
+      '<div id="lf-box">' + ledgerFavRow() + '</div>' +
+      '<fieldset class="chips-field"><legend>분류 <small class="mut">길게 누르면 고치기</small></legend><div class="lc-grid" id="ledger-cat-grid">' + ledgerCatGrid(tab, d ? d.cat : e ? e.cat : '') + '</div></fieldset>' +
+      '<div class="sheet__two"><fieldset class="chips-field"><legend>결제</legend><div class="choices" id="ledger-pay-chips">' + ledgerChips('pay', pays, pay) +
+        '<button type="button" class="choice-add" data-action="lp-add" aria-label="결제수단 추가">＋</button></div></fieldset>' +
+      '<fieldset class="chips-field"><legend>누가</legend><div class="choices">' + ledgerChips('who', LEDGER_WHO.concat([{ value: '', label: '함께' }]), who) + '</div></fieldset></div>' +
       '<div class="field"><label for="ledger-date">날짜</label><input type="date" id="ledger-date" value="' + date + '" required></div>' +
       '<div class="sheet__actions"><button type="submit" class="btn btn--primary">저장</button>' +
       (e ? '<button type="button" class="btn btn--danger" data-action="ledger-delete">삭제</button>' : '') + '</div></form>';
     sheet.hidden = false;
-    // 새 기록은 바로 입력하도록 내용 칸에, 수정은 키보드가 먼저 뜨지 않게 제목에 초점을 둔다
-    var first = e ? $('#ledger-form-title') : $('#ledger-text');
+    // 새 기록은 바로 금액부터, 수정은 키보드가 먼저 뜨지 않게 제목에 초점을 둔다
+    var first = e || d ? $('#ledger-form-title') : $('#ledger-amount');
     if (first) first.focus({ preventScroll: true });
   }
-  function openLedgerForm(id) {
+  function openLedgerForm(id, date) {
     ui.ledgerForm = id || 'new';
+    ui.ledgerNewDate = !id && date ? date : '';
+    ui.lfEdit = false;
     if (!id) ui.ledgerType = 'out';
     // 뒤로 가기(안드로이드 버튼·스와이프)로 입력 창만 닫히도록 기록을 하나 쌓는다
     try { window.history.pushState({ view: 'ledger', sheet: true }, ''); } catch (e) { /* ignore */ }
@@ -2807,18 +3014,20 @@ datesSorted().forEach(function (d) {
   }
   var sheetPopSilently = false;
   function closeLedgerForm(fromHistory) {
-    var back = ui.ledgerForm && ui.ledgerForm !== 'new' ? ui.ledgerForm : null;
-    ui.ledgerForm = null;
+    // 입력 중에 분류 편집을 열었다면 닫기는 입력 화면으로 돌아간다
+    if (ui.ledgerForm === 'cats' && ui.ledgerReturn) { lcBack(); return; }
+    var back = ui.ledgerForm && ['new', 'cats', 'import'].indexOf(ui.ledgerForm) === -1 ? ui.ledgerForm : null;
+    ui.ledgerForm = null; ui.ledgerReturn = null; ui.ledgerDraft = null; ui.lcEdit = null; ui.lcDel = null; ui.imp = null;
     if (!fromHistory) dropSheetHistory();
     renderLedgerSheet();
     var target = back ? document.querySelector('[data-focus-key="ledger:' + back + '"]') : $('#ledger-fab');
     if (target) target.focus({ preventScroll: true });
   }
   function submitLedgerForm(form) {
-    var val = function (name) { var c = form.querySelector('input[name="' + name + '"]:checked'); return c ? c.value : ''; };
-    var text = $('#ledger-text').value.trim();
+    var f = readLedgerForm(form);
+    var text = f.text.trim();
     var amountEl = $('#ledger-amount');
-    var pp = parsePrice(amountEl.value);
+    var pp = parsePrice(f.amount);
     if (!pp.ok) { showToast('금액은 숫자로 적어 주세요. 예: 9000, 9천원'); amountEl.focus(); return; }
     var amount = pp.value;
     if (amount === null && text) {
@@ -2826,19 +3035,20 @@ datesSorted().forEach(function (d) {
       if (line && line.price) { amount = line.price; text = line.name; }
     }
     if (!amount) { showToast('금액을 입력하세요.'); amountEl.focus(); return; }
-    var date = $('#ledger-date').value;
+    var date = f.date;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { showToast('날짜를 골라 주세요.'); $('#ledger-date').focus(); return; }
-    var type = val('type') === 'in' ? 'in' : 'out';
-    var cats = type === 'in' ? LEDGER_IN_CATS : LEDGER_OUT_CATS;
-    var cat = cats.indexOf(val('cat')) !== -1 ? val('cat') : '기타';
-    var who = LEDGER_WHO.indexOf(val('who')) !== -1 ? val('who') : '';
-    var pay = LEDGER_PAYS[val('pay')] ? val('pay') : '';
+    var type = f.tab === 'in' ? 'in' : 'out';
+    var cats = catsForTab(f.tab);
+    var cat = cats.some(function (c) { return c.name === f.cat; }) ? f.cat : (cats.length ? cats[0].name : '기타');
+    var who = LEDGER_WHO.indexOf(f.who) !== -1 ? f.who : '';
+    var pay = String(f.pay || '').slice(0, LP_NAME_MAX);
     var e = ui.ledgerForm === 'new' ? null : findEntry(ui.ledgerForm);
-    var data = { id: e ? e.id : uid(), date: date, type: type, amount: amount, cat: cat, text: text.slice(0, LEDGER_TEXT_MAX), who: who, pay: pay, t: e ? e.t : Date.now() };
+    var data = { id: e ? e.id : uid(), date: date, type: type, amount: amount, cat: cat, text: text.slice(0, LEDGER_TEXT_MAX), who: who, pay: pay, t: e ? e.t : Date.now(), src: e ? e.src || '' : '' };
     if (e) Object.keys(data).forEach(function (k) { e[k] = data[k]; });
     else state.ledger.push(data);
     ui.ledgerForm = null;
     ui.ledgerMonth = date.slice(0, 7);
+    ui.ledgerDay = date;
     dropSheetHistory();
     commit();
     var label = (text || cat) + ' ' + formatWon(amount);
@@ -2872,6 +3082,390 @@ datesSorted().forEach(function (d) {
     commit();
     act('ledger', state.budget ? '가계부 한 달 예산 ' + formatWon(state.budget) : '가계부 예산 없앰');
     showToast(state.budget ? '한 달 예산을 ' + formatWon(state.budget) + '으로 정했어요.' : '예산을 없앴어요.');
+  }
+  // 자주 쓰는 내역
+  function lfUse(id) {
+    var f = null; (state.ledgerFavs || []).forEach(function (x) { if (x.id === id) f = x; });
+    var form = $('#ledger-form'); if (!f || !form) return;
+    var tab = f.type === 'in' ? 'in' : (catOf(f.cat, 'out') || {}).excl ? 'move' : 'out';
+    var t = form.querySelector('input[name="type"][value="' + tab + '"]'); if (t) t.checked = true;
+    $('#ledger-cat-grid').innerHTML = ledgerCatGrid(tab, f.cat);
+    if (f.amount) $('#ledger-amount').value = formatNumber(f.amount);
+    if (f.text) $('#ledger-text').value = f.text;
+    if (f.pay) {
+      var p = form.querySelector('input[name="pay"][value="' + cssEsc(f.pay) + '"]');
+      if (!p) { $('#ledger-pay-chips').insertAdjacentHTML('afterbegin', ledgerChips('pay', [f.pay], f.pay)); } else p.checked = true;
+    }
+    var save = form.querySelector('[type="submit"]'); if (save) save.focus();
+  }
+  function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
+  function lfSave() {
+    var form = $('#ledger-form'); if (!form) return;
+    var f = readLedgerForm(form), pp = parsePrice(f.amount);
+    var text = f.text.trim();
+    if (!text && !(pp.ok && pp.value)) { showToast('내용이나 금액을 먼저 적어 주세요.'); return; }
+    state.ledgerFavs = (state.ledgerFavs || []).slice();
+    if (state.ledgerFavs.length >= 20) { showToast('자주 쓰는 내역은 20개까지예요. 편집에서 하나 지워 주세요.'); return; }
+    state.ledgerFavs.push({ id: uid(), text: text.slice(0, LEDGER_TEXT_MAX), amount: pp.ok && pp.value ? pp.value : 0, type: f.tab === 'in' ? 'in' : 'out', cat: f.cat, pay: f.pay });
+    commit(); $('#lf-box').innerHTML = ledgerFavRow();
+    showToast('⭐ 자주 쓰는 내역에 저장했어요.');
+  }
+
+  /* ---------- 분류 · 결제수단 편집 ---------- */
+  function lcCount(c) { var n = 0; state.ledger.forEach(function (e) { if (e.cat === c.name && e.type === c.type) n++; }); return n; }
+  function lcFormHtml(c) {
+    var isNew = !c, cur = c || { name: '', icon: 'tag', color: LC_COLORS[(ledgerCats().length * 5) % LC_COLORS.length], excl: false, type: ui.lcTab === 'in' ? 'in' : 'out' };
+    var id = isNew ? 'new' : c.id;
+    return '<form class="lc-form" data-lc-form="' + escapeHtml(id) + '">' +
+      '<div class="field"><label for="lc-name-' + escapeHtml(id) + '">이름</label><input type="text" id="lc-name-' + escapeHtml(id) + '" name="name" maxlength="' + LC_NAME_MAX + '" value="' + escapeHtml(cur.name) + '" autocomplete="off" placeholder="예: 반려동물" required></div>' +
+      '<fieldset class="chips-field"><legend>색</legend><div class="lc-colors">' + LC_COLORS.map(function (col) {
+        return '<label class="lc-color"><input type="radio" name="color" value="' + col + '"' + (col.toLowerCase() === cur.color.toLowerCase() ? ' checked' : '') + '><span style="background:' + col + '" aria-label="' + col + '"></span></label>';
+      }).join('') + '</div></fieldset>' +
+      '<fieldset class="chips-field"><legend>아이콘</legend><div class="lc-icons">' + Object.keys(LC_ICONS).map(function (k) {
+        return '<label class="lc-iconpick"><input type="radio" name="icon" value="' + k + '"' + (k === cur.icon ? ' checked' : '') + '><span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + LC_ICONS[k] + '"/></svg></span></label>';
+      }).join('') + '</div></fieldset>' +
+      (cur.type === 'out' ? '<label class="lc-excl"><input type="checkbox" name="excl"' + (cur.excl ? ' checked' : '') + '> 지출 합계에서 빼기 <small class="mut">(저축·카드대금처럼 돈이 옮겨 가는 것, 입력의 ‘이체·저축’ 탭에 보여요)</small></label>' : '') +
+      '<div class="bt-form__actions"><button type="button" class="btn btn--small" data-action="lc-cancel">취소</button><button type="submit" class="btn btn--primary btn--small">' + (isNew ? '추가' : '저장') + '</button></div></form>';
+  }
+  function lcEditorHtml() {
+    var tab = ui.lcTab === 'in' || ui.lcTab === 'pay' ? ui.lcTab : 'out';
+    var head = '<div class="sheet__panel lc-editor" role="dialog" aria-modal="true" aria-labelledby="lc-title"><span class="sheet__handle" aria-hidden="true"></span>' +
+      '<div class="sheet__head">' + (ui.ledgerReturn ? '<button type="button" class="icon-btn" data-action="lc-back" aria-label="입력으로 돌아가기">' + svgIcon('back', 20) + '</button>' : '') +
+      '<h2 id="lc-title" tabindex="-1">분류·결제 편집</h2><button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>' +
+      '<div class="seg seg--3">' + [['out', '지출 ' + catsOf('out').length], ['in', '수입 ' + catsOf('in').length], ['pay', '결제 ' + ledgerPays().length]].map(function (t) {
+        return '<button type="button" class="seg__btn' + (tab === t[0] ? ' is-on' : '') + '" data-action="lc-tab" data-tab="' + t[0] + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>';
+      }).join('') + '</div>';
+    var body = '';
+    if (tab === 'pay') {
+      var pays = ledgerPays();
+      body = '<p class="lc-note mut">카드 이름을 넣으면 카드별로 모아 볼 수 있어요. 이름을 바꾸면 이미 적힌 기록도 같이 바뀌어요.</p><ul class="lc-list">' + pays.map(function (p, i) {
+        return '<li class="lc-row"><span class="lc-row__name">' + escapeHtml(p) + '</span>' +
+          '<button type="button" class="lc-btn" data-action="lp-move" data-i="' + i + '" data-by="-1" aria-label="' + escapeHtml(p) + ' 위로"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+          '<button type="button" class="lc-btn" data-action="lp-move" data-i="' + i + '" data-by="1" aria-label="' + escapeHtml(p) + ' 아래로"' + (i === pays.length - 1 ? ' disabled' : '') + '>▼</button>' +
+          '<button type="button" class="lc-btn" data-action="lp-rename" data-i="' + i + '" aria-label="' + escapeHtml(p) + ' 이름 바꾸기">✎</button>' +
+          '<button type="button" class="lc-btn lc-btn--del" data-action="lp-del" data-i="' + i + '" aria-label="' + escapeHtml(p) + ' 삭제"' + (pays.length < 2 ? ' disabled' : '') + '>🗑</button></li>';
+      }).join('') + '</ul><button type="button" class="lc-add" data-action="lp-add">＋ 결제수단 추가</button>';
+    } else {
+      var cats = catsOf(tab);
+      body = '<p class="lc-note mut">이름을 바꾸면 이미 적힌 기록도 같이 바뀌어요. ▲▼로 순서를 바꿔요.</p><ul class="lc-list">' + cats.map(function (c, i) {
+        if (ui.lcEdit === c.id) return '<li class="lc-row is-editing">' + lcFormHtml(c) + '</li>';
+        var del = ui.lcDel === c.id ? lcDelHtml(c) : '';
+        return '<li class="lc-row">' + lcIcon(c, 32) + '<span class="lc-row__name">' + escapeHtml(c.name) + (c.excl ? '<span class="lc-badge">합계 제외</span>' : '') + '</span>' +
+          '<button type="button" class="lc-btn" data-action="lc-move" data-id="' + escapeHtml(c.id) + '" data-by="-1" aria-label="' + escapeHtml(c.name) + ' 위로"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+          '<button type="button" class="lc-btn" data-action="lc-move" data-id="' + escapeHtml(c.id) + '" data-by="1" aria-label="' + escapeHtml(c.name) + ' 아래로"' + (i === cats.length - 1 ? ' disabled' : '') + '>▼</button>' +
+          '<button type="button" class="lc-btn" data-action="lc-edit" data-id="' + escapeHtml(c.id) + '" aria-label="' + escapeHtml(c.name) + ' 고치기">✎</button>' +
+          '<button type="button" class="lc-btn lc-btn--del" data-action="lc-del" data-id="' + escapeHtml(c.id) + '" aria-label="' + escapeHtml(c.name) + ' 삭제"' + (cats.length < 2 ? ' disabled' : '') + '>🗑</button>' + del + '</li>';
+      }).join('') + '</ul>' + (ui.lcEdit === 'new' ? '<div class="lc-row is-editing">' + lcFormHtml(null) + '</div>' : '<button type="button" class="lc-add" data-action="lc-edit" data-id="new">＋ 분류 추가</button>');
+    }
+    return head + body + '</div>';
+  }
+  function lcDelHtml(c) {
+    var others = catsOf(c.type).filter(function (x) { return x.id !== c.id; });
+    var n = lcCount(c), def = others.filter(function (x) { return x.name === '기타'; })[0] || others[0];
+    return '<div class="lc-del" role="alertdialog" aria-label="' + escapeHtml(c.name) + ' 삭제"><p>‘' + escapeHtml(c.name) + '’ 분류로 적힌 기록이 <b>' + n + '건</b> 있어요. 어디로 옮길까요?</p>' +
+      '<label class="visually-hidden" for="lc-del-to">옮길 분류</label><select id="lc-del-to">' + others.map(function (x) { return '<option value="' + escapeHtml(x.name) + '"' + (x === def ? ' selected' : '') + '>' + escapeHtml(x.name) + '</option>'; }).join('') + '</select>' +
+      '<div class="bt-form__actions"><button type="button" class="btn btn--small" data-action="lc-del-cancel">취소</button><button type="button" class="btn btn--small btn--danger" data-action="lc-del-go" data-id="' + escapeHtml(c.id) + '">옮기고 삭제</button></div></div>';
+  }
+  function openLcEditor(fromForm, editId) {
+    var form = $('#ledger-form');
+    if (fromForm && form) {
+      var f = readLedgerForm(form); f.form = ui.ledgerForm; ui.ledgerDraft = f; ui.ledgerReturn = ui.ledgerForm;
+      ui.lcTab = f.tab === 'in' ? 'in' : 'out';
+    } else if (!ui.ledgerForm) {
+      try { window.history.pushState({ view: 'ledger', sheet: true }, ''); } catch (e) { /* ignore */ }
+    }
+    ui.ledgerForm = 'cats'; ui.lcEdit = editId || null; ui.lcDel = null;
+    if (editId && editId !== 'new') { var c = ledgerCats().filter(function (x) { return x.id === editId; })[0]; if (c) ui.lcTab = c.type; }
+    renderLedgerSheet(true);
+    var t = editId ? document.querySelector('.lc-form input[name="name"]') : $('#lc-title');
+    if (t) t.focus({ preventScroll: true });
+  }
+  function lcBack() {
+    ui.ledgerForm = ui.ledgerReturn; ui.ledgerReturn = null; ui.lcEdit = null; ui.lcDel = null;
+    if (ui.ledgerForm !== 'new' && !findEntry(ui.ledgerForm)) ui.ledgerForm = 'new';
+    if (ui.ledgerDraft) ui.ledgerDraft.form = ui.ledgerForm;
+    renderLedgerSheet(true);
+  }
+  function lcRerender(focusSel) {
+    renderLedgerSheet(true);
+    var t = focusSel ? document.querySelector(focusSel) : null; if (t) t.focus({ preventScroll: true });
+  }
+  function renameInEntries(type, from, to) {
+    state.ledger.forEach(function (e) { if (e.type === type && e.cat === from) e.cat = to; });
+    (state.ledgerFavs || []).forEach(function (f) { if (f.type === type && f.cat === from) f.cat = to; });
+  }
+  function submitLcForm(form) {
+    var id = form.dataset.lcForm, name = String(form.elements.name.value || '').trim().slice(0, LC_NAME_MAX);
+    var color = (form.querySelector('input[name="color"]:checked') || {}).value || '#BDBDBD';
+    var icon = (form.querySelector('input[name="icon"]:checked') || {}).value || 'tag';
+    var exclEl = form.querySelector('input[name="excl"]');
+    if (!name) { showToast('분류 이름을 적어 주세요.'); form.elements.name.focus(); return; }
+    var cats = ownCats();
+    var c = id === 'new' ? null : cats.filter(function (x) { return x.id === id; })[0];
+    var type = c ? c.type : (ui.lcTab === 'in' ? 'in' : 'out');
+    if (cats.some(function (x) { return x.type === type && x.name === name && x !== c; })) { showToast('‘' + name + '’ 분류가 이미 있어요.'); form.elements.name.focus(); return; }
+    if (c) {
+      var old = c.name;
+      if (old !== name) renameInEntries(type, old, name);
+      c.name = name; c.color = color; c.icon = icon; c.excl = type === 'out' && !!(exclEl && exclEl.checked);
+      act('ledger', '가계부 분류 수정: ' + (old !== name ? old + ' → ' : '') + name);
+    } else {
+      cats.push({ id: uid(), name: name, type: type, icon: icon, color: color, excl: type === 'out' && !!(exclEl && exclEl.checked) });
+      act('ledger', '가계부 분류 추가: ' + name);
+    }
+    ui.lcEdit = null; commit(); lcRerender('#lc-title');
+    showToast(c ? '분류를 고쳤어요.' : '‘' + name + '’ 분류를 추가했어요.');
+  }
+  function lcMove(id, by) {
+    var cats = ownCats(), c = cats.filter(function (x) { return x.id === id; })[0]; if (!c) return;
+    var same = cats.filter(function (x) { return x.type === c.type; }), i = same.indexOf(c), j = i + by;
+    if (j < 0 || j >= same.length) return;
+    var a = cats.indexOf(c), b = cats.indexOf(same[j]);
+    cats[a] = same[j]; cats[b] = c;
+    commit(); lcRerender('[data-action="lc-move"][data-id="' + cssEsc(id) + '"][data-by="' + by + '"]');
+  }
+  function lcDelete(id, to) {
+    var before = JSON.parse(JSON.stringify(ownCats())), cats = ownCats(), c = cats.filter(function (x) { return x.id === id; })[0]; if (!c) return;
+    var moved = [];
+    state.ledger.forEach(function (e) { if (e.type === c.type && e.cat === c.name) { moved.push(e.id); e.cat = to; } });
+    (state.ledgerFavs || []).forEach(function (f) { if (f.type === c.type && f.cat === c.name) f.cat = to; });
+    state.ledgerCats = cats.filter(function (x) { return x !== c; });
+    ui.lcDel = null; commit(); lcRerender('#lc-title');
+    act('ledger', '가계부 분류 삭제: ' + c.name + (moved.length ? ' (' + moved.length + '건 → ' + to + ')' : ''));
+    showToast('‘' + c.name + '’ 분류를 지웠어요.' + (moved.length ? ' ' + moved.length + '건은 ‘' + to + '’로 옮겼어요.' : ''), function () {
+      state.ledgerCats = before;
+      state.ledger.forEach(function (e) { if (moved.indexOf(e.id) !== -1) e.cat = c.name; });
+      commit(); if (ui.ledgerForm === 'cats') lcRerender(); showToast('되돌렸어요.');
+    });
+  }
+  function lpAdd() {
+    var name = window.prompt('결제수단 이름 (예: 현대카드 M, 신한체크)', '');
+    name = String(name || '').trim().slice(0, LP_NAME_MAX); if (!name) return null;
+    var pays = ledgerPays().slice();
+    if (pays.indexOf(name) === -1) { pays.push(name); state.ledgerPays = pays; commit(); act('ledger', '결제수단 추가: ' + name); }
+    return name;
+  }
+  function lpRename(i) {
+    var pays = ledgerPays().slice(), old = pays[i]; if (!old) return;
+    var name = String(window.prompt('결제수단 이름', old) || '').trim().slice(0, LP_NAME_MAX);
+    if (!name || name === old) return;
+    if (pays.indexOf(name) !== -1) { showToast('같은 이름이 이미 있어요.'); return; }
+    pays[i] = name; state.ledgerPays = pays;
+    state.ledger.forEach(function (e) { if (e.pay === old) e.pay = name; });
+    (state.ledgerFavs || []).forEach(function (f) { if (f.pay === old) f.pay = name; });
+    commit(); lcRerender('#lc-title');
+  }
+  function lpDel(i) {
+    var before = ledgerPays().slice(), pays = before.slice(), p = pays.splice(i, 1)[0]; if (!p) return;
+    state.ledgerPays = pays; commit(); lcRerender('#lc-title');
+    showToast('‘' + p + '’를 목록에서 뺐어요. 이미 적힌 기록은 그대로예요.', function () { state.ledgerPays = before; commit(); if (ui.ledgerForm === 'cats') lcRerender(); });
+  }
+  function lpMove(i, by) {
+    var pays = ledgerPays().slice(), j = i + by; if (j < 0 || j >= pays.length) return;
+    var t = pays[i]; pays[i] = pays[j]; pays[j] = t; state.ledgerPays = pays; commit(); lcRerender('[data-action="lp-move"][data-i="' + j + '"][data-by="' + by + '"]');
+  }
+
+  /* ---------- CSV 가져오기 (위플 등 다른 가계부의 내보내기 파일) ---------- */
+  function parseCsv(text) {
+    var first = text.split(/\r?\n/, 1)[0] || '';
+    var delim = [',', '\t', ';'].sort(function (a, b) { return first.split(b).length - first.split(a).length; })[0];
+    var rows = [], row = [], field = '', q = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (q) {
+        if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else q = false; }
+        else field += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === delim) { row.push(field); field = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(field); field = ''; rows.push(row); row = [];
+      } else field += ch;
+    }
+    if (field || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (c) { return String(c).trim(); }); });
+  }
+  var CSV_COLS = {
+    date: /^(날짜|일자|일시|거래일|거래일자|거래일시|사용일|사용일자|사용일시|이용일|이용일자|이용일시|승인일|승인일자|date|datetime)$/i,
+    time: /^(시간|시각|거래시간|이용시간|time)$/i,
+    type: /^(구분|타입|유형|종류|수입지출|수입\/지출|입출금|거래구분|type)$/i,
+    cat: /^(분류|카테고리|대분류|항목|category)$/i,
+    sub: /^(소분류|하위분류|세부분류|subcategory)$/i,
+    text: /^(내용|내역|사용처|가맹점|가맹점명|이용가맹점|적요|거래처|상호|title|description)$/i,
+    memo: /^(메모|비고|note|notes|memo)$/i,
+    amount: /^(금액|원화금액|사용금액|거래금액|이용금액|결제금액|amount|krw)$/i,
+    inAmt: /^(수입|입금|입금액|수입금액)$/i,
+    outAmt: /^(지출|출금|출금액|지출금액)$/i,
+    pay: /^(결제수단|자산|결제|계좌|카드|수단|출금계좌|결제방법|payment|account)$/i
+  };
+  function csvHeaderMap(row) {
+    var map = {};
+    row.forEach(function (h, i) {
+      var k = String(h || '').replace(/^\uFEFF/, '').replace(/\(.*?\)|\[.*?\]/g, '').replace(/\s+/g, '').trim();
+      Object.keys(CSV_COLS).forEach(function (key) { if (map[key] === undefined && CSV_COLS[key].test(k)) map[key] = i; });
+    });
+    return map;
+  }
+  function csvDate(s) {
+    s = String(s || '').trim(); if (!s) return null;
+    var m = /^(\d{4})[.\-\/년\s]+(\d{1,2})[.\-\/월\s]+(\d{1,2})/.exec(s) || /^(\d{4})(\d{2})(\d{2})/.exec(s);
+    var y, mo, d;
+    if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+    else if ((m = /^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})/.exec(s))) { y = +m[3]; mo = +m[1]; d = +m[2]; if (y < 100) y += 2000; }
+    else return null;
+    if (mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1990 || y > 2100) return null;
+    var tm = /(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(s.slice(8));
+    return { iso: y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (d < 10 ? '0' : '') + d, h: tm ? +tm[1] : null, mi: tm ? +tm[2] : null };
+  }
+  function csvNum(s) {
+    var t = String(s || '').replace(/[,\s원₩]/g, '');
+    if (/^\(.*\)$/.test(t)) t = '-' + t.slice(1, -1);
+    var n = parseFloat(t); return isFinite(n) ? n : null;
+  }
+  function analyzeCsv(text, fileName) {
+    var rows = parseCsv(text.replace(/^\uFEFF/, ''));
+    var hi = -1, map = null;
+    for (var i = 0; i < Math.min(rows.length, 15); i++) {
+      var mm = csvHeaderMap(rows[i]);
+      if (mm.date !== undefined && (mm.amount !== undefined || mm.inAmt !== undefined || mm.outAmt !== undefined)) { hi = i; map = mm; break; }
+    }
+    if (hi === -1) return { error: '날짜·금액 줄(머리글)을 찾지 못했어요. 첫 줄에 ‘날짜’, ‘금액’ 같은 이름이 있는 CSV인지 확인해 주세요.', fileName: fileName };
+    var get = function (r, k) { return map[k] === undefined ? '' : String(r[map[k]] === undefined ? '' : r[map[k]]).trim(); };
+    var inNames = {}; catsOf('in').forEach(function (c) { inNames[c.name] = true; });
+    var out = [], bad = 0;
+    rows.slice(hi + 1).forEach(function (r, n) {
+      var dt = csvDate(get(r, 'date'));
+      if (!dt) { bad++; return; }
+      if (dt.h === null && map.time !== undefined) { var tm = /(\d{1,2}):(\d{2})/.exec(get(r, 'time')); if (tm) { dt.h = +tm[1]; dt.mi = +tm[2]; } }
+      var amt = map.amount !== undefined ? csvNum(get(r, 'amount')) : null;
+      var kind = '', typ = get(r, 'type');
+      if (amt === null || amt === 0) {
+        var a1 = csvNum(get(r, 'inAmt')), a2 = csvNum(get(r, 'outAmt'));
+        if (a1) { amt = a1; kind = 'in'; } else if (a2) { amt = a2; kind = 'out'; }
+      }
+      if (!amt) { bad++; return; }
+      if (/수입|입금|income/i.test(typ)) kind = 'in';
+      else if (/이체|저축|transfer/i.test(typ)) kind = 'move';
+      else if (/지출|출금|사용|expense/i.test(typ)) kind = 'out';
+      var cat = get(r, 'cat') || get(r, 'sub');
+      if (!kind) kind = amt > 0 && inNames[cat] ? 'in' : 'out';
+      var text = get(r, 'text'), memo = get(r, 'memo');
+      if (!text) text = memo || get(r, 'sub'); else if (memo && memo !== text) text += ' · ' + memo;
+      var base = dateOf(dt.iso); if (dt.h !== null) base.setHours(dt.h, dt.mi || 0, 0, 0); else base.setHours(12, 0, 0, 0);
+      out.push({ date: dt.iso, kind: kind, amount: Math.min(Math.round(Math.abs(amt)), PRICE_MAX), cat: cat.slice(0, LC_NAME_MAX), text: text.slice(0, LEDGER_TEXT_MAX), pay: get(r, 'pay').slice(0, LP_NAME_MAX), t: base.getTime() + n });
+    });
+    // 이미 있는 기록과 같은 것(날짜·수입/지출·금액·내용)은 그만큼 빼고 넣는다
+    var have = {};
+    state.ledger.forEach(function (e) { var k = e.date + '|' + e.type + '|' + e.amount + '|' + e.text; have[k] = (have[k] || 0) + 1; });
+    var fresh = [], dup = 0;
+    out.forEach(function (x) {
+      var k = x.date + '|' + (x.kind === 'in' ? 'in' : 'out') + '|' + x.amount + '|' + x.text;
+      if (have[k]) { have[k]--; dup++; } else fresh.push(x);
+    });
+    var newCats = {};
+    fresh.forEach(function (x) {
+      var type = x.kind === 'in' ? 'in' : 'out';
+      if (!x.cat) return;
+      if (!catOf(x.cat, type)) newCats[type + ':' + x.cat] = { name: x.cat, type: type, excl: x.kind === 'move', n: (newCats[type + ':' + x.cat] || { n: 0 }).n + 1 };
+    });
+    var dates = fresh.map(function (x) { return x.date; }).sort();
+    return { fileName: fileName, rows: fresh, dup: dup, bad: bad, total: out.length, newCats: Object.keys(newCats).map(function (k) { return newCats[k]; }), from: dates[0] || '', to: dates[dates.length - 1] || '', cols: Object.keys(map) };
+  }
+  function importBatches() {
+    var b = {};
+    state.ledger.forEach(function (e) { if (e.src) { var x = b[e.src] || (b[e.src] = { id: e.src, n: 0, from: e.date, to: e.date }); x.n++; if (e.date < x.from) x.from = e.date; if (e.date > x.to) x.to = e.date; } });
+    return Object.keys(b).map(function (k) { return b[k]; }).sort(function (a, c) { return a.id < c.id ? 1 : -1; });
+  }
+  function importPanelHtml() {
+    var imp = ui.imp;
+    var html = '<div class="sheet__panel lg-imp" role="dialog" aria-modal="true" aria-labelledby="imp-title"><span class="sheet__handle" aria-hidden="true"></span>' +
+      '<div class="sheet__head"><h2 id="imp-title" tabindex="-1">CSV 가져오기</h2><button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>';
+    if (!imp || imp.error) {
+      html += '<p class="lc-note">위플 가계부 등에서 내보낸 <b>CSV 파일</b>을 고르면, 넣기 전에 몇 건이 들어갈지 먼저 보여 드려요. 날짜·금액·분류·내용·결제수단 칸을 알아서 찾아요.</p>' +
+        (imp && imp.error ? '<p class="lg-imp__err">' + escapeHtml(imp.fileName || '') + ': ' + escapeHtml(imp.error) + '</p>' : '') +
+        '<label class="btn btn--primary lg-imp__pick">CSV 파일 고르기<input type="file" id="ledger-csv" accept=".csv,text/csv,text/plain" hidden></label>';
+      var bs = importBatches();
+      if (bs.length) html += '<div class="lg-imp__past"><p class="mut">가져온 기록</p>' + bs.map(function (b) {
+        return '<div class="lg-imp__batch"><span>' + b.n + '건 · ' + b.from.replace(/-/g, '.') + ' ~ ' + b.to.replace(/-/g, '.') + '</span><button type="button" class="btn btn--small btn--danger" data-action="imp-undo" data-src="' + escapeHtml(b.id) + '">모두 지우기</button></div>';
+      }).join('') + '</div>';
+      return html + '</div>';
+    }
+    var nIn = 0, nOut = 0, nMove = 0, sIn = 0, sOut = 0;
+    imp.rows.forEach(function (x) { if (x.kind === 'in') { nIn++; sIn += x.amount; } else if (x.kind === 'move') nMove++; else { nOut++; sOut += x.amount; } });
+    var newOut = imp.newCats.filter(function (c) { return true; });
+    html += '<p class="lc-note"><b>' + escapeHtml(imp.fileName) + '</b><br>' + (imp.from ? imp.from.replace(/-/g, '.') + ' ~ ' + imp.to.replace(/-/g, '.') : '') + '</p>' +
+      '<div class="lg-imp__sum"><div><b>' + formatNumber(imp.rows.length) + '건</b><span>넣을 기록</span></div><div><b>' + formatNumber(nOut) + '</b><span>지출 ' + formatWonShort(sOut) + '</span></div><div><b>' + formatNumber(nIn) + '</b><span>수입 ' + formatWonShort(sIn) + '</span></div>' + (nMove ? '<div><b>' + nMove + '</b><span>이체</span></div>' : '') + '</div>' +
+      (imp.dup ? '<p class="lc-note mut">이미 있는 기록과 같은 ' + formatNumber(imp.dup) + '건은 빼요.</p>' : '') +
+      (imp.bad ? '<p class="lc-note mut">날짜나 금액을 읽지 못한 ' + formatNumber(imp.bad) + '줄은 건너뛰어요.</p>' : '');
+    if (newOut.length) {
+      html += '<fieldset class="chips-field"><legend>없는 분류 ' + newOut.length + '개: ' + newOut.map(function (c) { return escapeHtml(c.name) + '(' + c.n + ')'; }).join(', ') + '</legend><div class="choices">' +
+        ledgerChips('impcat', [{ value: 'new', label: '새 분류로 만들기' }, { value: 'etc', label: '기타로 넣기' }], imp.catMode || 'new') + '</div></fieldset>';
+    }
+    html += '<fieldset class="chips-field"><legend>누가 쓴 기록인가요?</legend><div class="choices">' + ledgerChips('impwho', LEDGER_WHO.concat([{ value: '', label: '함께' }]), imp.who || '') + '</div></fieldset>';
+    html += '<div class="lg-imp__prev"><p class="mut">미리 보기 (앞의 5건)</p><ul class="ledger-list">' + imp.rows.slice(0, 5).map(function (x) {
+      return '<li class="lg-imp__row"><span>' + x.date.slice(2).replace(/-/g, '.') + '</span><span>' + escapeHtml(x.cat || '기타') + '</span><span class="lg-imp__tx">' + escapeHtml(x.text) + '</span><b>' + (x.kind === 'in' ? '+' : '−') + formatNumber(x.amount) + '</b></li>';
+    }).join('') + '</ul></div>';
+    html += '<div class="sheet__actions"><button type="button" class="btn btn--primary" data-action="imp-go"' + (imp.rows.length ? '' : ' disabled') + '>' + formatNumber(imp.rows.length) + '건 넣기</button><button type="button" class="btn" data-action="imp-reset">다른 파일</button></div>';
+    return html + '</div>';
+  }
+  function openImport() {
+    if (!ui.ledgerForm) { try { window.history.pushState({ view: 'ledger', sheet: true }, ''); } catch (e) { /* ignore */ } }
+    ui.ledgerForm = 'import'; ui.imp = null;
+    renderLedgerSheet(true);
+    var t = $('#imp-title'); if (t) t.focus({ preventScroll: true });
+  }
+  function readCsvFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var buf = reader.result, text;
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+      catch (e) { try { text = new TextDecoder('euc-kr').decode(buf); } catch (e2) { text = ''; } }
+      ui.imp = text ? analyzeCsv(text, file.name) : { error: '파일을 읽지 못했어요.', fileName: file.name };
+      if (ui.imp.rows) { ui.imp.catMode = 'new'; ui.imp.who = ''; }
+      renderLedgerSheet(true);
+      var t = $('#imp-title'); if (t) t.focus({ preventScroll: true });
+    };
+    reader.onerror = function () { ui.imp = { error: '파일을 읽지 못했어요.', fileName: file.name }; renderLedgerSheet(true); };
+    reader.readAsArrayBuffer(file);
+  }
+  function runImport() {
+    var imp = ui.imp; if (!imp || !imp.rows || !imp.rows.length) return;
+    var panel = $('#ledger-sheet');
+    var mode = ((panel.querySelector('input[name="impcat"]:checked') || {}).value) || 'new';
+    var who = ((panel.querySelector('input[name="impwho"]:checked') || {}).value) || '';
+    if (LEDGER_WHO.indexOf(who) === -1) who = '';
+    if (state.ledger.length + imp.rows.length > LEDGER_MAX) { showToast('가계부에는 ' + formatNumber(LEDGER_MAX) + '건까지 넣을 수 있어요.'); return; }
+    var src = 'csv' + Date.now().toString(36);
+    var catsBefore = state.ledgerCats && state.ledgerCats.length ? JSON.parse(JSON.stringify(state.ledgerCats)) : [];
+    if (mode === 'new' && imp.newCats.length) {
+      var cats = ownCats(), k = cats.length;
+      imp.newCats.forEach(function (c) { if (!catOf(c.name, c.type)) { cats.push({ id: uid(), name: c.name, type: c.type, icon: 'tag', color: LC_COLORS[(k++ * 5) % LC_COLORS.length], excl: !!c.excl }); } });
+    }
+    var moveCat = (catsOf('out').filter(function (c) { return c.excl; })[0] || {}).name || '기타';
+    imp.rows.forEach(function (x) {
+      var type = x.kind === 'in' ? 'in' : 'out';
+      var cat = x.cat;
+      if (!cat || !catOf(cat, type)) cat = x.kind === 'move' ? moveCat : type === 'in' ? ((catsOf('in')[0] || {}).name || '기타') : '기타';
+      state.ledger.push({ id: uid(), date: x.date, type: type, amount: x.amount, cat: cat, text: x.text, who: who, pay: x.pay, t: x.t, src: src });
+    });
+    var n = imp.rows.length, last = imp.to;
+    ui.imp = null; ui.ledgerForm = null; dropSheetHistory();
+    if (last) { ui.ledgerMonth = last.slice(0, 7); ui.ledgerDay = ''; }
+    commit();
+    act('ledger', '가계부 CSV 가져오기 ' + n + '건');
+    showToast(formatNumber(n) + '건을 넣었어요.', function () {
+      state.ledger = state.ledger.filter(function (e) { return e.src !== src; });
+      state.ledgerCats = catsBefore; commit(); showToast('가져온 기록을 뺐어요.');
+    });
+  }
+  function undoImport(src) {
+    var n = state.ledger.filter(function (e) { return e.src === src; }).length;
+    if (!n || !window.confirm('가져온 기록 ' + n + '건을 모두 지울까요?')) return;
+    var removed = state.ledger.filter(function (e) { return e.src === src; });
+    state.ledger = state.ledger.filter(function (e) { return e.src !== src; });
+    commit(); renderLedgerSheet(true);
+    act('ledger', '가계부 가져온 기록 ' + n + '건 지움');
+    showToast(n + '건을 지웠어요.', function () { state.ledger = state.ledger.concat(removed); commit(); if (ui.ledgerForm === 'import') renderLedgerSheet(true); });
   }
 
   /* ---------- D-day ---------- */
@@ -5138,6 +5732,9 @@ datesSorted().forEach(function (d) {
       careTasks: state.careTasks,
       careDates: state.careDates,
       ledger: state.ledger,
+      ledgerCats: state.ledgerCats,
+      ledgerPays: state.ledgerPays,
+      ledgerFavs: state.ledgerFavs,
       budget: state.budget
     }, null, pretty ? 2 : 0);
   }
@@ -5239,7 +5836,7 @@ datesSorted().forEach(function (d) {
     if (el.readOnly || el.disabled) return false; // readonly share-link etc. must not block sync
     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file' || el.type === 'button') return false;
     // Only editable fields inside an item/note/highlights editor should defer a remote update.
-    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .gr-form, .bl-form, .bl-birth, .vx-form, .sp-spend, .care-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form, #goal-form');
+    return !!el.closest('.item--edit, .subs-manager, .is-qty-editing, .note-form, #highlights-form, #add-category-form, .pick-form, .date-form, .name-form, .support-form, .bt-form, .gr-form, .bl-form, .bl-birth, .vx-form, .sp-spend, .care-form, .memo-detail, .note__comments, .rx-comments, #view-settings, #ledger-form, .ledger-budget-form, .lc-editor, .lg-imp, .lg-search, #goal-form');
   }
 
   var migrationsQueued = false;
@@ -5262,7 +5859,7 @@ datesSorted().forEach(function (d) {
       // keep UI editors pointing at things that still exist
       if (ui.itemEdit && !findItem(ui.itemEdit)) ui.itemEdit = null;
       if (ui.qtyEdit && !findItem(ui.qtyEdit)) ui.qtyEdit = null;
-      if (ui.ledgerForm && ui.ledgerForm !== 'new' && !findEntry(ui.ledgerForm)) ui.ledgerForm = null;
+      if (ui.ledgerForm && ['new', 'cats', 'import'].indexOf(ui.ledgerForm) === -1 && !findEntry(ui.ledgerForm)) ui.ledgerForm = null;
       if (ui.noteForm && ui.noteForm !== 'new') {
         var still = state.notes.some(function (n) { return n.id === ui.noteForm; });
         if (!still) ui.noteForm = null;
@@ -5576,6 +6173,8 @@ datesSorted().forEach(function (d) {
     var ledgerView = $('#view-ledger');
     if (ledgerView) {
       ledgerView.addEventListener('click', function (e) {
+        // 길게 눌러 편집을 연 직후 손을 떼며 생기는 클릭은 버린다(그 자리에 새로 그려진 버튼이 눌리지 않게)
+        if (ui.lcLongAt && Date.now() - ui.lcLongAt < 900) { ui.lcLongAt = 0; e.preventDefault(); return; }
         var b = e.target.closest('[data-action]');
         if (!b) return;
         switch (b.dataset.action) {
@@ -5587,7 +6186,9 @@ datesSorted().forEach(function (d) {
             if (again) again.focus({ preventScroll: true });
             break;
           }
-          case 'ledger-new': openLedgerForm(null); break;
+          case 'ledger-tab': ui.ledgerTab = b.dataset.tab; renderLedger(); var tb = ledgerView.querySelector('[data-action="ledger-tab"][data-tab="' + b.dataset.tab + '"]'); if (tb) tb.focus({ preventScroll: true }); break;
+          case 'ledger-day': ui.ledgerDay = b.dataset.date; renderLedger(); var db = ledgerView.querySelector('[data-action="ledger-day"][data-date="' + b.dataset.date + '"]'); if (db) db.focus({ preventScroll: true }); break;
+          case 'ledger-new': openLedgerForm(null, b.dataset.date); break;
           case 'ledger-edit': openLedgerForm(b.dataset.id); break;
           case 'ledger-close': closeLedgerForm(); break;
           case 'ledger-delete': {
@@ -5598,21 +6199,84 @@ datesSorted().forEach(function (d) {
           case 'ledger-budget-edit': ui.budgetEdit = true; renderLedger(); var bi = $('#ledger-budget-input'); if (bi) bi.focus(); break;
           case 'ledger-budget-cancel': ui.budgetEdit = false; renderLedger(); break;
           case 'ledger-budget-clear': $('#ledger-budget-input').value = ''; saveBudget(); break;
+          // 자주 쓰는 내역
+          case 'lf-use': lfUse(b.dataset.id); break;
+          case 'lf-save': lfSave(); break;
+          case 'lf-edit': ui.lfEdit = !ui.lfEdit; $('#lf-box').innerHTML = ledgerFavRow(); break;
+          case 'lf-del': {
+            var fid = b.dataset.id, beforeF = (state.ledgerFavs || []).slice();
+            state.ledgerFavs = beforeF.filter(function (x) { return x.id !== fid; });
+            if (!state.ledgerFavs.length) ui.lfEdit = false;
+            commit(); $('#lf-box').innerHTML = ledgerFavRow();
+            showToast('자주 쓰는 내역에서 뺐어요.', function () { state.ledgerFavs = beforeF; commit(); var bx = $('#lf-box'); if (bx) bx.innerHTML = ledgerFavRow(); });
+            break;
+          }
+          // 분류·결제 편집
+          case 'lc-open': openLcEditor(!!$('#ledger-form'), b.dataset.new ? 'new' : null); break;
+          case 'lc-back': lcBack(); break;
+          case 'lc-tab': ui.lcTab = b.dataset.tab; ui.lcEdit = null; ui.lcDel = null; lcRerender('[data-action="lc-tab"][data-tab="' + b.dataset.tab + '"]'); break;
+          case 'lc-edit': ui.lcEdit = b.dataset.id; ui.lcDel = null; lcRerender('.lc-form input[name="name"]'); break;
+          case 'lc-cancel': ui.lcEdit = null; lcRerender('#lc-title'); break;
+          case 'lc-move': lcMove(b.dataset.id, parseInt(b.dataset.by, 10)); break;
+          case 'lc-del': {
+            var dc = ledgerCats().filter(function (x) { return x.id === b.dataset.id; })[0];
+            if (!dc) break;
+            if (!lcCount(dc)) lcDelete(dc.id, '');
+            else { ui.lcDel = dc.id; ui.lcEdit = null; lcRerender('#lc-del-to'); }
+            break;
+          }
+          case 'lc-del-cancel': ui.lcDel = null; lcRerender('#lc-title'); break;
+          case 'lc-del-go': lcDelete(b.dataset.id, $('#lc-del-to').value); break;
+          case 'lp-add': {
+            var pn = lpAdd();
+            if (pn && $('#ledger-form')) {
+              var chips = $('#ledger-pay-chips'), ex = chips.querySelector('input[name="pay"][value="' + cssEsc(pn) + '"]');
+              if (ex) ex.checked = true; else b.insertAdjacentHTML('beforebegin', ledgerChips('pay', [pn], pn));
+            } else if (ui.ledgerForm === 'cats') lcRerender('#lc-title');
+            break;
+          }
+          case 'lp-rename': lpRename(parseInt(b.dataset.i, 10)); break;
+          case 'lp-del': lpDel(parseInt(b.dataset.i, 10)); break;
+          case 'lp-move': lpMove(parseInt(b.dataset.i, 10), parseInt(b.dataset.by, 10)); break;
+          // CSV 가져오기
+          case 'ledger-import': openImport(); break;
+          case 'imp-go': runImport(); break;
+          case 'imp-reset': ui.imp = null; renderLedgerSheet(true); break;
+          case 'imp-undo': undoImport(b.dataset.src); break;
         }
       });
       ledgerView.addEventListener('submit', function (e) {
         if (e.target.id === 'ledger-form') { e.preventDefault(); submitLedgerForm(e.target); }
+        else if (e.target.matches('.lc-form')) { e.preventDefault(); submitLcForm(e.target); }
         else if (e.target.dataset.action === 'ledger-budget') { e.preventDefault(); saveBudget(); }
       });
       ledgerView.addEventListener('change', function (e) {
-        if (e.target.name !== 'type') return;
-        ui.ledgerType = e.target.value === 'in' ? 'in' : 'out';
-        var chips = $('#ledger-cat-chips');
-        if (chips) chips.innerHTML = ledgerChips('cat', ui.ledgerType === 'in' ? LEDGER_IN_CATS : LEDGER_OUT_CATS, ui.ledgerType === 'in' ? '급여' : '식비');
+        if (e.target.id === 'ledger-csv') { var file = e.target.files && e.target.files[0]; if (file) readCsvFile(file); return; }
+        if (ui.imp && e.target.name === 'impcat') { ui.imp.catMode = e.target.value; return; }
+        if (ui.imp && e.target.name === 'impwho') { ui.imp.who = e.target.value; return; }
+        if (e.target.name !== 'type' || !e.target.closest('#ledger-form')) return;
+        ui.ledgerType = e.target.value;
+        var grid = $('#ledger-cat-grid');
+        if (grid) grid.innerHTML = ledgerCatGrid(ui.ledgerType, '');
       });
       ledgerView.addEventListener('input', function (e) {
         if (e.target.hasAttribute('data-price-input') && !e.isComposing) formatPriceInput(e.target);
+        if (e.target.id === 'ledger-search') {
+          ui.ledgerQuery = e.target.value;
+          var res = $('#lg-results'); if (res) res.innerHTML = ledgerResultsHtml(ledgerMonth());
+        }
       });
+      // 분류를 길게 누르면 그 분류 고치기
+      var lcTimer = null, lcStart = null;
+      ledgerView.addEventListener('pointerdown', function (e) {
+        var opt = e.target.closest('.lc-opt[data-cat-id]'); if (!opt) return;
+        lcStart = { x: e.clientX, y: e.clientY };
+        clearTimeout(lcTimer);
+        lcTimer = setTimeout(function () { ui.lcLongAt = Date.now(); openLcEditor(true, opt.dataset.catId); }, 550);
+      });
+      ledgerView.addEventListener('pointermove', function (e) { if (lcStart && Math.abs(e.clientX - lcStart.x) + Math.abs(e.clientY - lcStart.y) > 10) { clearTimeout(lcTimer); lcStart = null; } });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (t) { ledgerView.addEventListener(t, function () { clearTimeout(lcTimer); lcStart = null; }); });
+      ledgerView.addEventListener('contextmenu', function (e) { if (e.target.closest('.lc-opt')) e.preventDefault(); });
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && ui.ledgerForm && ui.view === 'ledger') { e.preventDefault(); closeLedgerForm(); }
       });
