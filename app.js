@@ -2890,7 +2890,7 @@ datesSorted().forEach(function (d) {
     } else {
       var q = String(ui.ledgerQuery || '').trim();
       html += '<div class="lg-tools"><label class="visually-hidden" for="ledger-search">내역 검색</label><input type="search" id="ledger-search" class="lg-search" placeholder="검색: 내용·분류·카드·금액 (전체 기간)" value="' + escapeHtml(q) + '" autocomplete="off" data-focus-key="ledger-search" enterkeyhint="search">' +
-        '<button type="button" class="btn btn--small" data-action="lc-open">분류·결제 편집</button><button type="button" class="btn btn--small" data-action="ledger-import">CSV 가져오기</button></div>' +
+        '<button type="button" class="btn btn--small" data-action="lc-open">분류·결제 편집</button><button type="button" class="btn btn--small" data-action="ledger-import">CSV·SQLite 가져오기</button></div>' +
         '<div id="lg-results">' + ledgerResultsHtml(m) + '</div>';
     }
     root.innerHTML = html;
@@ -2921,7 +2921,7 @@ datesSorted().forEach(function (d) {
             }).join('') + '</ul></section>';
         }
         html += '<section class="ledger-card" aria-labelledby="ledger-list-title"><h3 class="ledger-card__title" id="ledger-list-title">내역 <span class="notes__count">' + (list.length ? list.length + '건' : '') + '</span></h3>' +
-          (list.length ? ledgerListHtml(list) : '<p class="ledger-empty">' + (state.ledger.length ? mo + '월에는 기록이 없어요.' : '아직 기록이 없어요. 아래 ‘기록’을 누르거나 ‘CSV 가져오기’로 예전 기록을 넣어 보세요.') + '</p>') + '</section>';
+          (list.length ? ledgerListHtml(list) : '<p class="ledger-empty">' + (state.ledger.length ? mo + '월에는 기록이 없어요.' : '아직 기록이 없어요. 아래 ‘기록’을 누르거나 ‘CSV·SQLite 가져오기’로 예전 기록을 넣어 보세요.') + '</p>') + '</section>';
       }
     return html;
   }
@@ -3354,22 +3354,7 @@ datesSorted().forEach(function (d) {
       var base = dateOf(dt.iso); if (dt.h !== null) base.setHours(dt.h, dt.mi || 0, 0, 0); else base.setHours(12, 0, 0, 0);
       out.push({ date: dt.iso, kind: kind, amount: Math.min(Math.round(Math.abs(amt)), PRICE_MAX), cat: cat.slice(0, LC_NAME_MAX), text: text.slice(0, LEDGER_TEXT_MAX), pay: get(r, 'pay').slice(0, LP_NAME_MAX), t: base.getTime() + n });
     });
-    // 이미 있는 기록과 같은 것(날짜·수입/지출·금액·내용)은 그만큼 빼고 넣는다
-    var have = {};
-    state.ledger.forEach(function (e) { var k = e.date + '|' + e.type + '|' + e.amount + '|' + e.text; have[k] = (have[k] || 0) + 1; });
-    var fresh = [], dup = 0;
-    out.forEach(function (x) {
-      var k = x.date + '|' + (x.kind === 'in' ? 'in' : 'out') + '|' + x.amount + '|' + x.text;
-      if (have[k]) { have[k]--; dup++; } else fresh.push(x);
-    });
-    var newCats = {};
-    fresh.forEach(function (x) {
-      var type = x.kind === 'in' ? 'in' : 'out';
-      if (!x.cat) return;
-      if (!catOf(x.cat, type)) newCats[type + ':' + x.cat] = { name: x.cat, type: type, excl: x.kind === 'move', n: (newCats[type + ':' + x.cat] || { n: 0 }).n + 1 };
-    });
-    var dates = fresh.map(function (x) { return x.date; }).sort();
-    return { fileName: fileName, rows: fresh, dup: dup, bad: bad, total: out.length, newCats: Object.keys(newCats).map(function (k) { return newCats[k]; }), from: dates[0] || '', to: dates[dates.length - 1] || '', cols: Object.keys(map) };
+    return finishAnalyze(out, bad, fileName);
   }
   function importBatches() {
     var b = {};
@@ -3379,11 +3364,13 @@ datesSorted().forEach(function (d) {
   function importPanelHtml() {
     var imp = ui.imp;
     var html = '<div class="sheet__panel lg-imp" role="dialog" aria-modal="true" aria-labelledby="imp-title"><span class="sheet__handle" aria-hidden="true"></span>' +
-      '<div class="sheet__head"><h2 id="imp-title" tabindex="-1">CSV 가져오기</h2><button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>';
+      '<div class="sheet__head"><h2 id="imp-title" tabindex="-1">기록 가져오기</h2><button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>';
+    if (imp && imp.loading) return html + '<p class="lc-note">‘' + escapeHtml(imp.fileName) + '’ 여는 중…</p></div>';
+    if (imp && imp.sq && !imp.rows) return html + sqMapHtml() + '</div>';
     if (!imp || imp.error) {
-      html += '<p class="lc-note">위플 가계부 등에서 내보낸 <b>CSV 파일</b>을 고르면, 넣기 전에 몇 건이 들어갈지 먼저 보여 드려요. 날짜·금액·분류·내용·결제수단 칸을 알아서 찾아요.</p>' +
+      html += '<p class="lc-note">위플 가계부 등에서 내보낸 <b>CSV 파일</b>이나 백업 <b>SQLite 파일</b>(.sqlite · .db)을 고르면, 넣기 전에 몇 건이 들어갈지 먼저 보여 드려요. 날짜·금액·분류·내용·결제수단 칸을 알아서 찾아요.</p>' +
         (imp && imp.error ? '<p class="lg-imp__err">' + escapeHtml(imp.fileName || '') + ': ' + escapeHtml(imp.error) + '</p>' : '') +
-        '<label class="btn btn--primary lg-imp__pick">CSV 파일 고르기<input type="file" id="ledger-csv" accept=".csv,text/csv,text/plain" hidden></label>';
+        '<label class="btn btn--primary lg-imp__pick">CSV · SQLite 파일 고르기<input type="file" id="ledger-csv" hidden></label>';
       var bs = importBatches();
       if (bs.length) html += '<div class="lg-imp__past"><p class="mut">가져온 기록</p>' + bs.map(function (b) {
         return '<div class="lg-imp__batch"><span>' + b.n + '건 · ' + b.from.replace(/-/g, '.') + ' ~ ' + b.to.replace(/-/g, '.') + '</span><button type="button" class="btn btn--small btn--danger" data-action="imp-undo" data-src="' + escapeHtml(b.id) + '">모두 지우기</button></div>';
@@ -3405,7 +3392,7 @@ datesSorted().forEach(function (d) {
     html += '<div class="lg-imp__prev"><p class="mut">미리 보기 (앞의 5건)</p><ul class="ledger-list">' + imp.rows.slice(0, 5).map(function (x) {
       return '<li class="lg-imp__row"><span>' + x.date.slice(2).replace(/-/g, '.') + '</span><span>' + escapeHtml(x.cat || '기타') + '</span><span class="lg-imp__tx">' + escapeHtml(x.text) + '</span><b>' + (x.kind === 'in' ? '+' : '−') + formatNumber(x.amount) + '</b></li>';
     }).join('') + '</ul></div>';
-    html += '<div class="sheet__actions"><button type="button" class="btn btn--primary" data-action="imp-go"' + (imp.rows.length ? '' : ' disabled') + '>' + formatNumber(imp.rows.length) + '건 넣기</button><button type="button" class="btn" data-action="imp-reset">다른 파일</button></div>';
+    html += '<div class="sheet__actions"><button type="button" class="btn btn--primary" data-action="imp-go"' + (imp.rows.length ? '' : ' disabled') + '>' + formatNumber(imp.rows.length) + '건 넣기</button>' + (imp.sq ? '<button type="button" class="btn" data-action="sq-back">칸 다시 고르기</button>' : '<button type="button" class="btn" data-action="imp-reset">다른 파일</button>') + '</div>';
     return html + '</div>';
   }
   function openImport() {
@@ -3414,10 +3401,234 @@ datesSorted().forEach(function (d) {
     renderLedgerSheet(true);
     var t = $('#imp-title'); if (t) t.focus({ preventScroll: true });
   }
-  function readCsvFile(file) {
+  // 가져올 행 목록 → 이미 있는 기록과 같은 것(날짜·수입/지출·금액·내용)은 그만큼 빼고, 없는 분류를 모은다
+  function finishAnalyze(out, bad, fileName) {
+    var have = {};
+    state.ledger.forEach(function (e) { var k = e.date + '|' + e.type + '|' + e.amount + '|' + e.text; have[k] = (have[k] || 0) + 1; });
+    var fresh = [], dup = 0;
+    out.forEach(function (x) {
+      var k = x.date + '|' + (x.kind === 'in' ? 'in' : 'out') + '|' + x.amount + '|' + x.text;
+      if (have[k]) { have[k]--; dup++; } else fresh.push(x);
+    });
+    var newCats = {};
+    fresh.forEach(function (x) {
+      var type = x.kind === 'in' ? 'in' : 'out';
+      if (!x.cat) return;
+      if (!catOf(x.cat, type)) newCats[type + ':' + x.cat] = { name: x.cat, type: type, excl: x.kind === 'move', n: (newCats[type + ':' + x.cat] || { n: 0 }).n + 1 };
+    });
+    var dates = fresh.map(function (x) { return x.date; }).sort();
+    return { fileName: fileName, rows: fresh, dup: dup, bad: bad, total: out.length, newCats: Object.keys(newCats).map(function (k) { return newCats[k]; }), from: dates[0] || '', to: dates[dates.length - 1] || '' };
+  }
+
+  /* ---------- SQLite 백업 파일 가져오기 (sql.js를 고를 때만 불러온다) ---------- */
+  var SQLJS_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/';
+  var sqlJsPromise = null, impDb = null;
+  function loadSqlJs() {
+    if (sqlJsPromise) return sqlJsPromise;
+    sqlJsPromise = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = SQLJS_BASE + 'sql-wasm.js';
+      s.onload = function () { window.initSqlJs({ locateFile: function (f) { return SQLJS_BASE + f; } }).then(resolve, reject); };
+      s.onerror = function () { reject(new Error('load')); };
+      document.head.appendChild(s);
+    }).catch(function (e) { sqlJsPromise = null; throw e; });
+    return sqlJsPromise;
+  }
+  var SQ_FIELDS = [['date', '날짜', true], ['amount', '금액', true], ['type', '수입/지출 구분'], ['cat', '분류'], ['text', '내용'], ['memo', '메모'], ['pay', '결제수단']];
+  var SQ_GUESS = {
+    date: /^(date|datetime|time|timestamp|regdate|regdt|created|createdat|createdate|txdate|transdate|usedate|ymd|day|날짜|일자|일시|거래일|사용일)/,
+    amount: /^(amount|amt|money|price|cost|value|sum|krw|금액|사용금액)/,
+    type: /^(type|kind|inout|iotype|division|direction|구분|유형|종류|수입지출)/,
+    cat: /^(category|cat|categoryid|catid|class|분류|카테고리|대분류)/,
+    text: /^(title|content|contents|desc|description|merchant|store|place|item|subject|내용|내역|사용처|가맹점)/,
+    memo: /^(memo|note|notes|comment|메모|비고)/,
+    pay: /^(payment|pay|method|asset|account|card|wallet|assetid|accountid|결제|자산|카드|계좌)/
+  };
+  function sqQ(name) { return '"' + String(name).replace(/"/g, '""') + '"'; }
+  // Core Data(아이폰 앱)는 표·칸 이름 앞에 Z가 붙는다: ZTRANSACTION.ZAMOUNT
+  function sqNorm(col) { var s = String(col); if (/^Z[A-Z_]/.test(s)) s = s.slice(1); return s.toLowerCase().replace(/[^a-z0-9가-힣]/g, ''); }
+  var sqCache = {};
+  function sqRows(table) {
+    if (sqCache[table]) return sqCache[table];
+    var r = impDb.exec('SELECT * FROM ' + sqQ(table));
+    return (sqCache[table] = r.length ? r[0] : { columns: [], values: [] });
+  }
+  function sqGuessMap(cols) {
+    var map = {};
+    Object.keys(SQ_GUESS).forEach(function (k) {
+      for (var i = 0; i < cols.length; i++) {
+        var n = sqNorm(cols[i]);
+        if (/^(pk|ent|opt|id|rowid)$/.test(n)) continue;
+        if (SQ_GUESS[k].test(n) && !Object.keys(map).some(function (x) { return map[x] === cols[i]; })) { map[k] = cols[i]; break; }
+      }
+    });
+    return map;
+  }
+  function sqTables() {
+    var r = impDb.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
+    return (r.length ? r[0].values : []).map(function (v) {
+      var name = v[0], cols = [], n = 0;
+      try { var ti = impDb.exec('PRAGMA table_info(' + sqQ(name) + ')'); cols = ti.length ? ti[0].values.map(function (c) { return c[1]; }) : []; } catch (e) { /* ignore */ }
+      try { n = impDb.exec('SELECT COUNT(*) FROM ' + sqQ(name))[0].values[0][0]; } catch (e) { /* ignore */ }
+      var g = sqGuessMap(cols);
+      return { name: name, cols: cols, n: n, score: (g.date ? 2 : 0) + (g.amount ? 2 : 0) + (g.cat ? 1 : 0) + (g.text ? 1 : 0) + (n ? 1 : 0) };
+    });
+  }
+  // 숫자 날짜: YYYYMMDD · 엑셀 일련번호 · 애플(2001년 기준 초) · 유닉스 초 · 밀리초
+  function sqDate(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (typeof v === 'number' || /^-?\d+(\.\d+)?$/.test(String(v).trim())) {
+      var n = Number(v), d;
+      if (n >= 19000101 && n <= 21001231 && Math.floor(n) === n) return csvDate(String(n));
+      if (n >= 30000 && n < 80000) d = new Date(Date.UTC(1899, 11, 30) + n * 86400000);
+      else if (n >= 1e8 && n < 1.2e9) d = new Date((978307200 + n) * 1000);
+      else if (n >= 1.2e9 && n < 1e11) d = new Date(n * 1000);
+      else if (n >= 1e11) d = new Date(n);
+      else return null;
+      if (isNaN(d)) return null;
+      return { iso: isoOf(d), h: d.getHours(), mi: d.getMinutes() };
+    }
+    return csvDate(String(v));
+  }
+  // 분류·결제 칸이 번호면 다른 표에서 이름을 찾는다(Core Data: ZCATEGORY.Z_PK → ZNAME)
+  function sqResolveRef(table, col, hint) {
+    var data = sqRows(table), ci = data.columns.indexOf(col);
+    var vals = {}, total = 0, nums = 0;
+    data.values.forEach(function (r) { var v = r[ci]; if (v !== null && v !== '') { total++; if (/^\d+$/.test(String(v))) { nums++; vals[String(v)] = true; } } });
+    var keys = Object.keys(vals);
+    if (!total || !keys.length || nums < total * 0.8) return null; // 글자로 된 칸이면 그대로 쓴다
+    var best = null;
+    ui.imp.sq.tables.forEach(function (t) {
+      if (t.name === table || !t.n) return;
+      var key = ['Z_PK', 'id', '_id', 'ID', 'Id', 'idx', 'seq'].filter(function (k) { return t.cols.indexOf(k) !== -1; })[0] || 'rowid';
+      var rows; try { rows = impDb.exec('SELECT ' + (key === 'rowid' ? 'rowid' : sqQ(key)) + ', * FROM ' + sqQ(t.name)); } catch (e) { return; }
+      if (!rows.length) return;
+      var cols = rows[0].columns.slice(1), vs = rows[0].values;
+      var nameCol = cols.filter(function (c) { return /^(name|title|label|text|이름|명칭|분류명)/.test(sqNorm(c)); })[0];
+      if (!nameCol) nameCol = cols.filter(function (c, i) { return vs.some(function (r) { return typeof r[i + 1] === 'string' && r[i + 1].trim() && !/^\d+$/.test(r[i + 1]); }); })[0];
+      if (!nameCol) return;
+      var ni = cols.indexOf(nameCol) + 1, m = {};
+      vs.forEach(function (r) { if (r[0] !== null && typeof r[ni] === 'string') m[String(r[0])] = r[ni].trim(); });
+      var hit = keys.filter(function (k) { return m[k]; }).length / keys.length;
+      var score = hit + (hint.test(t.name.toLowerCase()) ? 0.5 : 0);
+      if (hit >= 0.6 && (!best || score > best.score)) best = { table: t.name, name: nameCol, map: m, score: score };
+    });
+    return best;
+  }
+  function sqSetTable(name) {
+    var sq = ui.imp.sq, t = sq.tables.filter(function (x) { return x.name === name; })[0]; if (!t) return;
+    sq.table = name; sq.map = sqGuessMap(t.cols); sq.typeVals = {}; sq.refs = {};
+    sqRefresh();
+  }
+  function sqRefresh() {
+    var sq = ui.imp.sq;
+    sq.refs = {};
+    if (sq.map.cat) sq.refs.cat = sqResolveRef(sq.table, sq.map.cat, /categ|class|분류/);
+    if (sq.map.pay) sq.refs.pay = sqResolveRef(sq.table, sq.map.pay, /asset|account|card|pay|wallet|자산|카드|계좌/);
+    sq.typeList = [];
+    if (sq.map.type) {
+      // 값이 숫자(0·1·2)여도 그 값 기록들의 분류 이름(월급·저축 등)으로 수입·이체를 짐작한다
+      var data = sqRows(sq.table), ci = data.columns.indexOf(sq.map.type), ki = data.columns.indexOf(sq.map.cat || ''), cref = sq.refs.cat, cnt = {}, kin = {}, kmove = {};
+      data.values.forEach(function (r) {
+        var v = String(r[ci] === null ? '' : r[ci]); cnt[v] = (cnt[v] || 0) + 1;
+        if (ki === -1) return;
+        var cv = r[ki], name = cref && cref.map[String(cv)] ? cref.map[String(cv)] : String(cv === null ? '' : cv);
+        if (catOf(name, 'in')) kin[v] = (kin[v] || 0) + 1;
+        else { var oc = catOf(name, 'out'); if (oc && oc.excl) kmove[v] = (kmove[v] || 0) + 1; }
+      });
+      sq.typeList = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; }).slice(0, 12).map(function (v) {
+        if (!sq.typeVals[v]) sq.typeVals[v] = /수입|입금|income|in$/i.test(v) ? 'in' : /이체|저축|transfer|move/i.test(v) ? 'move' : /지출|출금|expense|out$/i.test(v) ? 'out' :
+          (kin[v] || 0) > cnt[v] / 2 ? 'in' : (kmove[v] || 0) > cnt[v] / 2 ? 'move' : 'out';
+        return { v: v, n: cnt[v] };
+      });
+    }
+  }
+  function sqSample(col, field) {
+    if (!col) return '';
+    var data = sqRows(ui.imp.sq.table), ci = data.columns.indexOf(col), seen = [], ref = ui.imp.sq.refs[field];
+    for (var i = 0; i < data.values.length && seen.length < 3; i++) {
+      var v = data.values[i][ci]; if (v === null || v === '') continue;
+      var s = field === 'date' ? (function () { var d = sqDate(v); return d ? d.iso.replace(/-/g, '.') + ' ← ' + v : '? ' + v; })() : ref && ref.map[String(v)] ? ref.map[String(v)] + ' ← ' + v : String(v);
+      if (seen.indexOf(s) === -1) seen.push(s);
+    }
+    return seen.map(function (s) { return escapeHtml(String(s).slice(0, 40)); }).join(' · ');
+  }
+  function sqMapHtml() {
+    var sq = ui.imp.sq, t = sq.tables.filter(function (x) { return x.name === sq.table; })[0];
+    var html = '<p class="lc-note"><b>' + escapeHtml(ui.imp.fileName) + '</b> (SQLite)<br>기록이 들어 있는 표와 칸을 골라 주세요. 알아서 고른 것이 맞는지 예시를 보고 확인하면 돼요.</p>' +
+      '<div class="sq-f"><label for="sq-table">표</label><select id="sq-table" data-sq="table">' + sq.tables.map(function (x) {
+        return '<option value="' + escapeHtml(x.name) + '"' + (x.name === sq.table ? ' selected' : '') + '>' + escapeHtml(x.name) + ' · ' + formatNumber(x.n) + '줄</option>';
+      }).join('') + '</select></div>';
+    SQ_FIELDS.forEach(function (f) {
+      var cur = sq.map[f[0]] || '', ref = sq.refs[f[0]];
+      html += '<div class="sq-f"><label for="sq-' + f[0] + '">' + f[1] + (f[2] ? ' *' : '') + '</label><select id="sq-' + f[0] + '" data-sq="' + f[0] + '"><option value="">' + (f[2] ? '골라 주세요' : '없음') + '</option>' +
+        t.cols.map(function (c) { return '<option value="' + escapeHtml(c) + '"' + (c === cur ? ' selected' : '') + '>' + escapeHtml(c) + '</option>'; }).join('') + '</select>' +
+        (cur ? '<small>' + (ref ? '이름은 ' + escapeHtml(ref.table + '.' + ref.name) + '에서 · ' : '') + '예: ' + sqSample(cur, f[0]) + '</small>' : '') + '</div>';
+    });
+    if (sq.typeList && sq.typeList.length) {
+      html += '<fieldset class="chips-field"><legend>‘' + escapeHtml(sq.map.type) + '’ 값마다 종류를 골라 주세요</legend>' + sq.typeList.map(function (x, i) {
+        return '<div class="sq-f sq-f--row"><label for="sqt-' + i + '">' + escapeHtml(x.v || '(빈 값)') + ' <small>' + formatNumber(x.n) + '건</small></label><select id="sqt-' + i + '" data-sqt="' + escapeHtml(x.v) + '">' +
+          [['out', '지출'], ['in', '수입'], ['move', '이체·저축'], ['skip', '넣지 않기']].map(function (o) { return '<option value="' + o[0] + '"' + (sq.typeVals[x.v] === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>';
+      }).join('') + '</fieldset>';
+    } else html += '<p class="lc-note mut">구분 칸이 없으면 금액이 마이너스이거나 지출 분류면 지출, 수입 분류(월급·용돈)면 수입으로 봐요.</p>';
+    var ok = sq.map.date && sq.map.amount;
+    return html + '<div class="sheet__actions"><button type="button" class="btn btn--primary" data-action="sq-preview"' + (ok ? '' : ' disabled') + '>미리 보기</button><button type="button" class="btn" data-action="imp-reset">다른 파일</button></div>';
+  }
+  function sqBuild() {
+    var sq = ui.imp.sq, data = sqRows(sq.table), idx = {};
+    Object.keys(sq.map).forEach(function (k) { if (sq.map[k]) idx[k] = data.columns.indexOf(sq.map[k]); });
+    var get = function (r, k) {
+      if (idx[k] === undefined || idx[k] === -1) return '';
+      var v = r[idx[k]]; if (v === null || v === undefined) return '';
+      var ref = sq.refs[k]; if (ref && ref.map[String(v)]) return ref.map[String(v)];
+      return v;
+    };
+    var inNames = {}; catsOf('in').forEach(function (c) { inNames[c.name] = true; });
+    var out = [], bad = 0;
+    data.values.forEach(function (r, n) {
+      var dt = sqDate(get(r, 'date')), amt = csvNum(get(r, 'amount'));
+      if (!dt || !amt) { bad++; return; }
+      var kind = sq.map.type ? sq.typeVals[String(r[idx.type] === null ? '' : r[idx.type])] || 'out' : '';
+      if (kind === 'skip') return;
+      var cat = String(get(r, 'cat')).trim();
+      if (!kind) kind = amt > 0 && inNames[cat] ? 'in' : 'out';
+      var text = String(get(r, 'text')).trim(), memo = String(get(r, 'memo')).trim();
+      if (!text) text = memo; else if (memo && memo !== text) text += ' · ' + memo;
+      var base = dateOf(dt.iso); if (dt.h !== null && dt.h !== undefined) base.setHours(dt.h, dt.mi || 0, 0, 0); else base.setHours(12, 0, 0, 0);
+      out.push({ date: dt.iso, kind: kind, amount: Math.min(Math.round(Math.abs(amt)), PRICE_MAX), cat: cat.slice(0, LC_NAME_MAX), text: text.slice(0, LEDGER_TEXT_MAX), pay: String(get(r, 'pay')).trim().slice(0, LP_NAME_MAX), t: base.getTime() + n });
+    });
+    var res = finishAnalyze(out, bad, ui.imp.fileName);
+    res.sq = sq; res.catMode = 'new'; res.who = '';
+    ui.imp = res;
+  }
+  function openSqlite(buf, fileName) {
+    ui.imp = { loading: true, fileName: fileName };
+    renderLedgerSheet(true);
+    loadSqlJs().then(function (SQL) {
+      try { if (impDb) impDb.close(); } catch (e) { /* ignore */ }
+      impDb = new SQL.Database(new Uint8Array(buf)); sqCache = {};
+      var tables = sqTables().filter(function (t) { return t.cols.length; });
+      if (!tables.length) { ui.imp = { error: '파일 안에 표가 없어요.', fileName: fileName }; renderLedgerSheet(true); return; }
+      var best = tables.slice().sort(function (a, b) { return (b.score - a.score) || (b.n - a.n); })[0];
+      ui.imp = { fileName: fileName, sq: { tables: tables, table: '', map: {}, typeVals: {}, refs: {} } };
+      sqSetTable(best.name);
+      renderLedgerSheet(true);
+      var tt = $('#imp-title'); if (tt) tt.focus({ preventScroll: true });
+    }, function () {
+      ui.imp = { error: 'SQLite를 여는 도구를 불러오지 못했어요. 인터넷 연결을 확인하고 다시 골라 주세요.', fileName: fileName };
+      renderLedgerSheet(true);
+    }).catch(function () {
+      ui.imp = { error: 'SQLite 파일을 열지 못했어요. 파일이 깨졌거나 암호가 걸려 있을 수 있어요.', fileName: fileName };
+      renderLedgerSheet(true);
+    });
+  }
+  function readImportFile(file) {
     var reader = new FileReader();
     reader.onload = function () {
-      var buf = reader.result, text;
+      var buf = reader.result, head = new Uint8Array(buf.slice(0, 16)), magic = String.fromCharCode.apply(null, head);
+      if (magic.indexOf('SQLite format 3') === 0) { openSqlite(buf, file.name); return; }
+      if (head[0] === 0x50 && head[1] === 0x4B) { ui.imp = { error: '압축(zip) 파일이에요. 압축을 푼 뒤 안에 있는 .sqlite·.db 또는 .csv 파일을 골라 주세요.', fileName: file.name }; renderLedgerSheet(true); return; }
+      var text;
       try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
       catch (e) { try { text = new TextDecoder('euc-kr').decode(buf); } catch (e2) { text = ''; } }
       ui.imp = text ? analyzeCsv(text, file.name) : { error: '파일을 읽지 못했어요.', fileName: file.name };
@@ -6242,6 +6453,8 @@ datesSorted().forEach(function (d) {
           case 'ledger-import': openImport(); break;
           case 'imp-go': runImport(); break;
           case 'imp-reset': ui.imp = null; renderLedgerSheet(true); break;
+          case 'sq-preview': sqBuild(); renderLedgerSheet(true); var it = $('#imp-title'); if (it) it.focus({ preventScroll: true }); break;
+          case 'sq-back': if (ui.imp && ui.imp.sq) { ui.imp = { fileName: ui.imp.fileName, sq: ui.imp.sq }; renderLedgerSheet(true); } break;
           case 'imp-undo': undoImport(b.dataset.src); break;
         }
       });
@@ -6251,7 +6464,13 @@ datesSorted().forEach(function (d) {
         else if (e.target.dataset.action === 'ledger-budget') { e.preventDefault(); saveBudget(); }
       });
       ledgerView.addEventListener('change', function (e) {
-        if (e.target.id === 'ledger-csv') { var file = e.target.files && e.target.files[0]; if (file) readCsvFile(file); return; }
+        if (e.target.id === 'ledger-csv') { var file = e.target.files && e.target.files[0]; if (file) readImportFile(file); e.target.value = ''; return; }
+        if (ui.imp && ui.imp.sq && e.target.dataset.sq) {
+          var fld = e.target.dataset.sq;
+          if (fld === 'table') sqSetTable(e.target.value); else { ui.imp.sq.map[fld] = e.target.value; if (fld === 'type') ui.imp.sq.typeVals = {}; sqRefresh(); }
+          renderLedgerSheet(true); var again = $('#sq-' + fld); if (again) again.focus({ preventScroll: true }); return;
+        }
+        if (ui.imp && ui.imp.sq && e.target.hasAttribute('data-sqt')) { ui.imp.sq.typeVals[e.target.getAttribute('data-sqt')] = e.target.value; return; }
         if (ui.imp && e.target.name === 'impcat') { ui.imp.catMode = e.target.value; return; }
         if (ui.imp && e.target.name === 'impwho') { ui.imp.who = e.target.value; return; }
         if (e.target.name !== 'type' || !e.target.closest('#ledger-form')) return;

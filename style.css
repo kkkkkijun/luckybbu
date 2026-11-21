@@ -1871,3 +1871,8 @@ a.care-link { display: inline-flex; align-items: center; text-decoration: none; 
 .lg-imp__row span:first-child { color: var(--muted); font-variant-numeric: tabular-nums; }
 .lg-imp__tx { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lg-imp__row b { font-variant-numeric: tabular-nums; }
+.sq-f { display: grid; gap: 4px; }
+.sq-f label { font-size: 0.8rem; color: var(--muted); }
+.sq-f select { min-height: 44px; border: 1px solid var(--border); border-radius: 10px; padding: 0 10px; font: inherit; background: #fff; max-width: 100%; }
+.sq-f small { font-size: 0.74rem; color: var(--mint-ink); word-break: break-all; }
+.sq-f--row { grid-template-columns: minmax(0, 1fr) 140px; align-items: center; margin-top: 6px; }
