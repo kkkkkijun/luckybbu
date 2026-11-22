@@ -2838,7 +2838,7 @@ datesSorted().forEach(function (d) {
 
   var CAL_COLORS = ['#6FA8E8', '#EE8FB0', '#F5C24B'];
   var CAL_REP = { w: '매주', m: '매달', y: '매년' };
-  var CAL_TITLE_MAX = 40, CAL_MEMO_MAX = 100;
+  var CAL_TITLE_MAX = 40, CAL_MEMO_MAX = 100, CAL_PLACE_MAX = 40;
   function calWhoList() { return [TAG_NAMES[0], TAG_NAMES[1], '함께']; }
   function calWhoIdx(w) { var i = calWhoList().indexOf(w); return i === -1 ? 2 : i; }
   function calDefaultWho() { var me = myName(); return calWhoList().indexOf(me) !== -1 ? me : '함께'; }
@@ -2871,6 +2871,7 @@ datesSorted().forEach(function (d) {
     return html + (list.length > 3 ? '<b>+</b>' : '');
   }
   var CAL_ICON_REP = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
+  var CAL_ICON_PIN = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>';
   var CAL_ICON_MOON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.6A8.2 8.2 0 1 1 9.4 4a6.6 6.6 0 0 0 10.6 10.6z"/></svg>';
   function renderCalendar() {
     var root = $('#cal-root'); if (!root || ui.view !== 'calendar') return;
@@ -2896,6 +2897,7 @@ datesSorted().forEach(function (d) {
     var items = occ[sel] || [];
     html += items.length ? '<ul class="cal-list">' + items.map(function (ev) {
       var i = calWhoIdx(ev.who), sub = [];
+      if (ev.place) sub.push(CAL_ICON_PIN + escapeHtml(ev.place));
       if (ev.start && ev.end) sub.push(ev.start + ' ~ ' + ev.end);
       if (ev.rep) sub.push(CAL_ICON_REP + CAL_REP[ev.rep]);
       if (ev.lunar) sub.push(CAL_ICON_MOON + lunarText(ev.lunar));
@@ -2916,7 +2918,7 @@ datesSorted().forEach(function (d) {
     var ev = id ? calFind(id) : null; if (id && !ev) return;
     var date = ev ? ev.date : calSel(), L = ev && ev.lunar ? ev.lunar : solarToLunar(date);
     ui.calForm = ev ? ev.id : 'new';
-    ui.calDraft = { title: ev ? ev.title : '', date: date, lunarOn: !!(ev && ev.lunar), ly: L ? (ev && ev.lunar ? +date.slice(0, 4) : L.y) : +date.slice(0, 4), lm: L ? L.m : 1, ld: L ? L.d : 1, leap: !!(L && L.leap), start: ev ? ev.start : '', end: ev ? ev.end : '', rep: ev ? ev.rep : '', who: ev ? (ev.who || '함께') : calDefaultWho(), memo: ev ? ev.memo : '' };
+    ui.calDraft = { title: ev ? ev.title : '', date: date, lunarOn: !!(ev && ev.lunar), ly: L ? (ev && ev.lunar ? +date.slice(0, 4) : L.y) : +date.slice(0, 4), lm: L ? L.m : 1, ld: L ? L.d : 1, leap: !!(L && L.leap), start: ev ? ev.start : '', end: ev ? ev.end : '', rep: ev ? ev.rep : '', who: ev ? (ev.who || '함께') : calDefaultWho(), memo: ev ? ev.memo : '', place: ev ? (ev.place || '') : '' };
     if (ev && ev.lunar) { var l2 = solarToLunar(ev.date); if (l2) ui.calDraft.ly = l2.y; }
     var m = $('#cal-modal'); if (!m) return;
     calRenderForm();
@@ -2953,7 +2955,8 @@ datesSorted().forEach(function (d) {
     var stamp = function (t) { var x = new Date(t); return (x.getMonth() + 1) + '/' + x.getDate() + ' ' + pad2(x.getHours()) + ':' + pad2(x.getMinutes()); };
     m.querySelector('.modal__box').innerHTML = '<form id="cal-form" novalidate><div class="modal__head"><h3 class="modal__title" id="cal-modal-title">' + (ev ? '일정 고치기' : '일정 추가') + '</h3><button type="button" class="modal__close" data-action="cal-close" aria-label="닫기">×</button></div>' +
       '<div class="cal-form">' +
-      '<label class="cal-f"><span>제목</span><input type="text" id="cal-title" name="title" maxlength="' + CAL_TITLE_MAX + '" value="' + escapeHtml(d.title) + '" placeholder="예: 소아과 검진" autocomplete="off" enterkeyhint="done"></label>' +
+      '<label class="cal-f"><span>제목</span><input type="text" id="cal-title" name="title" maxlength="' + CAL_TITLE_MAX + '" value="' + escapeHtml(d.title) + '" placeholder="예: 소아과 검진" autocomplete="off" enterkeyhint="next"></label>' +
+      '<label class="cal-f"><span>장소</span><input type="text" id="cal-place" name="place" maxlength="' + CAL_PLACE_MAX + '" value="' + escapeHtml(d.place || '') + '" placeholder="예: 마포 소아과" autocomplete="off" enterkeyhint="done"></label>' +
       '<div class="cal-f"><span>날짜</span>' + calSeg('cal', [['sol', '양력'], ['lun', '음력']], d.lunarOn ? 'lun' : 'sol') +
         (d.lunarOn
           ? '<div class="cal-lunar"><label class="visually-hidden" for="cal-ly">음력 연도</label><select id="cal-ly" name="ly">' + years.map(function (v) { return opt(v, v + '년', d.ly); }).join('') + '</select>' +
@@ -2966,7 +2969,7 @@ datesSorted().forEach(function (d) {
         '<button type="button" class="btn btn--small" data-action="cal-allday"' + (d.start || d.end ? '' : ' disabled') + '>시간 지우기</button></div></div>' +
       '<div class="cal-f"><span>반복</span>' + calSeg('rep', d.lunarOn ? [['', '안 함'], ['y', '매년']] : [['', '안 함'], ['w', '매주'], ['m', '매달'], ['y', '매년']], d.rep) + '</div>' +
       '<div class="cal-f"><span>누구 일정</span><div class="cal-whos">' + whoBtns + '</div></div>' +
-      '<label class="cal-f"><span>메모</span><input type="text" name="memo" maxlength="' + CAL_MEMO_MAX + '" value="' + escapeHtml(d.memo) + '" placeholder="장소 · 준비물 등" autocomplete="off" enterkeyhint="done"></label>' +
+      '<label class="cal-f"><span>메모</span><input type="text" name="memo" maxlength="' + CAL_MEMO_MAX + '" value="' + escapeHtml(d.memo) + '" placeholder="준비물 · 전할 말 등" autocomplete="off" enterkeyhint="done"></label>' +
       (ev ? '<p class="cal-by">' + escapeHtml(ev.by || '알 수 없음') + ' 작성' + (ev.at ? ' · ' + stamp(ev.at) : '') + (ev.eby ? ' · ' + escapeHtml(ev.eby) + ' 고침' + (ev.eat ? ' ' + stamp(ev.eat) : '') : '') + '</p>' : '<p class="cal-by">' + escapeHtml(myName()) + ' 작성으로 저장돼요</p>') +
       '<div class="modal__actions">' + (ev ? '<button type="button" class="btn bt-tool--danger" data-action="cal-del">' + (ev.rep ? '반복 일정 삭제' : '삭제') + '</button>' : '') +
       '<button type="submit" class="btn btn--primary modal__done">저장</button></div></div></form>';
@@ -2974,7 +2977,7 @@ datesSorted().forEach(function (d) {
   function calReadForm() {
     var f = $('#cal-form'), d = ui.calDraft; if (!f || !d) return;
     var el = f.elements;
-    d.title = el.title.value; d.memo = el.memo.value; d.start = el.start.value; d.end = el.end.value;
+    d.title = el.title.value; d.place = el.place.value; d.memo = el.memo.value; d.start = el.start.value; d.end = el.end.value;
     if (el.date) d.date = el.date.value;
     if (el.ly) { d.ly = +el.ly.value; d.lm = +el.lm.value; d.ld = +el.ld.value; d.leap = el.leap.checked; }
   }
@@ -3004,7 +3007,7 @@ datesSorted().forEach(function (d) {
     if (!start && d.end) { showToast('끝 시간만 있으면 안 돼요. 시작 시간을 적어 주세요.'); return; }
     if (end && end < start) { showToast('끝 시간이 시작보다 빨라요.'); return; }
     var rep = lunar ? (d.rep === 'y' ? 'y' : '') : (['w', 'm', 'y'].indexOf(d.rep) !== -1 ? d.rep : '');
-    var fields = { title: title, date: date, start: start, end: end, rep: rep, who: calWhoList().indexOf(d.who) !== -1 ? d.who : '함께', memo: String(d.memo || '').trim().slice(0, CAL_MEMO_MAX) };
+    var fields = { title: title, date: date, start: start, end: end, rep: rep, who: calWhoList().indexOf(d.who) !== -1 ? d.who : '함께', memo: String(d.memo || '').trim().slice(0, CAL_MEMO_MAX), place: String(d.place || '').trim().slice(0, CAL_PLACE_MAX) };
     var ev = ui.calForm !== 'new' ? calFind(ui.calForm) : null;
     if (ev) { Object.keys(fields).forEach(function (k) { ev[k] = fields[k]; }); if (lunar) ev.lunar = lunar; else delete ev.lunar; ev.eby = myName(); ev.eat = Date.now(); }
     else { ev = fields; ev.id = uid(); ev.by = myName(); ev.at = Date.now(); ev.eby = ''; ev.eat = 0; if (lunar) ev.lunar = lunar; state.events = (state.events || []).concat([ev]); }
@@ -3029,7 +3032,7 @@ datesSorted().forEach(function (d) {
       if (typeof e.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) return;
       var title = str(e.title, CAL_TITLE_MAX); if (!title) return;
       seen[e.id] = true;
-      var ev = { id: e.id, title: title, date: e.date, start: tm(e.start), end: '', rep: ['w', 'm', 'y'].indexOf(e.rep) !== -1 ? e.rep : '', who: str(e.who, 12), memo: str(e.memo, CAL_MEMO_MAX), by: str(e.by, 12), at: typeof e.at === 'number' ? e.at : 0, eby: str(e.eby, 12), eat: typeof e.eat === 'number' ? e.eat : 0 };
+      var ev = { id: e.id, title: title, date: e.date, start: tm(e.start), end: '', rep: ['w', 'm', 'y'].indexOf(e.rep) !== -1 ? e.rep : '', who: str(e.who, 12), memo: str(e.memo, CAL_MEMO_MAX), place: str(e.place, CAL_PLACE_MAX), by: str(e.by, 12), at: typeof e.at === 'number' ? e.at : 0, eby: str(e.eby, 12), eat: typeof e.eat === 'number' ? e.eat : 0 };
       if (ev.start) ev.end = tm(e.end);
       var L = e.lunar;
       if (L && typeof L === 'object' && +L.m >= 1 && +L.m <= 12 && +L.d >= 1 && +L.d <= 30) ev.lunar = { y: +L.y || +e.date.slice(0, 4), m: +L.m, d: +L.d, leap: L.leap === true };
