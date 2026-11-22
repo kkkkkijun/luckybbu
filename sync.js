@@ -158,6 +158,8 @@
     (s.ledgerFavs || []).forEach(function (f, i) { doc.ledgerFavs[f.id] = { text: f.text || '', amount: f.amount || 0, type: f.type || 'out', cat: f.cat || '', pay: f.pay || '', order: i }; });
     doc.ledgerPays = (s.ledgerPays && s.ledgerPays.length) ? s.ledgerPays.slice() : null;
     doc.ledgerWho = (s.ledgerWho && s.ledgerWho.length) ? s.ledgerWho.slice() : null;
+    doc.events = {};
+    (s.events || []).forEach(function (e) { var d = { title: e.title, date: e.date, start: e.start || '', end: e.end || '', rep: e.rep || '', who: e.who || '', memo: e.memo || '', by: e.by || '', at: e.at || 0, eby: e.eby || '', eat: e.eat || 0 }; if (e.lunar) d.lunar = { y: e.lunar.y, m: e.lunar.m, d: e.lunar.d, leap: !!e.lunar.leap }; doc.events[e.id] = d; });
     doc.memo = s.memo || '';
     doc.spendTags = (s.spendTags && s.spendTags.length) ? s.spendTags.slice() : null;
     doc.memos = {};
@@ -221,6 +223,7 @@
       ledgerFavs: sortedEntries(doc.ledgerFavs).map(function (f) { return { id: f.id, text: f.text || '', amount: typeof f.amount === 'number' ? f.amount : 0, type: f.type || 'out', cat: f.cat || '', pay: f.pay || '' }; }),
       ledgerPays: asArr(doc.ledgerPays).filter(function (t) { return typeof t === 'string'; }),
       ledgerWho: asArr(doc.ledgerWho).filter(function (t) { return typeof t === 'string'; }),
+      events: Object.keys(doc.events || {}).map(function (id) { var e = doc.events[id] || {}; var out = { id: id, title: e.title || '', date: e.date, start: e.start || '', end: e.end || '', rep: e.rep || '', who: e.who || '', memo: e.memo || '', by: e.by || '', at: typeof e.at === 'number' ? e.at : 0, eby: e.eby || '', eat: typeof e.eat === 'number' ? e.eat : 0 }; if (e.lunar && typeof e.lunar === 'object') out.lunar = { y: e.lunar.y, m: e.lunar.m, d: e.lunar.d, leap: e.lunar.leap === true }; return out; }),
       memo: typeof doc.memo === 'string' ? doc.memo : '',
       spendTags: asArr(doc.spendTags).filter(function (t) { return typeof t === 'string'; }),
       memos: sortedEntries(doc.memos).map(function (m) { return { id: m.id, text: m.text || '', updated: typeof m.updated === 'number' ? m.updated : 0, who: m.who || '', fav: m.fav === true, likes: m.likes || [], comments: m.comments || [], tables: m.tables || [] }; }),
@@ -231,14 +234,14 @@
   }
 
   function isEmptyDoc(doc) {
-    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !Object.keys(doc.vaccines || {}).length && !Object.keys(doc.careTasks || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
+    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !Object.keys(doc.vaccines || {}).length && !Object.keys(doc.careTasks || {}).length && !Object.keys(doc.events || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
   }
 
   // Multi-path update: only entities that changed, null for removed ones.
   function diff(prev, next) {
     var updates = {};
     prev = prev || { categories: {}, items: {}, notes: {}, highlights: '' };
-    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'ledgerCats', 'ledgerFavs', 'ledgerRecs', 'ledgerInst', 'birthTasks', 'growth', 'babyLog', 'vaccines', 'careTasks'].forEach(function (group) {
+    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'ledgerCats', 'ledgerFavs', 'ledgerRecs', 'ledgerInst', 'birthTasks', 'growth', 'babyLog', 'vaccines', 'careTasks', 'events'].forEach(function (group) {
       var a = prev[group] || {}, b = next[group] || {};
       Object.keys(b).forEach(function (id) {
         if (!a[id] || JSON.stringify(a[id]) !== JSON.stringify(b[id])) updates[group + '/' + id] = b[id];

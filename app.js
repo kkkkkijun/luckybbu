@@ -24,7 +24,7 @@
   // 화면에서 숨긴 공간(데이터는 그대로 보관·동기화): 출산 당일 · 택일 · 작명
   var HIDDEN_VIEWS = ['birthday', 'picks', 'names'];
   function shownView(v) { return HIDDEN_VIEWS.indexOf(v) !== -1 ? 'home' : v; }
-  var VIEWS = ['portal', 'ledger', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'growth', 'babylog', 'vaccine'];
+  var VIEWS = ['portal', 'ledger', 'calendar', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'growth', 'babylog', 'vaccine'];
   // 이도로그 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
   var GROUPS = ['birth', 'baby'];
   function defaultGroupFor(name) { var n = String(name || ''); if (/맞이|의류|출산|병원|조리원/.test(n)) return 'birth'; return /육아|이유식|예방접종|성장/i.test(n) ? 'baby' : 'birth'; }
@@ -464,7 +464,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerWho: [], ledgerFavs: [], ledgerRecs: [], ledgerInst: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {} };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerWho: [], ledgerFavs: [], ledgerRecs: [], ledgerInst: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {}, events: [] };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -723,7 +723,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerWho: ledgerWho, ledgerFavs: ledgerFavs, ledgerRecs: ledgerRecs, ledgerInst: ledgerInst, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerWho: ledgerWho, ledgerFavs: ledgerFavs, ledgerRecs: ledgerRecs, ledgerInst: ledgerInst, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates, events: normalizeEvents(raw.events) } };
   }
 
   /* ---------- storage ---------- */
@@ -1055,7 +1055,7 @@
 
   // 지금 화면이 속한 공간: portal · ledger · mamibag (포털에서 연 설정은 'settings')
   function spaceOf(view) {
-    if (view === 'portal' || view === 'ledger') return view;
+    if (view === 'portal' || view === 'ledger' || view === 'calendar') return view;
     if (view === 'settings' && ui.settingsFrom !== 'mamibag') return 'settings';
     return 'mamibag';
   }
@@ -1066,6 +1066,7 @@
     if (view === 'settings') ui.settingsFrom = from || (spaceOf(ui.view) === 'mamibag' ? 'mamibag' : spaceOf(ui.view));
     if (ui.view === view) { render(); return; }
     if (view !== 'ledger') ui.ledgerForm = null;
+    if (calOpenState && view !== 'calendar') calClose(true);
     if (ui.view === 'memos' && ui.memoOpen) closeMemo();
     if (ui.view === 'notes' && ui.noteOpen && view !== 'notes') closeNote();
     if (view !== 'notes' && view !== 'memos') ui.detailFrom = null;
@@ -1120,12 +1121,13 @@
     document.body.dataset.space = space;
     var vpo = $('#view-portal'); if (vpo) vpo.hidden = ui.view !== 'portal';
     var vle = $('#view-ledger'); if (vle) vle.hidden = ui.view !== 'ledger';
+    var vca = $('#view-calendar'); if (vca) vca.hidden = ui.view !== 'calendar';
     var ptabsNav = $('#primary-tabs'); if (ptabsNav) ptabsNav.hidden = space !== 'mamibag';
     var back = $('#space-back'); if (back) back.hidden = space === 'portal';
     var titleText = $('#app-title-text');
-    if (titleText) titleText.textContent = space === 'ledger' ? '가계부' : space === 'settings' ? '설정' : '이도로그';
+    if (titleText) titleText.textContent = space === 'ledger' ? '가계부' : space === 'calendar' ? '캘린더' : space === 'settings' ? '설정' : '이도로그';
     var titleBtn = $('#app-title-btn');
-    if (titleBtn) { titleBtn.dataset.action = space === 'mamibag' ? 'go-home' : (space === 'ledger' ? 'go-ledger' : 'go-portal'); titleBtn.setAttribute('aria-label', space === 'mamibag' ? '이도로그 홈으로' : titleText ? titleText.textContent : ''); }
+    if (titleBtn) { titleBtn.dataset.action = space === 'mamibag' ? 'go-home' : (space === 'ledger' ? 'go-ledger' : space === 'calendar' ? 'go-calendar' : 'go-portal'); titleBtn.setAttribute('aria-label', space === 'mamibag' ? '이도로그 홈으로' : titleText ? titleText.textContent : ''); }
     var vh = $('#view-home');
     if (vh) vh.hidden = ui.view !== 'home';
     var vs = $('#view-settings'); if (vs) vs.hidden = ui.view !== 'settings';
@@ -1183,6 +1185,7 @@
     renderHome();
     renderPortal();
     renderLedger();
+    renderCalendar();
     renderHighlightsStrip();
     renderDday();
     renderMemo();
@@ -2782,6 +2785,258 @@ datesSorted().forEach(function (d) {
     ui.weekSeeded = true;
     saveUiPrefs();
     if (!state.weekBase) { state.weekBase = FAMILY_WEEK_BASE; commit(); }
+  }
+
+  /* ---------- 캘린더 (가족 공유 일정) ---------- */
+  // 공휴일 이름: 한국천문연구원 특일 정보(공공데이터포털) 기준 표. 날짜 목록은 위 KR_HOLIDAYS와 같고, 해마다 발표가 나오면 둘 다 더한다
+  var KR_HOLIDAY_NAMES = {
+    '2025-01-01': '신정', '2025-01-27': '임시공휴일', '2025-01-28': '설날 연휴', '2025-01-29': '설날', '2025-01-30': '설날 연휴', '2025-03-01': '삼일절', '2025-03-03': '대체공휴일', '2025-05-05': '어린이날·부처님오신날', '2025-05-06': '대체공휴일', '2025-06-03': '대통령선거일', '2025-06-06': '현충일',
+    '2025-08-15': '광복절', '2025-10-03': '개천절', '2025-10-05': '추석 연휴', '2025-10-06': '추석', '2025-10-07': '추석 연휴', '2025-10-08': '대체공휴일', '2025-10-09': '한글날', '2025-12-25': '성탄절',
+    '2026-01-01': '신정', '2026-02-16': '설날 연휴', '2026-02-17': '설날', '2026-02-18': '설날 연휴', '2026-03-01': '삼일절', '2026-03-02': '대체공휴일', '2026-05-05': '어린이날', '2026-05-24': '부처님오신날', '2026-05-25': '대체공휴일', '2026-06-03': '지방선거일', '2026-06-06': '현충일',
+    '2026-08-15': '광복절', '2026-08-17': '대체공휴일', '2026-09-24': '추석 연휴', '2026-09-25': '추석', '2026-09-26': '추석 연휴', '2026-10-03': '개천절', '2026-10-05': '대체공휴일', '2026-10-09': '한글날', '2026-12-25': '성탄절',
+    '2027-01-01': '신정', '2027-02-06': '설날 연휴', '2027-02-07': '설날', '2027-02-08': '설날 연휴', '2027-02-09': '대체공휴일', '2027-03-01': '삼일절', '2027-05-05': '어린이날', '2027-05-13': '부처님오신날', '2027-06-06': '현충일', '2027-08-15': '광복절', '2027-08-16': '대체공휴일',
+    '2027-09-14': '추석 연휴', '2027-09-15': '추석', '2027-09-16': '추석 연휴', '2027-10-03': '개천절', '2027-10-04': '대체공휴일', '2027-10-09': '한글날', '2027-10-11': '대체공휴일', '2027-12-25': '성탄절', '2027-12-27': '대체공휴일'
+  };
+  function holidayName(iso) { return KR_HOLIDAYS[iso] ? (KR_HOLIDAY_NAMES[iso] || '공휴일') : ''; }
+
+  // 음력 ↔ 양력: 한국천문연구원 데이터를 담은 korean-lunar-calendar(MIT, usingsky)의 2000~2050년 표만 옮겨 와 직접 계산한다
+  // 한 해 값: 0~11비트 1~12월 큰달(30일) 여부, 12~15 윤달 월, 16 윤달 큰달, 17~25 그해 날수. 기준점: 2025년 음력 1월 1일 = 양력 2025-01-29
+  var LUNAR_DATA = [3267628182, 2197835413, 2193886538, 2194017701, 3271567189, 2193884524, 2197977787, 2193883741, 3267627309, 2197839019, 2193885845, 2193886026, 3271637834, 2194017109, 2197853533, 2193884346, 3267758683, 2197837143, 2193884459, 2193885845, 3271576469, 2193884842, 2194016981, 2197825205, 3267626166, 2197842542, 2194016855, 2193884455, 3271448230, 2194017683, 2193884586, 2197830506, 3267758445, 2197861551, 2193884334, 2193885773, 3271650573, 2193886501, 2193886546, 2197839316, 3267758954, 2194016621, 2197824859, 2193884315, 3271588439, 2193885771, 2193885989, 2197904165, 3267626708, 2194016986, 2197895350];
+  var LUNAR_MIN = 2000, LUNAR_MAX = 2049;
+  function lunarLeapMonth(y) { return LUNAR_DATA[y - 2000] >> 12 & 15; }
+  function lunarYearDays(y) { return LUNAR_DATA[y - 2000] >> 17 & 511; }
+  function lunarMonthDays(y, m, leap) { var d = LUNAR_DATA[y - 2000]; return (leap && (d >> 12 & 15) === m ? (d >> 16 & 1) : (d >> (12 - m) & 1)) ? 30 : 29; }
+  var LUNAR_EPOCH = Date.UTC(2025, 0, 29);
+  function lunarToSolar(y, m, d, leap) {
+    if (!(y >= LUNAR_MIN && y <= LUNAR_MAX) || !(m >= 1 && m <= 12) || !(d >= 1)) return '';
+    var L = lunarLeapMonth(y); leap = !!leap && L === m;
+    if (d > lunarMonthDays(y, m, leap)) return '';
+    var off = 0, i;
+    if (y >= 2025) for (i = 2025; i < y; i++) off += lunarYearDays(i); else for (i = y; i < 2025; i++) off -= lunarYearDays(i);
+    for (i = 1; i < m; i++) off += lunarMonthDays(y, i, false);
+    if (L && L < m) off += lunarMonthDays(y, L, true);
+    if (leap) off += lunarMonthDays(y, m, false);
+    var t = new Date(LUNAR_EPOCH + (off + d - 1) * 86400000);
+    return t.getUTCFullYear() + '-' + pad2(t.getUTCMonth() + 1) + '-' + pad2(t.getUTCDate());
+  }
+  function solarToLunar(iso) {
+    var off = Math.round((Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) - LUNAR_EPOCH) / 86400000), y = 2025;
+    if (off >= 0) { while (y <= LUNAR_MAX && off >= lunarYearDays(y)) { off -= lunarYearDays(y); y++; } }
+    else { while (off < 0 && y > LUNAR_MIN) { y--; off += lunarYearDays(y); } }
+    if (y < LUNAR_MIN || y > LUNAR_MAX || off < 0) return null;
+    var L = lunarLeapMonth(y);
+    for (var m = 1; m <= 12; m++) {
+      var md = lunarMonthDays(y, m, false); if (off < md) return { y: y, m: m, d: off + 1, leap: false }; off -= md;
+      if (L === m) { md = lunarMonthDays(y, m, true); if (off < md) return { y: y, m: m, d: off + 1, leap: true }; off -= md; }
+    }
+    return null;
+  }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  // 음력 날짜가 그해에 없으면(윤달이 없는 해 · 작은달의 30일) 가까운 날로
+  function lunarOccur(ly, L) { return lunarToSolar(ly, L.m, L.d, L.leap) || (L.leap ? lunarToSolar(ly, L.m, L.d, false) : '') || (L.d === 30 ? lunarToSolar(ly, L.m, 29, L.leap) || lunarToSolar(ly, L.m, 29, false) : ''); }
+  function lunarText(L) { return '음력 ' + (L.leap ? '윤' : '') + L.m + '월 ' + L.d + '일'; }
+
+  var CAL_COLORS = ['#6FA8E8', '#EE8FB0', '#F5C24B'];
+  var CAL_REP = { w: '매주', m: '매달', y: '매년' };
+  var CAL_TITLE_MAX = 40, CAL_MEMO_MAX = 100;
+  function calWhoList() { return [TAG_NAMES[0], TAG_NAMES[1], '함께']; }
+  function calWhoIdx(w) { var i = calWhoList().indexOf(w); return i === -1 ? 2 : i; }
+  function calDefaultWho() { var me = myName(); return calWhoList().indexOf(me) !== -1 ? me : '함께'; }
+  function calMonth() { return /^\d{4}-\d{2}$/.test(ui.calMonth || '') ? ui.calMonth : todayStamp().slice(0, 7); }
+  function calSel() { var s = ui.calSel || '', ym = calMonth(); if (/^\d{4}-\d{2}-\d{2}$/.test(s) && s.slice(0, 7) === ym) return s; return ym === todayStamp().slice(0, 7) ? todayStamp() : ym + '-01'; }
+  function calMonthDays(ym) { return new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate(); }
+  // 이 달에 일정이 놓이는 날짜 → 일정 목록 (반복 · 음력 매년 포함)
+  function calOccurrences(ym) {
+    var y = +ym.slice(0, 4), m0 = +ym.slice(5, 7) - 1, n = calMonthDays(ym), first = ym + '-01', last = ym + '-' + pad2(n), map = {};
+    var add = function (iso, ev) { if (!iso || iso < first || iso > last || iso < ev.date) return; (map[iso] = map[iso] || []).push(ev); };
+    (state.events || []).forEach(function (ev) {
+      if (!ev.rep) { add(ev.date, ev); return; }
+      if (ev.date > last) return;
+      if (ev.rep === 'w') {
+        var s = dateOf(ev.date), gap = Math.round((dateOf(first) - s) / 86400000), k = gap <= 0 ? 0 : Math.ceil(gap / 7);
+        for (var d = new Date(s.getFullYear(), s.getMonth(), s.getDate() + k * 7); isoOf(d) <= last; d.setDate(d.getDate() + 7)) add(isoOf(d), ev);
+        return;
+      }
+      if (ev.rep === 'm') { add(ym + '-' + pad2(Math.min(+ev.date.slice(8, 10), n)), ev); return; }
+      if (ev.lunar) { [y - 1, y].forEach(function (ly) { add(lunarOccur(ly, ev.lunar), ev); }); return; }
+      if (+ev.date.slice(5, 7) - 1 === m0) add(ym + '-' + pad2(Math.min(+ev.date.slice(8, 10), n)), ev);
+    });
+    Object.keys(map).forEach(function (k) { map[k].sort(function (a, b) { return (a.start || '') < (b.start || '') ? -1 : (a.start || '') > (b.start || '') ? 1 : a.title < b.title ? -1 : 1; }); });
+    return map;
+  }
+  function calDotsHtml(list) {
+    if (!list || !list.length) return '';
+    var seen = {}, html = '';
+    list.forEach(function (ev) { var i = calWhoIdx(ev.who); if (seen[i]) return; seen[i] = true; html += '<i style="background:' + CAL_COLORS[i] + '"></i>'; });
+    return html + (list.length > 3 ? '<b>+</b>' : '');
+  }
+  var CAL_ICON_REP = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>';
+  var CAL_ICON_MOON = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.6A8.2 8.2 0 1 1 9.4 4a6.6 6.6 0 0 0 10.6 10.6z"/></svg>';
+  function renderCalendar() {
+    var root = $('#cal-root'); if (!root || ui.view !== 'calendar') return;
+    var ym = calMonth(), y = +ym.slice(0, 4), mo = +ym.slice(5, 7), n = calMonthDays(ym), lead = new Date(y, mo - 1, 1).getDay();
+    var today = todayStamp(), sel = calSel(), occ = calOccurrences(ym);
+    var html = '<div class="cal-nav"><button type="button" class="cal-nav__btn" data-action="cal-month" data-d="-1" aria-label="이전 달">' + svgIcon('back', 20) + '</button>' +
+      '<h2 class="cal-nav__t" aria-live="polite">' + y + '년 ' + mo + '월</h2>' +
+      '<button type="button" class="cal-nav__btn" data-action="cal-month" data-d="1" aria-label="다음 달">' + svgIcon('next', 20) + '</button>' +
+      '<button type="button" class="cal-nav__today" data-action="cal-today"' + (ym === today.slice(0, 7) && sel === today ? ' disabled' : '') + '>오늘</button></div>';
+    html += '<section class="cal-grid" aria-label="' + mo + '월 달력"><div class="cal-dow" aria-hidden="true">' + WEEKDAYS.map(function (d, i) { return '<span' + (i === 0 ? ' class="is-red"' : i === 6 ? ' class="is-sat"' : '') + '>' + d + '</span>'; }).join('') + '</div><div class="cal-days">';
+    for (var b = 0; b < lead; b++) html += '<span class="cal-c is-empty" aria-hidden="true"></span>';
+    for (var d = 1; d <= n; d++) {
+      var iso = ym + '-' + pad2(d), dow = (lead + d - 1) % 7, hol = holidayName(iso), list = occ[iso] || [];
+      var cls = 'cal-c' + (dow === 0 || hol ? ' is-red' : dow === 6 ? ' is-sat' : '') + (iso === today ? ' is-today' : '') + (iso === sel ? ' is-sel' : '');
+      var label = mo + '월 ' + d + '일 ' + WEEKDAYS[dow] + '요일' + (iso === today ? ', 오늘' : '') + (hol ? ', ' + hol : '') + (list.length ? ', 일정 ' + list.length + '개' : '');
+      html += '<button type="button" class="' + cls + '" data-action="cal-pick" data-date="' + iso + '" data-focus-key="cal:' + iso + '" aria-label="' + label + '" aria-pressed="' + (iso === sel) + '"' + (iso === today ? ' aria-current="date"' : '') + '><span class="cal-c__n">' + d + '</span><span class="cal-c__dots">' + calDotsHtml(list) + '</span></button>';
+    }
+    html += '</div></section>';
+    var selHol = holidayName(sel), selD = dateOf(sel), lun = solarToLunar(sel);
+    html += '<div class="cal-day"><div class="cal-day__t"><b>' + (selD.getMonth() + 1) + '월 ' + selD.getDate() + '일 (' + WEEKDAYS[selD.getDay()] + ')' + (sel === today ? ' · 오늘' : '') + '</b>' +
+      (selHol ? '<span class="cal-hol">' + selHol + '</span>' : '') + (lun ? '<small>' + lunarText(lun) + '</small>' : '') + '</div>' +
+      '<div class="cal-legend" aria-hidden="true">' + calWhoList().map(function (w, i) { return '<span><i style="background:' + CAL_COLORS[i] + '"></i>' + escapeHtml(w) + '</span>'; }).join('') + '</div></div>';
+    var items = occ[sel] || [];
+    html += items.length ? '<ul class="cal-list">' + items.map(function (ev) {
+      var i = calWhoIdx(ev.who), sub = [];
+      if (ev.start && ev.end) sub.push(ev.start + ' ~ ' + ev.end);
+      if (ev.rep) sub.push(CAL_ICON_REP + CAL_REP[ev.rep]);
+      if (ev.lunar) sub.push(CAL_ICON_MOON + lunarText(ev.lunar));
+      if (ev.memo) sub.push(escapeHtml(ev.memo));
+      if (ev.by && ev.by !== ev.who) sub.push(escapeHtml(ev.by) + ' 작성');
+      return '<li><button type="button" class="cal-ev" data-action="cal-edit" data-id="' + escapeHtml(ev.id) + '" data-focus-key="cal-ev:' + escapeHtml(ev.id) + '">' +
+        '<span class="cal-ev__bar" style="background:' + CAL_COLORS[i] + '"></span><span class="cal-ev__t">' + (ev.start || '종일') + '</span>' +
+        '<span class="cal-ev__main"><b>' + escapeHtml(ev.title) + '</b>' + (sub.length ? '<small>' + sub.join('<span aria-hidden="true"> · </span>') + '</small>' : '') + '</span>' +
+        '<span class="cal-who cal-who--' + i + '">' + escapeHtml(ev.who || '함께') + '</span></button></li>';
+    }).join('') + '</ul>' : '<div class="cal-empty">일정이 없어요. 아래 <b>＋ 일정</b>으로 추가하세요.</div>';
+    root.innerHTML = html;
+  }
+
+  /* 일정 추가 · 고치기 창 */
+  var calOpenState = false;
+  function calFind(id) { var list = state.events || []; for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
+  function calOpen(id) {
+    var ev = id ? calFind(id) : null; if (id && !ev) return;
+    var date = ev ? ev.date : calSel(), L = ev && ev.lunar ? ev.lunar : solarToLunar(date);
+    ui.calForm = ev ? ev.id : 'new';
+    ui.calDraft = { title: ev ? ev.title : '', date: date, lunarOn: !!(ev && ev.lunar), ly: L ? (ev && ev.lunar ? +date.slice(0, 4) : L.y) : +date.slice(0, 4), lm: L ? L.m : 1, ld: L ? L.d : 1, leap: !!(L && L.leap), start: ev ? ev.start : '', end: ev ? ev.end : '', rep: ev ? ev.rep : '', who: ev ? (ev.who || '함께') : calDefaultWho(), memo: ev ? ev.memo : '' };
+    if (ev && ev.lunar) { var l2 = solarToLunar(ev.date); if (l2) ui.calDraft.ly = l2.y; }
+    var m = $('#cal-modal'); if (!m) return;
+    calRenderForm();
+    m.hidden = false; calOpenState = true; document.body.classList.add('has-modal');
+    try { window.history.pushState({ view: 'calendar', sheet: true }, ''); } catch (e) { /* ignore */ }
+    var t = $('#cal-title'); if (t) t.focus();
+  }
+  function calClose(fromHistory) {
+    var m = $('#cal-modal'); var was = ui.calForm;
+    if (!m || m.hidden) { calOpenState = false; return; }
+    m.hidden = true; calOpenState = false; ui.calForm = null; ui.calDraft = null;
+    document.body.classList.remove('has-modal');
+    if (!fromHistory) dropSheetHistory();
+    var back = was && was !== 'new' ? document.querySelector('[data-focus-key="cal-ev:' + was + '"]') : $('#cal-fab'); if (back) back.focus({ preventScroll: true });
+  }
+  function calSeg(name, opts, cur) {
+    return '<div class="done-tabs cal-seg" role="group">' + opts.map(function (o) { var on = cur === o[0]; return '<button type="button" class="done-tab' + (on ? ' is-active' : '') + '" data-action="cal-set" data-k="' + name + '" data-v="' + o[0] + '" aria-pressed="' + on + '">' + o[1] + '</button>'; }).join('') + '</div>';
+  }
+  function calConvText(d) {
+    var s = lunarToSolar(d.ly, d.lm, d.ld, d.leap);
+    if (d.leap && lunarLeapMonth(d.ly) !== d.lm) return { ok: false, text: d.ly + '년에는 윤' + d.lm + '월이 없어요.' + (lunarLeapMonth(d.ly) ? ' (그해 윤달: ' + lunarLeapMonth(d.ly) + '월)' : '') };
+    if (!s) return { ok: false, text: d.ly + '년 음력 ' + d.lm + '월은 ' + lunarMonthDays(d.ly, d.lm, d.leap) + '일까지 있어요.' };
+    var sd = dateOf(s), txt = '양력 ' + sd.getFullYear() + '년 ' + (sd.getMonth() + 1) + '월 ' + sd.getDate() + '일 (' + WEEKDAYS[sd.getDay()] + ')';
+    if (d.rep === 'y') { var nx = lunarOccur(d.ly + 1, { m: d.lm, d: d.ld, leap: d.leap }); if (nx) { var nd = dateOf(nx); txt += ' · 다음 해 ' + (nd.getMonth() + 1) + '월 ' + nd.getDate() + '일 (' + WEEKDAYS[nd.getDay()] + ')'; } }
+    return { ok: true, text: txt, date: s };
+  }
+  function calRenderForm() {
+    var m = $('#cal-modal'), d = ui.calDraft; if (!m || !d) return;
+    var ev = ui.calForm !== 'new' ? calFind(ui.calForm) : null, yNow = new Date().getFullYear();
+    var years = []; for (var yy = Math.max(LUNAR_MIN, Math.min(d.ly, yNow - 1)); yy <= Math.min(LUNAR_MAX, Math.max(d.ly, yNow + 3)); yy++) years.push(yy);
+    var opt = function (v, label, cur) { return '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + label + '</option>'; };
+    var conv = d.lunarOn ? calConvText(d) : null;
+    var whoBtns = calWhoList().map(function (w, i) { var on = d.who === w; return '<button type="button" class="cal-whob cal-whob--' + i + (on ? ' is-on' : '') + '" data-action="cal-set" data-k="who" data-v="' + escapeHtml(w) + '" aria-pressed="' + on + '"><i style="background:' + CAL_COLORS[i] + '"></i>' + escapeHtml(w) + '</button>'; }).join('');
+    var stamp = function (t) { var x = new Date(t); return (x.getMonth() + 1) + '/' + x.getDate() + ' ' + pad2(x.getHours()) + ':' + pad2(x.getMinutes()); };
+    m.querySelector('.modal__box').innerHTML = '<form id="cal-form" novalidate><div class="modal__head"><h3 class="modal__title" id="cal-modal-title">' + (ev ? '일정 고치기' : '일정 추가') + '</h3><button type="button" class="modal__close" data-action="cal-close" aria-label="닫기">×</button></div>' +
+      '<div class="cal-form">' +
+      '<label class="cal-f"><span>제목</span><input type="text" id="cal-title" name="title" maxlength="' + CAL_TITLE_MAX + '" value="' + escapeHtml(d.title) + '" placeholder="예: 소아과 검진" autocomplete="off" enterkeyhint="done"></label>' +
+      '<div class="cal-f"><span>날짜</span>' + calSeg('cal', [['sol', '양력'], ['lun', '음력']], d.lunarOn ? 'lun' : 'sol') +
+        (d.lunarOn
+          ? '<div class="cal-lunar"><label class="visually-hidden" for="cal-ly">음력 연도</label><select id="cal-ly" name="ly">' + years.map(function (v) { return opt(v, v + '년', d.ly); }).join('') + '</select>' +
+            '<label class="visually-hidden" for="cal-lm">음력 월</label><select id="cal-lm" name="lm">' + [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function (v) { return opt(v, v + '월', d.lm); }).join('') + '</select>' +
+            '<label class="visually-hidden" for="cal-ld">음력 일</label><select id="cal-ld" name="ld">' + Array.apply(null, { length: 30 }).map(function (_, i) { return opt(i + 1, (i + 1) + '일', d.ld); }).join('') + '</select>' +
+            '<label class="cal-leap"><input type="checkbox" name="leap"' + (d.leap ? ' checked' : '') + '>윤달</label></div>' +
+            '<p class="cal-conv' + (conv.ok ? '' : ' is-bad') + '" id="cal-conv" aria-live="polite">' + CAL_ICON_MOON + escapeHtml(conv.text) + '</p>'
+          : '<label class="visually-hidden" for="cal-date">날짜</label><input type="date" id="cal-date" name="date" value="' + d.date + '">') + '</div>' +
+      '<div class="cal-f"><span>시간 <small>비워 두면 종일</small></span><div class="cal-time"><label class="visually-hidden" for="cal-start">시작 시간</label><input type="time" id="cal-start" name="start" value="' + d.start + '"><span aria-hidden="true">~</span><label class="visually-hidden" for="cal-end">끝 시간</label><input type="time" id="cal-end" name="end" value="' + d.end + '">' +
+        '<button type="button" class="btn btn--small" data-action="cal-allday"' + (d.start || d.end ? '' : ' disabled') + '>시간 지우기</button></div></div>' +
+      '<div class="cal-f"><span>반복</span>' + calSeg('rep', d.lunarOn ? [['', '안 함'], ['y', '매년']] : [['', '안 함'], ['w', '매주'], ['m', '매달'], ['y', '매년']], d.rep) + '</div>' +
+      '<div class="cal-f"><span>누구 일정</span><div class="cal-whos">' + whoBtns + '</div></div>' +
+      '<label class="cal-f"><span>메모</span><input type="text" name="memo" maxlength="' + CAL_MEMO_MAX + '" value="' + escapeHtml(d.memo) + '" placeholder="장소 · 준비물 등" autocomplete="off" enterkeyhint="done"></label>' +
+      (ev ? '<p class="cal-by">' + escapeHtml(ev.by || '알 수 없음') + ' 작성' + (ev.at ? ' · ' + stamp(ev.at) : '') + (ev.eby ? ' · ' + escapeHtml(ev.eby) + ' 고침' + (ev.eat ? ' ' + stamp(ev.eat) : '') : '') + '</p>' : '<p class="cal-by">' + escapeHtml(myName()) + ' 작성으로 저장돼요</p>') +
+      '<div class="modal__actions">' + (ev ? '<button type="button" class="btn bt-tool--danger" data-action="cal-del">' + (ev.rep ? '반복 일정 삭제' : '삭제') + '</button>' : '') +
+      '<button type="submit" class="btn btn--primary modal__done">저장</button></div></div></form>';
+  }
+  function calReadForm() {
+    var f = $('#cal-form'), d = ui.calDraft; if (!f || !d) return;
+    var el = f.elements;
+    d.title = el.title.value; d.memo = el.memo.value; d.start = el.start.value; d.end = el.end.value;
+    if (el.date) d.date = el.date.value;
+    if (el.ly) { d.ly = +el.ly.value; d.lm = +el.lm.value; d.ld = +el.ld.value; d.leap = el.leap.checked; }
+  }
+  function calRefresh(focusSel) { calReadForm(); calRenderForm(); var f = focusSel && document.querySelector(focusSel); if (f) f.focus(); }
+  function calSet(k, v) {
+    var d = ui.calDraft; if (!d) return;
+    calReadForm();
+    if (k === 'cal') {
+      var lun = v === 'lun';
+      if (lun && !d.lunarOn) { var L = /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? solarToLunar(d.date) : null; if (L) { d.ly = L.y; d.lm = L.m; d.ld = L.d; d.leap = L.leap; } if (d.rep && d.rep !== 'y') d.rep = 'y'; }
+      if (!lun && d.lunarOn) { var c = calConvText(d); if (c.ok) d.date = c.date; }
+      d.lunarOn = lun;
+    } else if (k === 'rep') d.rep = v;
+    else if (k === 'who') d.who = v;
+    calRenderForm();
+    var b = document.querySelector('#cal-form [data-action="cal-set"][data-k="' + k + '"][data-v="' + v + '"]'); if (b) b.focus();
+  }
+  function calSave() {
+    calReadForm();
+    var d = ui.calDraft; if (!d) return;
+    var title = String(d.title || '').trim().slice(0, CAL_TITLE_MAX);
+    if (!title) { showToast('제목을 적어 주세요.'); var t = $('#cal-title'); if (t) t.focus(); return; }
+    var date = d.date, lunar = null;
+    if (d.lunarOn) { var c = calConvText(d); if (!c.ok) { showToast(c.text); return; } date = c.date; lunar = { y: d.ly, m: d.lm, d: d.ld, leap: !!d.leap }; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) { showToast('날짜를 골라 주세요.'); return; }
+    var start = /^\d{2}:\d{2}$/.test(d.start) ? d.start : '', end = start && /^\d{2}:\d{2}$/.test(d.end) ? d.end : '';
+    if (!start && d.end) { showToast('끝 시간만 있으면 안 돼요. 시작 시간을 적어 주세요.'); return; }
+    if (end && end < start) { showToast('끝 시간이 시작보다 빨라요.'); return; }
+    var rep = lunar ? (d.rep === 'y' ? 'y' : '') : (['w', 'm', 'y'].indexOf(d.rep) !== -1 ? d.rep : '');
+    var fields = { title: title, date: date, start: start, end: end, rep: rep, who: calWhoList().indexOf(d.who) !== -1 ? d.who : '함께', memo: String(d.memo || '').trim().slice(0, CAL_MEMO_MAX) };
+    var ev = ui.calForm !== 'new' ? calFind(ui.calForm) : null;
+    if (ev) { Object.keys(fields).forEach(function (k) { ev[k] = fields[k]; }); if (lunar) ev.lunar = lunar; else delete ev.lunar; ev.eby = myName(); ev.eat = Date.now(); }
+    else { ev = fields; ev.id = uid(); ev.by = myName(); ev.at = Date.now(); ev.eby = ''; ev.eat = 0; if (lunar) ev.lunar = lunar; state.events = (state.events || []).concat([ev]); }
+    var isNew = ui.calForm === 'new';
+    ui.calMonth = date.slice(0, 7); ui.calSel = date;
+    calClose();
+    commit(); act('calendar', '일정 ' + (isNew ? '추가' : '수정') + ': ' + title);
+    showToast(isNew ? '일정을 추가했어요.' : '일정을 고쳤어요.');
+    var back = document.querySelector('[data-focus-key="cal-ev:' + ev.id + '"]'); if (back) back.focus({ preventScroll: true });
+  }
+  function calDelete() {
+    var ev = ui.calForm && ui.calForm !== 'new' ? calFind(ui.calForm) : null; if (!ev) return;
+    var before = (state.events || []).slice();
+    state.events = before.filter(function (x) { return x.id !== ev.id; });
+    calClose(); commit(); act('calendar', '일정 삭제: ' + ev.title);
+    showToast('‘' + ev.title + '’ 일정을 삭제했어요.', function () { state.events = before; commit(); showToast('삭제를 취소했어요.'); });
+  }
+  function normalizeEvents(raw) {
+    var out = [], seen = {}, str = function (v, n) { return typeof v === 'string' ? v.trim().slice(0, n) : ''; }, tm = function (v) { return typeof v === 'string' && /^\d{2}:\d{2}$/.test(v) ? v : ''; };
+    (Array.isArray(raw) ? raw : []).forEach(function (e) {
+      if (!e || typeof e !== 'object' || typeof e.id !== 'string' || !e.id || seen[e.id] || /[.#$\[\]\/]/.test(e.id)) return;
+      if (typeof e.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) return;
+      var title = str(e.title, CAL_TITLE_MAX); if (!title) return;
+      seen[e.id] = true;
+      var ev = { id: e.id, title: title, date: e.date, start: tm(e.start), end: '', rep: ['w', 'm', 'y'].indexOf(e.rep) !== -1 ? e.rep : '', who: str(e.who, 12), memo: str(e.memo, CAL_MEMO_MAX), by: str(e.by, 12), at: typeof e.at === 'number' ? e.at : 0, eby: str(e.eby, 12), eat: typeof e.eat === 'number' ? e.eat : 0 };
+      if (ev.start) ev.end = tm(e.end);
+      var L = e.lunar;
+      if (L && typeof L === 'object' && +L.m >= 1 && +L.m <= 12 && +L.d >= 1 && +L.d <= 30) ev.lunar = { y: +L.y || +e.date.slice(0, 4), m: +L.m, d: +L.d, leap: L.leap === true };
+      if (ev.lunar && ev.rep !== 'y') ev.rep = '';
+      out.push(ev);
+    });
+    return out;
   }
 
   /* ---------- 가계부 ---------- */
@@ -6300,6 +6555,7 @@ datesSorted().forEach(function (d) {
       spendTags: state.spendTags,
       careTasks: state.careTasks,
       careDates: state.careDates,
+      events: state.events,
       ledger: state.ledger,
       ledgerCats: state.ledgerCats,
       ledgerPays: state.ledgerPays,
@@ -6541,7 +6797,8 @@ datesSorted().forEach(function (d) {
       else if (a === 'go-home') setView('home');
       else if (a === 'go-portal') setView('portal');
       else if (a === 'go-ledger') setView('ledger');
-      else if (a === 'space-back') setView(ui.view === 'settings' && ui.settingsFrom === 'ledger' ? 'ledger' : 'portal');
+      else if (a === 'go-calendar') { ui.calMonth = ''; ui.calSel = ''; setView('calendar'); }
+      else if (a === 'space-back') setView(ui.view === 'settings' && (ui.settingsFrom === 'ledger' || ui.settingsFrom === 'calendar') ? ui.settingsFrom : 'portal');
     });
     $('#share-panel').addEventListener('click', function (e) {
       var btn = e.target.closest('[data-action]');
@@ -6723,7 +6980,7 @@ datesSorted().forEach(function (d) {
       portalView.addEventListener('click', function (e) {
         var b = e.target.closest('[data-action]');
         if (!b) return;
-        if (b.dataset.action === 'open-space') setView(b.dataset.space === 'ledger' ? 'ledger' : 'home');
+        if (b.dataset.action === 'open-space') setView(b.dataset.space === 'ledger' || b.dataset.space === 'calendar' ? b.dataset.space : 'home');
         else if (b.dataset.action === 'goal-edit') openGoal(b.dataset.focus);
         else if (b.dataset.action === 'goal-close') closeGoal();
         else if (b.dataset.action === 'goal-month') goalMonthAdd();
@@ -6740,6 +6997,34 @@ datesSorted().forEach(function (d) {
       var gm = $('#goal-modal');
       if (gm) gm.addEventListener('click', function (e) { if (e.target === gm) closeGoal(); }); // 바깥(어두운 곳) 누르면 닫기
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && goalOpen) { e.preventDefault(); closeGoal(); } });
+    }
+
+    // 캘린더
+    var calView = $('#view-calendar');
+    if (calView) {
+      calView.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-action]'); if (!b) return;
+        switch (b.dataset.action) {
+          case 'cal-month': { var cm = calMonth(), dm = new Date(+cm.slice(0, 4), +cm.slice(5, 7) - 1 + Number(b.dataset.d), 1); ui.calMonth = isoOf(dm).slice(0, 7); ui.calSel = ''; renderCalendar(); var nb = calView.querySelector('[data-action="cal-month"][data-d="' + b.dataset.d + '"]'); if (nb) nb.focus(); break; }
+          case 'cal-today': ui.calMonth = ''; ui.calSel = ''; renderCalendar(); { var tb = calView.querySelector('.cal-c.is-today'); if (tb) tb.focus(); } break;
+          case 'cal-pick': ui.calSel = b.dataset.date; ui.calMonth = b.dataset.date.slice(0, 7); renderCalendar(); { var pb = calView.querySelector('[data-focus-key="cal:' + b.dataset.date + '"]'); if (pb) pb.focus(); } break;
+          case 'cal-new': calOpen(null); break;
+          case 'cal-edit': calOpen(b.dataset.id); break;
+          case 'cal-close': calClose(); break;
+          case 'cal-set': calSet(b.dataset.k, b.dataset.v); break;
+          case 'cal-allday': { var fs = $('#cal-start'), fe = $('#cal-end'); if (fs) fs.value = ''; if (fe) fe.value = ''; calRefresh('#cal-start'); break; }
+          case 'cal-del': calDelete(); break;
+        }
+      });
+      calView.addEventListener('submit', function (e) { if (e.target.id !== 'cal-form') return; e.preventDefault(); calSave(); });
+      calView.addEventListener('change', function (e) {
+        var t = e.target; if (!t.closest('#cal-form')) return;
+        if (t.name === 'ly' || t.name === 'lm' || t.name === 'ld' || t.name === 'leap') calRefresh('#cal-form [name="' + t.name + '"]');
+        else if (t.name === 'start' || t.name === 'end') { var ad = calView.querySelector('[data-action="cal-allday"]'); if (ad) ad.disabled = !($('#cal-start').value || $('#cal-end').value); }
+      });
+      var cmod = $('#cal-modal');
+      if (cmod) cmod.addEventListener('click', function (e) { if (e.target === cmod) calClose(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && calOpenState) { e.preventDefault(); calClose(); } });
     }
 
     // 가계부
@@ -7901,6 +8186,7 @@ datesSorted().forEach(function (d) {
       if (sheetPopSilently) { sheetPopSilently = false; return; }
       if (ui.ledgerForm) { closeLedgerForm(true); return; }
       if (goalOpen) { closeGoal(true); return; }
+      if (calOpenState) { calClose(true); return; }
       var v = e.state && VIEWS.indexOf(e.state.view) !== -1 ? e.state.view : 'portal';
       setView(v, v === 'settings' ? ui.settingsFrom : undefined, true);
     });
