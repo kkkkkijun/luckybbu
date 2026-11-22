@@ -3308,51 +3308,94 @@ datesSorted().forEach(function (d) {
     return html;
   }
 
-  /* ---------- 가계부 리포트 알림: cron-job.org가 매달 1일 오전 9시에 ntfy로 알림을 보낸다 ---------- */
-  var NTFY_KEY = 'luckybbu:ntfy';
-  function ntfyTopic() {
-    var S = window.ChecklistSync, room = S && S.getState && S.getState().roomId;
-    if (room) { // 가족 방이 같으면 두 폰의 주제 이름도 같다
-      var h1 = 0x811c9dc5, h2 = 0x01000193;
-      for (var i = 0; i < room.length; i++) { h1 = Math.imul(h1 ^ room.charCodeAt(i), 16777619) >>> 0; h2 = Math.imul(h2 ^ room.charCodeAt(i), 2246822519) >>> 0; }
-      return 'luckybbu-' + h1.toString(36) + h2.toString(36);
-    }
-    var t = null; try { t = window.localStorage.getItem(NTFY_KEY); } catch (e) { /* ignore */ }
-    if (!t || !/^luckybbu-[a-z0-9]{8,}$/.test(t)) {
-      var chars = 'abcdefghijkmnpqrstuvwxyz23456789', buf = new Uint8Array(14), out = '';
-      if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(buf); else for (var j = 0; j < buf.length; j++) buf[j] = Math.floor(Math.random() * 256);
-      for (var k = 0; k < buf.length; k++) out += chars[buf[k] % chars.length];
-      t = 'luckybbu-' + out; try { window.localStorage.setItem(NTFY_KEY, t); } catch (e) { /* ignore */ }
-    }
-    return t;
+  /* ---------- 가계부 리포트 알림: 웹 푸시 (cron-job.org → GitHub Actions → 이 앱으로 바로) ---------- */
+  // VAPID 공개 키. 짝이 되는 비밀 키는 GitHub Secrets(VAPID_PRIVATE_KEY)에만 둔다
+  var PUSH_PUBLIC_KEY = '';
+  var PUSH_REPO = 'kkkkkijun/luckybbu';
+  var pushInfo = { checked: false, on: false, busy: false };
+  function pushRoom() { var S = window.ChecklistSync; return (S && S.getState && S.getState().roomId) || ''; }
+  function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function isIOS() { return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+  function isStandalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
+  function pushIdOf(endpoint) {
+    var h1 = 0x811c9dc5, h2 = 0x01000193;
+    for (var i = 0; i < endpoint.length; i++) { h1 = Math.imul(h1 ^ endpoint.charCodeAt(i), 16777619) >>> 0; h2 = Math.imul(h2 ^ endpoint.charCodeAt(i), 2246822519) >>> 0; }
+    return 'd' + h1.toString(36) + h2.toString(36);
   }
-  function appBaseUrl() { return window.location.origin + window.location.pathname.replace(/index\.html$/, ''); }
-  function rpCronBody() {
-    return JSON.stringify({ topic: ntfyTopic(), title: 'luckybbu 가계부', message: '지난달 가계부 리포트가 완성됐어요. 눌러서 확인해 보세요.', click: appBaseUrl() + '?open=report', tags: ['moneybag'] });
+  function b64uToBytes(s) {
+    var b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), out = new Uint8Array(b.length);
+    for (var i = 0; i < b.length; i++) out[i] = b.charCodeAt(i);
+    return out;
+  }
+  function pushCheck() {
+    if (!pushSupported()) { pushInfo.checked = true; return; }
+    navigator.serviceWorker.getRegistration().then(function (reg) { return reg ? reg.pushManager.getSubscription() : null; }).then(function (sub) {
+      var on = !!sub && Notification.permission === 'granted', changed = on !== pushInfo.on || !pushInfo.checked;
+      pushInfo.on = on; pushInfo.checked = true;
+      if (changed && ui.view === 'ledger') renderLedger();
+    }, function () { pushInfo.checked = true; });
+  }
+  function pushEnable() {
+    if (pushInfo.busy) return;
+    if (!PUSH_PUBLIC_KEY) { showToast('아직 알림 키가 설정되지 않았어요.'); return; }
+    if (!pushRoom()) { showToast('가족 공유를 먼저 켜 주세요.'); return; }
+    if (!pushSupported()) { showToast(isIOS() ? '아이폰은 홈 화면에 추가한 luckybbu 앱에서 켤 수 있어요(iOS 16.4 이상).' : '이 브라우저는 알림을 지원하지 않아요.'); return; }
+    pushInfo.busy = true;
+    // 아이폰은 누른 그 순간에 권한을 물어야 해서 다른 일보다 먼저 부른다
+    Notification.requestPermission().then(function (perm) {
+      if (perm !== 'granted') throw new Error(perm === 'denied' ? 'DENIED' : 'DISMISSED');
+      return navigator.serviceWorker.ready;
+    }).then(function (reg) {
+      return reg.pushManager.getSubscription().then(function (old) { return old || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(PUSH_PUBLIC_KEY) }); });
+    }).then(function (sub) {
+      var j = sub.toJSON();
+      return window.ChecklistSync.savePush(pushIdOf(j.endpoint), { endpoint: j.endpoint, keys: { p256dh: j.keys.p256dh, auth: j.keys.auth }, who: String(myName()).slice(0, 12), at: Date.now() });
+    }).then(function () {
+      pushInfo.on = true; showToast('이 폰에서 알림을 켰어요. 매달 1일 오전 9시에 알려 드려요.');
+    }, function (err) {
+      var m = err && err.message;
+      showToast(m === 'DENIED' ? '알림이 막혀 있어요. 폰 설정 › 알림에서 luckybbu를 허용해 주세요.' : m === 'DISMISSED' ? '알림 허용을 누르지 않았어요.' : '알림을 켜지 못했어요. 잠시 뒤 다시 해 주세요.');
+    }).then(function () { pushInfo.busy = false; renderLedger(); });
+    renderLedger();
+  }
+  function pushDisable() {
+    if (pushInfo.busy || !pushSupported()) return;
+    pushInfo.busy = true; renderLedger();
+    navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
+      if (!sub) return null;
+      var id = pushIdOf(sub.endpoint);
+      return sub.unsubscribe().then(function () { return window.ChecklistSync.removePush(id); });
+    }).then(function () { pushInfo.on = false; showToast('이 폰의 알림을 껐어요.'); }, function () { showToast('알림을 끄지 못했어요. 잠시 뒤 다시 해 주세요.'); })
+      .then(function () { pushInfo.busy = false; renderLedger(); });
   }
   function rpAlarmHtml() {
-    var topic = ntfyTopic(), body = rpCronBody();
-    var copy = function (text, label, btn) { return '<button type="button" class="btn btn--small" data-action="rp-copy" data-text="' + escapeHtml(text) + '" data-label="' + escapeHtml(label) + '">' + (btn || '복사') + '</button>'; };
-    var row = function (label, text, copyLabel) { return '<div class="rp-cron__row"><span>' + label + '</span><code>' + escapeHtml(text) + '</code>' + copy(text, copyLabel) + '</div>'; };
-    return '<details class="ledger-card rp-alarm"><summary>매달 1일 오전 9시 ‘리포트 완성’ 알림 받기</summary>' +
-      '<p class="rp-cron__lead">무료 서비스 두 개를 이어요. <b>cron-job.org</b>가 정해진 시각에 <b>ntfy</b>로 알림을 보내고, 폰의 ntfy 앱이 알림을 띄워요. 알림을 누르면 지난달 리포트가 바로 열려요.</p><ol>' +
-      '<li><b>ntfy 앱</b>을 설치하세요(App Store · Play 스토어에서 ‘ntfy’). 앱에서 <b>＋ 구독</b>을 누르고 주제 이름에 아래 값을 붙여 넣으세요. 서버는 기본값(ntfy.sh) 그대로 두면 돼요. 함께 받을 가족 폰도 같은 주제를 구독하세요.' +
-        row('주제', topic, '주제 이름') + '</li>' +
-      '<li>폰에 알림이 오는지 먼저 확인하세요. <button type="button" class="btn btn--small btn--primary" data-action="rp-test">테스트 알림 보내기</button></li>' +
-      '<li><b>cron-job.org</b>에 가입(무료)하고 <b>CREATE CRONJOB</b>을 누르세요.<ul>' +
-        '<li>Title: <code>luckybbu 가계부 리포트</code></li>' +
-        '<li>URL: ' + row('', 'https://ntfy.sh/', '주소') + '</li>' +
-        '<li>Execution schedule: <b>Custom</b>을 고르고 아래 값을 넣으세요(매달 1일 9시 0분).' + row('', '0 9 1 * *', '일정') + '</li>' +
-        '<li><b>ADVANCED</b> 탭: Time zone <code>Asia/Seoul</code>, Request method <code>POST</code>, Request body에 아래 내용을 붙여 넣으세요.' +
-          '<div class="rp-cron__body"><code>' + escapeHtml(body) + '</code>' + copy(body, '보낼 내용') + '</div></li>' +
-        '<li>저장한 뒤 <b>TEST RUN</b>을 눌러 알림이 오면 끝이에요.</li></ul></li>' +
-      '</ol><p class="rp-cron__note">주제 이름이 비밀번호 역할을 해요. 다른 사람에게 알려 주지 마세요. 알림 내용에는 금액이 들어가지 않아요.' + (window.ChecklistSync && window.ChecklistSync.getState && window.ChecklistSync.getState().roomId ? '' : '<br>가족 공유를 켜면 주제 이름이 바뀌어요. 공유를 켠 뒤에 설정하세요.') + '</p></details>';
-  }
-  function rpSendTest() {
-    var body = JSON.parse(rpCronBody()); body.title = 'luckybbu 테스트'; body.message = '테스트 알림이에요. 매달 1일 오전 9시에 이렇게 와요.';
-    fetch('https://ntfy.sh/', { method: 'POST', body: JSON.stringify(body) }).then(function (r) {
-      showToast(r.ok ? '테스트 알림을 보냈어요. 폰의 ntfy 앱을 확인하세요.' : '보내지 못했어요. 잠시 뒤 다시 해 주세요.');
-    }, function () { showToast('보내지 못했어요. 인터넷 연결을 확인해 주세요.'); });
+    pushCheck();
+    var room = pushRoom(), status, btn = '';
+    var copy = function (text, label) { return '<button type="button" class="btn btn--small" data-action="rp-copy" data-text="' + escapeHtml(text) + '" data-label="' + escapeHtml(label) + '">복사</button>'; };
+    var row = function (label, text, copyLabel) { return '<div class="rp-cron__row">' + (label ? '<span>' + label + '</span>' : '') + '<code>' + escapeHtml(text) + '</code>' + copy(text, copyLabel) + '</div>'; };
+    if (!PUSH_PUBLIC_KEY) status = '알림 키를 준비하는 중이에요. 아래 ‘처음 한 번 설정’을 마치면 켤 수 있어요.';
+    else if (!room) status = '가족 공유를 켜야 알림을 받을 수 있어요.';
+    else if (isIOS() && !isStandalone()) status = '아이폰은 Safari의 공유 › <b>홈 화면에 추가</b>로 설치한 luckybbu 앱에서 켤 수 있어요(iOS 16.4 이상).';
+    else if (!pushSupported()) status = '이 브라우저는 알림을 지원하지 않아요.';
+    else if (pushInfo.on) { status = '<b>이 폰: 알림 켜짐</b> · 매달 1일 오전 9시에 지난달 리포트 알림이 와요.'; btn = '<button type="button" class="btn btn--small" data-action="rp-push-off"' + (pushInfo.busy ? ' disabled' : '') + '>이 폰 알림 끄기</button>'; }
+    else { status = '이 폰은 아직 꺼져 있어요. 알림을 받을 폰마다 한 번씩 켜 주세요.'; btn = '<button type="button" class="btn btn--small btn--primary" data-action="rp-push-on"' + (pushInfo.busy ? ' disabled' : '') + '>이 폰에서 알림 켜기</button>'; }
+    var dispatch = 'https://api.github.com/repos/' + PUSH_REPO + '/dispatches';
+    return '<details class="ledger-card rp-alarm"><summary>매달 1일 오전 9시 ‘리포트 완성’ 알림</summary>' +
+      '<div class="rp-push"><p>' + status + '</p>' + btn + '</div>' +
+      '<details class="rp-setup"><summary>처음 한 번 설정 (PC에서 한 번만)</summary>' +
+      '<p class="rp-cron__lead">서버 없이 무료 서비스로 보내요. <b>cron-job.org</b>가 매달 1일 9시에 GitHub에 실행을 요청하면, <b>GitHub Actions</b>가 가족 방에 저장된 폰들로 알림을 보내요. 알림을 누르면 지난달 리포트가 열려요.</p><ol>' +
+      '<li><b>GitHub Secrets</b>: 저장소 <b>Settings › Secrets and variables › Actions › New repository secret</b>에서 두 개를 넣으세요.<ul>' +
+        '<li><code>VAPID_PRIVATE_KEY</code>: 알림 키 파일(.pem) 내용 전체</li>' +
+        '<li><code>PUSH_ROOM_ID</code>: 가족 방 ID' + (room ? row('', room, '방 ID') : ' (가족 공유를 켜면 여기에 보여요)') + '</li></ul></li>' +
+      '<li><b>GitHub 토큰</b>: GitHub › Settings › Developer settings › <b>Fine-grained tokens</b> › Generate. 저장소는 <code>luckybbu</code>만, 권한은 <b>Contents: Read and write</b>. 만든 토큰은 다음 단계에만 쓰고 어디에도 올리지 마세요.</li>' +
+      '<li><b>cron-job.org</b> › CREATE CRONJOB<ul>' +
+        '<li>URL' + row('', dispatch, '주소') + '</li>' +
+        '<li>Execution schedule: <b>Custom</b>' + row('', '0 9 1 * *', '일정') + '</li>' +
+        '<li><b>ADVANCED</b>: Time zone <code>Asia/Seoul</code>, Request method <code>POST</code></li>' +
+        '<li>Headers 세 줄: <code>Accept: application/vnd.github+json</code>, <code>X-GitHub-Api-Version: 2022-11-28</code>, <code>Authorization: Bearer (위 토큰)</code></li>' +
+        '<li>Request body' + row('', '{"event_type":"report-push"}', '보낼 내용') + '</li></ul></li>' +
+      '<li><b>테스트</b>: 위에서 이 폰 알림을 켠 뒤, GitHub 저장소 <b>Actions › 리포트 알림 › Run workflow</b>를 누르면 바로 테스트 알림이 와요. cron-job.org의 TEST RUN으로도 확인할 수 있어요(테스트 실행도 실제 알림으로 기록되니 1일이 아닐 땐 Actions 쪽을 쓰세요).</li>' +
+      '</ol><p class="rp-cron__note">방 ID와 토큰은 비밀번호처럼 다뤄 주세요. 알림 내용에는 금액이 들어가지 않아요. cron-job.org가 멈춰도 GitHub 자체 예약이 9시 30분쯤 한 번 더 확인해요(이미 보낸 달은 건너뜀).</p></details></details>';
   }
 
   /* ---------- 반복·구독 · 할부: 날짜가 되면 기록을 자동으로 만든다 ---------- */
@@ -7048,7 +7091,8 @@ datesSorted().forEach(function (d) {
             break;
           }
           case 'rp-copy': copyText(b.dataset.text, b.dataset.label); break;
-          case 'rp-test': rpSendTest(); break;
+          case 'rp-push-on': pushEnable(); break;
+          case 'rp-push-off': pushDisable(); break;
           case 'ledger-tab': ui.ledgerTab = b.dataset.tab; renderLedger(); var tb = ledgerView.querySelector('[data-action="ledger-tab"][data-tab="' + b.dataset.tab + '"]'); if (tb) tb.focus({ preventScroll: true }); break;
           case 'rec-add': ui.ledgerPresetRep = 'm'; openLedgerForm(null); break;
           case 'rec-edit': ui.recEdit = b.dataset.id; renderLedger(); var rf = ledgerView.querySelector('.rec-form input[name="text"]'); if (rf) rf.focus(); break;

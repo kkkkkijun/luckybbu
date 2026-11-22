@@ -1,14 +1,14 @@
 /* 서비스 워커 — 앱 셸 오프라인 지원 (네트워크 우선, 실패 시 캐시)
    온라인이면 항상 최신 파일을 받고, 오프라인이면 마지막으로 받은 화면을 보여준다.
    같은 출처(same-origin)만 처리하고, Firebase 등 외부 요청은 건드리지 않는다. */
-var CACHE = 'birth-bag-checklist-20261122f'; // 배포마다 index.html의 ?v= 와 함께 올린다 → 옛 캐시 자동 삭제
+var CACHE = 'birth-bag-checklist-20261122g'; // 배포마다 index.html의 ?v= 와 함께 올린다 → 옛 캐시 자동 삭제
 var CORE = [
   './',
   './index.html',
-  './style.css?v=20261122f',
-  './app.js?v=20261122f',
-  './sync.js?v=20261122f',
-  './firebase-config.js?v=20261122f',
+  './style.css?v=20261122g',
+  './app.js?v=20261122g',
+  './sync.js?v=20261122g',
+  './firebase-config.js?v=20261122g',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
@@ -57,4 +57,25 @@ self.addEventListener('fetch', function (e) {
       });
     })
   );
+});
+
+// 웹 푸시: GitHub Actions(scripts/push_send.py)가 보낸 알림을 띄우고, 누르면 그 화면을 연다
+self.addEventListener('push', function (e) {
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
+  var url = new URL(d.url || './', self.registration.scope).href;
+  e.waitUntil(self.registration.showNotification(d.title || 'luckybbu', {
+    body: d.body || '', icon: './icon-192.png', badge: './favicon-48.png', tag: d.tag || 'luckybbu', data: { url: url }
+  }));
+});
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  var url = (e.notification.data && e.notification.data.url) || self.registration.scope;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      if (c.url.indexOf(self.registration.scope) === 0 && 'navigate' in c) return c.navigate(url).then(function (w) { return (w || c).focus(); });
+    }
+    return self.clients.openWindow(url);
+  }));
 });

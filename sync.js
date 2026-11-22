@@ -549,6 +549,15 @@
     joinRoom: joinRoom,
     leaveRoom: leaveRoom,
     extractRoomId: extractRoomId,
+    // 웹 푸시 구독: rooms/<방>/push/<기기> (GitHub Actions가 읽어서 알림을 보낸다)
+    savePush: function (id, data) {
+      if (!sync.roomId || !sync.adapter) return Promise.reject(new Error('NO_ROOM'));
+      var u = {}; u['push/' + id] = data; return sync.adapter.update(sync.roomId, u);
+    },
+    removePush: function (id) {
+      if (!sync.roomId || !sync.adapter) return Promise.resolve();
+      var u = {}; u['push/' + id] = null; return sync.adapter.update(sync.roomId, u);
+    },
     logActivity: function (entry) {
       if (!sync.roomId || !sync.adapter || !sync.adapter.pushActivity) return;
       var who = (app.getDeviceName ? app.getDeviceName() : '') || '나';
