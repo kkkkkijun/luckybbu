@@ -17,7 +17,8 @@ import urllib.request
 from pywebpush import WebPushException, webpush
 
 KST = datetime.timezone(datetime.timedelta(hours=9))
-SITE = 'https://kkkkkijun.github.io/luckybbu/'
+# VAPID 'sub'는 mailto: 또는 경로 없는 https://호스트 형식만 받는다
+VAPID_SUB = 'https://kkkkkijun.github.io'
 
 
 def db_url():
@@ -79,7 +80,7 @@ def main():
             try:
                 # 클레임은 기기마다 새로 만든다 (보내는 곳마다 aud가 다름)
                 webpush(subscription_info=info, data=payload, vapid_private_key=key_path,
-                        vapid_claims={'sub': SITE}, ttl=86400, timeout=20)
+                        vapid_claims={'sub': VAPID_SUB}, ttl=86400, timeout=20)
                 sent += 1
                 print(f'보냄: {s.get("who") or sid}')
             except WebPushException as e:
