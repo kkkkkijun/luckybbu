@@ -3310,7 +3310,7 @@ datesSorted().forEach(function (d) {
 
   /* ---------- 가계부 리포트 알림: 웹 푸시 (cron-job.org → GitHub Actions → 이 앱으로 바로) ---------- */
   // VAPID 공개 키. 짝이 되는 비밀 키는 GitHub Secrets(VAPID_PRIVATE_KEY)에만 둔다
-  var PUSH_PUBLIC_KEY = '';
+  var PUSH_PUBLIC_KEY = 'BCydcU7NBKR-ZkJw_dGAnUxywycOYRSxqHFDhgeZ_lM487z5ffuMxm1-W9iXvTANu86SqVSNlE7iUUqv2ICcmus';
   var PUSH_REPO = 'kkkkkijun/luckybbu';
   var pushInfo = { checked: false, on: false, busy: false };
   function pushRoom() { var S = window.ChecklistSync; return (S && S.getState && S.getState().roomId) || ''; }
