@@ -2989,7 +2989,7 @@ datesSorted().forEach(function (d) {
     var isCur = m === currentMonth(), future = m > currentMonth(), upto = isCur ? new Date().getDate() : days;
     var list = entriesOfMonth(m), pm = shiftMonth(m, -1), pmo = parseInt(pm.slice(5, 7), 10);
     var cur = ledgerAgg(list), prev = ledgerAgg(entriesOfMonth(pm), isCur ? upto : 0);
-    if (!list.length) return '<section class="ledger-card rp"><p class="ledger-empty">' + (future ? '아직 오지 않은 달이에요.' : mo + '월에는 기록이 없어서 리포트를 만들 수 없어요.') + '</p></section>';
+    if (!list.length) return '<section class="ledger-card rp"><p class="ledger-empty">' + (future ? '아직 오지 않은 달이에요.' : mo + '월에는 기록이 없어서 리포트를 만들 수 없어요.') + '</p></section>' + rpAlarmHtml();
     var html = '';
     // 머리: 지출 · 지난달 비교 · 수입 · 저축
     var d = cur.out - prev.out, pct = prev.out ? Math.round(Math.abs(d) / prev.out * 100) : 0;
@@ -3046,12 +3046,55 @@ datesSorted().forEach(function (d) {
       var t = totals[i];
       return '<button type="button" role="listitem" class="rp-trend__c' + (mm === m ? ' is-on' : '') + '" data-action="ledger-goto" data-month="' + mm + '" aria-label="' + monthLabel(mm) + ' 지출 ' + formatNumber(t) + '원"><small>' + (t ? shortWon(t) : '') + '</small><span style="height:' + Math.max(t ? 4 : 0, Math.round(t / maxT * 100)) + '%"></span><b>' + parseInt(mm.slice(5, 7), 10) + '월</b></button>';
     }).join('') + '</div></section>';
-    html += '<details class="ledger-card rp-alarm"><summary>말일에 ‘리포트 보세요’ 알림 받기 (아이폰)</summary><ol>' +
-      '<li><b>단축어</b> 앱 › 아래 <b>자동화</b> › ＋ › <b>특정 시간</b> › 오후 9시 · <b>매일</b> › <b>즉시 실행</b>.</li>' +
-      '<li>동작 추가: <b>현재 날짜</b> → <b>날짜 조정</b>(1일 더하기) → <b>날짜 형식</b>(사용자화, 형식 <code>d</code>).</li>' +
-      '<li><b>만약</b> 결과가 <code>1</code>이면 → <b>알림 보기</b> ‘이번 달 가계부 리포트가 완성됐어요’.</li>' +
-      '<li>알림이 오면 luckybbu › 가계부 › 리포트에서 확인하세요.</li></ol></details>';
+    html += rpAlarmHtml();
     return html;
+  }
+
+  /* ---------- 가계부 리포트 알림: cron-job.org가 매달 1일 오전 9시에 ntfy로 알림을 보낸다 ---------- */
+  var NTFY_KEY = 'luckybbu:ntfy';
+  function ntfyTopic() {
+    var S = window.ChecklistSync, room = S && S.getState && S.getState().roomId;
+    if (room) { // 가족 방이 같으면 두 폰의 주제 이름도 같다
+      var h1 = 0x811c9dc5, h2 = 0x01000193;
+      for (var i = 0; i < room.length; i++) { h1 = Math.imul(h1 ^ room.charCodeAt(i), 16777619) >>> 0; h2 = Math.imul(h2 ^ room.charCodeAt(i), 2246822519) >>> 0; }
+      return 'luckybbu-' + h1.toString(36) + h2.toString(36);
+    }
+    var t = null; try { t = window.localStorage.getItem(NTFY_KEY); } catch (e) { /* ignore */ }
+    if (!t || !/^luckybbu-[a-z0-9]{8,}$/.test(t)) {
+      var chars = 'abcdefghijkmnpqrstuvwxyz23456789', buf = new Uint8Array(14), out = '';
+      if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(buf); else for (var j = 0; j < buf.length; j++) buf[j] = Math.floor(Math.random() * 256);
+      for (var k = 0; k < buf.length; k++) out += chars[buf[k] % chars.length];
+      t = 'luckybbu-' + out; try { window.localStorage.setItem(NTFY_KEY, t); } catch (e) { /* ignore */ }
+    }
+    return t;
+  }
+  function appBaseUrl() { return window.location.origin + window.location.pathname.replace(/index\.html$/, ''); }
+  function rpCronBody() {
+    return JSON.stringify({ topic: ntfyTopic(), title: 'luckybbu 가계부', message: '지난달 가계부 리포트가 완성됐어요. 눌러서 확인해 보세요.', click: appBaseUrl() + '?open=report', tags: ['moneybag'] });
+  }
+  function rpAlarmHtml() {
+    var topic = ntfyTopic(), body = rpCronBody();
+    var copy = function (text, label, btn) { return '<button type="button" class="btn btn--small" data-action="rp-copy" data-text="' + escapeHtml(text) + '" data-label="' + escapeHtml(label) + '">' + (btn || '복사') + '</button>'; };
+    var row = function (label, text, copyLabel) { return '<div class="rp-cron__row"><span>' + label + '</span><code>' + escapeHtml(text) + '</code>' + copy(text, copyLabel) + '</div>'; };
+    return '<details class="ledger-card rp-alarm"><summary>매달 1일 오전 9시 ‘리포트 완성’ 알림 받기</summary>' +
+      '<p class="rp-cron__lead">무료 서비스 두 개를 이어요. <b>cron-job.org</b>가 정해진 시각에 <b>ntfy</b>로 알림을 보내고, 폰의 ntfy 앱이 알림을 띄워요. 알림을 누르면 지난달 리포트가 바로 열려요.</p><ol>' +
+      '<li><b>ntfy 앱</b>을 설치하세요(App Store · Play 스토어에서 ‘ntfy’). 앱에서 <b>＋ 구독</b>을 누르고 주제 이름에 아래 값을 붙여 넣으세요. 서버는 기본값(ntfy.sh) 그대로 두면 돼요. 함께 받을 가족 폰도 같은 주제를 구독하세요.' +
+        row('주제', topic, '주제 이름') + '</li>' +
+      '<li>폰에 알림이 오는지 먼저 확인하세요. <button type="button" class="btn btn--small btn--primary" data-action="rp-test">테스트 알림 보내기</button></li>' +
+      '<li><b>cron-job.org</b>에 가입(무료)하고 <b>CREATE CRONJOB</b>을 누르세요.<ul>' +
+        '<li>Title: <code>luckybbu 가계부 리포트</code></li>' +
+        '<li>URL: ' + row('', 'https://ntfy.sh/', '주소') + '</li>' +
+        '<li>Execution schedule: <b>Custom</b>을 고르고 아래 값을 넣으세요(매달 1일 9시 0분).' + row('', '0 9 1 * *', '일정') + '</li>' +
+        '<li><b>ADVANCED</b> 탭: Time zone <code>Asia/Seoul</code>, Request method <code>POST</code>, Request body에 아래 내용을 붙여 넣으세요.' +
+          '<div class="rp-cron__body"><code>' + escapeHtml(body) + '</code>' + copy(body, '보낼 내용') + '</div></li>' +
+        '<li>저장한 뒤 <b>TEST RUN</b>을 눌러 알림이 오면 끝이에요.</li></ul></li>' +
+      '</ol><p class="rp-cron__note">주제 이름이 비밀번호 역할을 해요. 다른 사람에게 알려 주지 마세요. 알림 내용에는 금액이 들어가지 않아요.' + (window.ChecklistSync && window.ChecklistSync.getState && window.ChecklistSync.getState().roomId ? '' : '<br>가족 공유를 켜면 주제 이름이 바뀌어요. 공유를 켠 뒤에 설정하세요.') + '</p></details>';
+  }
+  function rpSendTest() {
+    var body = JSON.parse(rpCronBody()); body.title = 'luckybbu 테스트'; body.message = '테스트 알림이에요. 매달 1일 오전 9시에 이렇게 와요.';
+    fetch('https://ntfy.sh/', { method: 'POST', body: JSON.stringify(body) }).then(function (r) {
+      showToast(r.ok ? '테스트 알림을 보냈어요. 폰의 ntfy 앱을 확인하세요.' : '보내지 못했어요. 잠시 뒤 다시 해 주세요.');
+    }, function () { showToast('보내지 못했어요. 인터넷 연결을 확인해 주세요.'); });
   }
 
   /* ---------- 반복·구독 · 할부: 날짜가 되면 기록을 자동으로 만든다 ---------- */
@@ -6716,6 +6759,8 @@ datesSorted().forEach(function (d) {
             if (again) again.focus({ preventScroll: true });
             break;
           }
+          case 'rp-copy': copyText(b.dataset.text, b.dataset.label); break;
+          case 'rp-test': rpSendTest(); break;
           case 'ledger-tab': ui.ledgerTab = b.dataset.tab; renderLedger(); var tb = ledgerView.querySelector('[data-action="ledger-tab"][data-tab="' + b.dataset.tab + '"]'); if (tb) tb.focus({ preventScroll: true }); break;
           case 'rec-add': ui.ledgerPresetRep = 'm'; openLedgerForm(null); break;
           case 'rec-edit': ui.recEdit = b.dataset.id; renderLedger(); var rf = ledgerView.querySelector('.rec-form input[name="text"]'); if (rf) rf.focus(); break;
@@ -7829,6 +7874,12 @@ datesSorted().forEach(function (d) {
     try { sessionView = window.sessionStorage.getItem(SESSION_VIEW_KEY); } catch (e) { /* ignore */ }
     ui.view = VIEWS.indexOf(sessionView) !== -1 ? shownView(sessionView) : 'portal';
     if (ui.view === 'settings') ui.settingsFrom = 'portal';
+    // 알림에서 연 주소(?open=report): 가계부 › 리포트 › 지난달
+    if (/[?&]open=report(&|$)/.test(window.location.search)) {
+      var pm = new Date(); pm = new Date(pm.getFullYear(), pm.getMonth() - 1, 1);
+      ui.view = 'ledger'; ui.ledgerTab = 'report'; ui.ledgerMonth = pm.getFullYear() + '-' + (pm.getMonth() < 9 ? '0' : '') + (pm.getMonth() + 1);
+      try { window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search.replace(/([?&])open=report(&|$)/, function (m0, a1, a2) { return a2 ? a1 : ''; }).replace(/[?&]$/, '') + window.location.hash); } catch (e) { /* ignore */ }
+    }
     var restoredDraft = restoreDrafts();
     bindEvents();
     if (loaded.fresh && storageOk) {
