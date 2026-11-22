@@ -1,0 +1,41 @@
+# 매달 1일 오전 9시(한국 시간) 가계부 리포트 알림을 가족 폰에 웹 푸시로 보낸다.
+# - cron-job.org가 정시에 repository_dispatch(report-push)를 보낸다 (주 실행)
+# - GitHub 자체 예약은 늦게 돌 수 있어 백업으로만 둔다. 이미 보낸 달이면 스크립트가 건너뛴다
+# - Actions 탭의 'Run workflow'로 테스트 알림을 바로 보낼 수 있다
+name: 리포트 알림
+
+on:
+  repository_dispatch:
+    types: [report-push]
+  schedule:
+    - cron: '30 0 1 * *' # 매달 1일 00:30 UTC = 09:30 KST (백업)
+  workflow_dispatch:
+    inputs:
+      test:
+        description: '테스트 알림 (이미 보낸 달이어도 지금 보냄)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: report-push
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --disable-pip-version-check pywebpush==2.5.0
+      - name: 알림 보내기
+        run: python scripts/push_send.py
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_ROOM_ID: ${{ secrets.PUSH_ROOM_ID }}
+          PUSH_TEST: ${{ github.event_name == 'workflow_dispatch' && inputs.test && '1' || '' }}
