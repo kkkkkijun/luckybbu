@@ -273,6 +273,166 @@
     try { el.setSelectionRange(pos, pos); } catch (e) { /* ignore */ }
   }
 
+  /* ---------- 금액 계산기 ---------- */
+  // 금액 칸 옆 계산기 버튼 → 아래에서 올라오는 키패드. 결과를 '넣기'로 그 칸에 넣는다.
+  // 아이폰 숫자 키보드엔 + × 가 없어서 앱 안의 키패드로 계산한다. 식은 + - * / ( ) 와 숫자만 쓴다
+  var CALC_MAX_LEN = 60, CALC_NUM_MAX = 10;
+  var calcSt = { el: null, input: null, inputId: '', btn: null, s: '', fresh: false };
+  function calcBtnHtml() { return '<button type="button" class="calc-btn" data-calc aria-label="계산기로 금액 계산">' + svgIcon('calc', 20) + '</button>'; }
+  function calcWrap(inputHtml) { return '<span class="calc-wrap">' + inputHtml + calcBtnHtml() + '</span>'; }
+  // 식 계산: 끝에 남은 연산자·여는 괄호는 무시하고, 닫히지 않은 괄호는 닫아서 계산. 못 하면 null
+  function calcEval(src) {
+    var s = String(src).replace(/[+\-*/(]+$/, '');
+    var open = (s.match(/\(/g) || []).length - (s.match(/\)/g) || []).length;
+    for (var o = 0; o < open; o++) s += ')';
+    if (!s) return 0;
+    var pos = 0;
+    function num() { var m = /^\d+/.exec(s.slice(pos)); if (!m) throw 0; pos += m[0].length; return parseInt(m[0], 10); }
+    function factor() {
+      var c = s.charAt(pos);
+      if (c === '(') { pos++; var v = expr(); if (s.charAt(pos) !== ')') throw 0; pos++; return v; }
+      if (c === '-') { pos++; return -factor(); }
+      return num();
+    }
+    function term() {
+      var v = factor();
+      while (s.charAt(pos) === '*' || s.charAt(pos) === '/') { var op = s.charAt(pos++), r = factor(); if (op === '/' && r === 0) throw 0; v = op === '*' ? v * r : v / r; }
+      return v;
+    }
+    function expr() {
+      var v = term();
+      while (s.charAt(pos) === '+' || s.charAt(pos) === '-') { var op = s.charAt(pos++), r = term(); v = op === '+' ? v + r : v - r; }
+      return v;
+    }
+    try { var v = expr(); if (pos !== s.length || !isFinite(v)) return null; return Math.round(v); } catch (e) { return null; }
+  }
+  function calcPretty(s) {
+    return String(s).replace(/\d+/g, function (m) { return formatNumber(m); })
+      .replace(/\*/g, ' × ').replace(/\//g, ' ÷ ').replace(/\+/g, ' + ').replace(/-/g, ' − ').replace(/\s+/g, ' ').trim();
+  }
+  function calcKey(k) {
+    var s = calcSt.s, last = s.slice(-1), isOp = function (c) { return '+-*/'.indexOf(c) !== -1 && c !== ''; };
+    var open = (s.match(/\(/g) || []).length - (s.match(/\)/g) || []).length;
+    var wasFresh = calcSt.fresh;
+    calcSt.fresh = false;
+    if (/^\d$/.test(k) || k === '00') {
+      if (wasFresh) { s = ''; last = ''; }
+      if (last === ')') return calcRender();
+      var cur = (/\d+$/.exec(s) || [''])[0];
+      if (k === '00') { if (!cur || cur === '0' || cur.length + 2 > CALC_NUM_MAX) return calcRender(); s += '00'; }
+      else if (cur === '0') s = s.slice(0, -1) + k;
+      else if (cur.length >= CALC_NUM_MAX) return calcRender();
+      else s += k;
+    } else if (isOp(k)) {
+      if (!s || last === '(') return calcRender();
+      s = isOp(last) ? s.slice(0, -1) + k : s + k;
+    } else if (k === '(') {
+      if (wasFresh) s = '';
+      s += (!s || isOp(s.slice(-1)) || s.slice(-1) === '(') ? '(' : '*(';
+    } else if (k === ')') {
+      if (open > 0 && (/\d/.test(last) || last === ')')) s += ')';
+    } else if (k === '=') {
+      var v = calcEval(s);
+      if (v !== null) { s = String(Math.max(0, v)); calcSt.fresh = true; }
+    } else if (k === 'C') s = '';
+    else if (k === 'back') s = s.slice(0, -1);
+    if (s.length > CALC_MAX_LEN) return calcRender();
+    calcSt.s = s;
+    calcRender();
+  }
+  function calcRender() {
+    var el = calcSt.el; if (!el) return;
+    var v = calcEval(calcSt.s), shown = v === null ? null : Math.max(0, v);
+    el.querySelector('#calc-expr').textContent = calcPretty(calcSt.s) || '0';
+    var res = el.querySelector('#calc-res'), ok = el.querySelector('#calc-ok');
+    if (v === null) { res.textContent = '계산할 수 없어요'; ok.textContent = '넣기'; }
+    else if (shown > PRICE_MAX) { res.textContent = '너무 큰 금액이에요'; ok.textContent = '넣기'; }
+    else { res.textContent = formatNumber(shown) + '원'; ok.textContent = formatNumber(shown) + '원 넣기'; }
+    el.querySelector('.calc__result').classList.toggle('is-bad', v === null || shown > PRICE_MAX);
+  }
+  function calcBuild() {
+    var keys = [['C', 'C', '모두 지우기', 'op'], ['(', '(', '여는 괄호'], [')', ')', '닫는 괄호'], ['/', '÷', '나누기', 'op'],
+      ['7', '7'], ['8', '8'], ['9', '9'], ['*', '×', '곱하기', 'op'],
+      ['4', '4'], ['5', '5'], ['6', '6'], ['-', '−', '빼기', 'op'],
+      ['1', '1'], ['2', '2'], ['3', '3'], ['+', '+', '더하기', 'op'],
+      ['00', '00'], ['0', '0'], ['back', '⌫', '한 칸 지우기'], ['=', '=', '계산', 'op']];
+    var el = document.createElement('div');
+    el.className = 'calc'; el.id = 'calc-pad'; el.hidden = true;
+    el.innerHTML = '<div class="calc__backdrop" data-calc-act="close"></div>' +
+      '<div class="calc__panel" role="dialog" aria-modal="true" aria-labelledby="calc-title" tabindex="-1">' +
+      '<div class="calc__head"><h2 id="calc-title">금액 계산</h2><button type="button" class="icon-btn" data-calc-act="close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>' +
+      '<div class="calc__screen"><div class="calc__expr" id="calc-expr"></div><div class="calc__result" aria-live="polite"><span id="calc-res">0원</span></div></div>' +
+      '<div class="calc__keys">' + keys.map(function (k) {
+        return '<button type="button" class="calc__key' + (k[3] ? ' calc__key--op' : '') + '" data-calc-key="' + k[0] + '"' + (k[2] ? ' aria-label="' + k[2] + '"' : '') + '>' + k[1] + '</button>';
+      }).join('') + '</div>' +
+      '<button type="button" class="calc__ok" id="calc-ok" data-calc-act="ok">넣기</button></div>';
+    document.body.appendChild(el);
+    el.addEventListener('click', function (e) {
+      var kb = e.target.closest('[data-calc-key]'); if (kb) { calcKey(kb.getAttribute('data-calc-key')); return; }
+      var ab = e.target.closest('[data-calc-act]'); if (!ab) return;
+      if (ab.getAttribute('data-calc-act') === 'ok') calcApply(); else calcClose();
+    });
+    calcSt.el = el;
+  }
+  function calcOpen(btn) {
+    var wrap = btn.closest('.calc-wrap, .lg-amt'), input = wrap && wrap.querySelector('input');
+    if (!input) return;
+    if (!calcSt.el) calcBuild();
+    var p = parsePrice(input.value);
+    calcSt.input = input; calcSt.inputId = input.id || ''; calcSt.btn = btn;
+    calcSt.s = p.ok && p.value ? String(p.value) : ''; calcSt.fresh = !!calcSt.s;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // 폰 키보드 내리기
+    calcSt.el.hidden = false;
+    document.body.classList.add('has-calc');
+    calcRender();
+    calcSt.el.querySelector('.calc__panel').focus();
+  }
+  function calcClose(keepFocus) {
+    if (!calcSt.el || calcSt.el.hidden) return;
+    calcSt.el.hidden = true;
+    document.body.classList.remove('has-calc');
+    var b = calcSt.btn;
+    if (!keepFocus && b && document.body.contains(b)) b.focus();
+    calcSt.input = calcSt.btn = null;
+  }
+  function calcApply() {
+    var v = calcEval(calcSt.s);
+    if (v === null) { showToast('식을 확인해 주세요.'); return; }
+    v = Math.max(0, v);
+    if (v > PRICE_MAX) { showToast('너무 큰 금액이에요.'); return; }
+    var input = calcSt.input;
+    // 계산하는 사이 화면이 다시 그려졌으면 같은 id의 새 칸에 넣는다
+    if (!input || !document.body.contains(input)) input = calcSt.inputId ? document.getElementById(calcSt.inputId) : null;
+    if (!input) { calcClose(true); showToast('금액 칸이 닫혀서 넣지 못했어요.'); return; }
+    input.value = v ? formatNumber(v) : '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    calcClose();
+  }
+  function calcIsOpen() { return !!(calcSt.el && !calcSt.el.hidden); }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-calc]');
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    calcOpen(b);
+  }, true);
+  window.addEventListener('keydown', function (e) {
+    if (!calcIsOpen()) return;
+    var k = e.key, map = { 'x': '*', 'X': '*', '*': '*', '/': '/', '+': '+', '-': '-', '(': '(', ')': ')', '=': '=', 'Backspace': 'back', 'Delete': 'C', 'c': 'C', 'C': 'C' };
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (k === 'Escape') calcClose();
+    else if (k === 'Enter') { if (/[+\-*/]/.test(calcSt.s.replace(/^-/, ''))) calcKey('='); else calcApply(); }
+    else if (/^\d$/.test(k)) calcKey(k);
+    else if (map[k]) calcKey(map[k]);
+    else if (k === 'Tab') {
+      var f = Array.prototype.slice.call(calcSt.el.querySelectorAll('button')), i = f.indexOf(document.activeElement);
+      var n = e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i === -1 || i === f.length - 1 ? 0 : i + 1);
+      f[n].focus();
+    } else return;
+    e.preventDefault(); e.stopImmediatePropagation();
+  }, true);
+  window.addEventListener('popstate', function () { calcClose(true); });
+
   /* ---------- 메모의 표 ---------- */
   var TABLES_PER_MEMO = 5, TABLE_ROWS_MAX = 30, TABLE_COLS_MAX = 8, CELL_MAX = 300;
   var COL_W_MIN = 60, COL_W_MAX = 600, COL_W_DEFAULT = 130, ROW_H_MIN = 36, ROW_H_MAX = 300;
@@ -2318,6 +2478,7 @@ datesSorted().forEach(function (d) {
     back: '<path d="M15 18l-6-6 6-6"/>',
     next: '<path d="M9 6l6 6-6 6"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    calc: '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M8.5 6.5h7M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h3.5"/>',
     settings: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
     breast: '<path d="M12 20.5s-7.5-4.6-7.5-10.4A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.5 2.7c0 5.8-7.5 10.4-7.5 10.4z"/><path d="M12 10.8c-1.1 1.4-1.7 2.3-1.7 3a1.7 1.7 0 0 0 3.4 0c0-.7-.6-1.6-1.7-3z"/>',
     bowl: '<path d="M3 11.5h18a9 7.5 0 0 1-18 0z"/><path d="M8.5 20.5h7M14 11.5l4.5-8"/>',
@@ -2650,9 +2811,9 @@ datesSorted().forEach(function (d) {
       '<label class="visually-hidden" for="acc-name-' + id + '">통장 이름</label><input type="text" id="acc-name-' + id + '" class="goal-acc-row__name-input" data-acc-field="name" maxlength="' + ACC_NAME_MAX + '" value="' + escapeHtml(a.name) + '" placeholder="통장 이름">' +
       (info ? '<span class="goal-acc-row__info">' + escapeHtml(info) + '</span>' : '') +
       (isDefault ? '' : '<button type="button" class="goal-acc-row__del" data-action="goal-acc-del" aria-label="' + escapeHtml(a.name) + ' 지우기">×</button>') + '</div>' +
-      '<input type="text" id="acc-amt-' + id + '" data-acc-field="amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (a.amount ? formatNumber(a.amount) : '') + '" placeholder="0" aria-label="' + escapeHtml(a.name) + ' 금액">' +
+      calcWrap('<input type="text" id="acc-amt-' + id + '" data-acc-field="amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (a.amount ? formatNumber(a.amount) : '') + '" placeholder="0" aria-label="' + escapeHtml(a.name) + ' 금액">') +
       (a.saving ? '<details class="goal-acc-row__more"' + (a.monthly || a.start || a.end ? '' : ' open') + '><summary>적금 정보 (매달 넣는 돈 · 가입일 · 만기일)</summary><div class="goal-acc-row__three">' +
-        '<div class="field"><label for="acc-mon-' + id + '">매달 넣는 돈</label><input type="text" id="acc-mon-' + id + '" data-acc-field="monthly" inputmode="numeric" autocomplete="off" data-price-input value="' + (a.monthly ? formatNumber(a.monthly) : '') + '" placeholder="예: 400,000"></div>' +
+        '<div class="field"><label for="acc-mon-' + id + '">매달 넣는 돈</label>' + calcWrap('<input type="text" id="acc-mon-' + id + '" data-acc-field="monthly" inputmode="numeric" autocomplete="off" data-price-input value="' + (a.monthly ? formatNumber(a.monthly) : '') + '" placeholder="예: 400,000">') + '</div>' +
         '<div class="field"><label for="acc-start-' + id + '">가입일</label><input type="date" id="acc-start-' + id + '" data-acc-field="start" value="' + a.start + '"></div>' +
         '<div class="field"><label for="acc-end-' + id + '">만기일</label><input type="date" id="acc-end-' + id + '" data-acc-field="end" value="' + a.end + '"></div></div></details>' : '') +
       '</div>';
@@ -2667,7 +2828,7 @@ datesSorted().forEach(function (d) {
       '<div class="goal-form__tools"><button type="button" class="goal-tool goal-tool--month" data-action="goal-month" id="goal-month-btn"></button>' +
       '<button type="button" class="goal-tool goal-tool--add" data-action="goal-acc-add">＋ 통장 추가</button></div>' +
       '<p class="goal-form__preview" id="goal-preview" aria-live="polite"></p>' +
-      '<div class="goal-form__two"><div class="field"><label for="goal-target">목표 금액</label><input type="text" id="goal-target" inputmode="numeric" autocomplete="off" data-price-input value="' + (g.target ? formatNumber(g.target) : '') + '" placeholder="예: 20,000,000"></div>' +
+      '<div class="goal-form__two"><div class="field"><label for="goal-target">목표 금액</label>' + calcWrap('<input type="text" id="goal-target" inputmode="numeric" autocomplete="off" data-price-input value="' + (g.target ? formatNumber(g.target) : '') + '" placeholder="예: 20,000,000">') + '</div>' +
       '<div class="field"><label for="goal-due">목표일 (선택)</label><input type="date" id="goal-due" value="' + g.due + '"></div></div>' +
       '<div class="modal__actions"><button type="button" class="btn" data-action="goal-close">취소</button><button type="submit" class="btn btn--primary goal-form__save">저장</button></div></div></form>';
   }
@@ -2836,11 +2997,11 @@ datesSorted().forEach(function (d) {
   function lunarOccur(ly, L) { return lunarToSolar(ly, L.m, L.d, L.leap) || (L.leap ? lunarToSolar(ly, L.m, L.d, false) : '') || (L.d === 30 ? lunarToSolar(ly, L.m, 29, L.leap) || lunarToSolar(ly, L.m, 29, false) : ''); }
   function lunarText(L) { return '음력 ' + (L.leap ? '윤' : '') + L.m + '월 ' + L.d + '일'; }
 
-  var CAL_COLORS = ['#6FA8E8', '#EE8FB0', '#F5C24B'];
+  var CAL_COLORS = ['#6FA8E8', '#EE8FB0', '#5CC79A', '#F5C24B'];
   var CAL_REP = { w: '매주', m: '매달', y: '매년' };
   var CAL_TITLE_MAX = 40, CAL_MEMO_MAX = 100, CAL_PLACE_MAX = 40;
-  function calWhoList() { return [TAG_NAMES[0], TAG_NAMES[1], '함께']; }
-  function calWhoIdx(w) { var i = calWhoList().indexOf(w); return i === -1 ? 2 : i; }
+  function calWhoList() { return [TAG_NAMES[0], TAG_NAMES[1], '이도', '함께']; }
+  function calWhoIdx(w) { var i = calWhoList().indexOf(w); return i === -1 ? calWhoList().length - 1 : i; }
   function calDefaultWho() { var me = myName(); return calWhoList().indexOf(me) !== -1 ? me : '함께'; }
   function calMonth() { return /^\d{4}-\d{2}$/.test(ui.calMonth || '') ? ui.calMonth : todayStamp().slice(0, 7); }
   function calSel() { var s = ui.calSel || '', ym = calMonth(); if (/^\d{4}-\d{2}-\d{2}$/.test(s) && s.slice(0, 7) === ym) return s; return ym === todayStamp().slice(0, 7) ? todayStamp() : ym + '-01'; }
@@ -3154,7 +3315,7 @@ datesSorted().forEach(function (d) {
       '<p class="ledger-sum__num">' + formatNumber(out) + '원</p>';
     if (ui.budgetEdit) {
       html += '<form class="ledger-budget-form" data-action="ledger-budget"><label for="ledger-budget-input">한 달 예산</label>' +
-        '<input type="text" id="ledger-budget-input" inputmode="numeric" autocomplete="off" data-price-input value="' + (state.budget ? formatNumber(state.budget) : '') + '" placeholder="예: 2,000,000">' +
+        calcWrap('<input type="text" id="ledger-budget-input" inputmode="numeric" autocomplete="off" data-price-input value="' + (state.budget ? formatNumber(state.budget) : '') + '" placeholder="예: 2,000,000">') +
         '<button type="submit" class="btn btn--primary btn--small">저장</button>' +
         (state.budget ? '<button type="button" class="btn btn--small" data-action="ledger-budget-clear">예산 없애기</button>' : '') +
         '<button type="button" class="btn btn--small" data-action="ledger-budget-cancel">취소</button></form>';
@@ -3454,7 +3615,7 @@ datesSorted().forEach(function (d) {
     var id = escapeHtml(r.id);
     return '<form class="rec-form" data-rec-form="' + id + '">' +
       '<div class="rec-form__g"><label>내용<input type="text" name="text" maxlength="' + LEDGER_TEXT_MAX + '" value="' + escapeHtml(r.text) + '" autocomplete="off"></label>' +
-      '<label>금액<input type="text" name="amount" inputmode="numeric" data-price-input value="' + formatNumber(r.amount) + '" autocomplete="off"></label>' +
+      '<label>금액' + calcWrap('<input type="text" name="amount" inputmode="numeric" data-price-input value="' + formatNumber(r.amount) + '" autocomplete="off">') + '</label>' +
       '<label>분류' + catSelect('cat', r.type, r.cat, true) + '</label><label>결제' + paySelect(r.pay) + '</label>' +
       '<label>주기<select name="freq">' + Object.keys(REC_FREQ).map(function (k) { return '<option value="' + k + '"' + (k === r.freq ? ' selected' : '') + '>' + REC_FREQ[k] + '</option>'; }).join('') + '</select></label>' +
       '<label>다음 날짜<input type="date" name="next" value="' + recOcc(r, r.n) + '"></label></div>' +
@@ -3502,14 +3663,14 @@ datesSorted().forEach(function (d) {
     html += '<section class="ledger-card pl"><h3 class="ledger-card__title pl-h"><span>분류별 예산</span><span class="notes__count">' + parseInt(m.slice(5, 7), 10) + '월 · 합 ' + formatNumber(sumB) + '원' + (state.budget ? ' / 전체 ' + formatNumber(state.budget) + '원' : '') + '</span></h3>';
     if (withB.length) html += '<ul class="pl-list">' + withB.map(function (c) {
       var used = spent[c.name] || 0, pct = Math.round(used / c.budget * 100), over = used > c.budget;
-      if (ui.cbEdit === c.id) return '<li class="pl-row is-editing"><form class="cb-form" data-cb-form="' + escapeHtml(c.id) + '">' + lcIcon(c, 30) + '<label class="visually-hidden" for="cb-in">' + escapeHtml(c.name) + ' 예산</label><input type="text" id="cb-in" name="amount" inputmode="numeric" data-price-input value="' + formatNumber(c.budget) + '" autocomplete="off"><button type="submit" class="btn btn--primary btn--small">저장</button><button type="button" class="btn btn--small" data-action="cb-clear" data-id="' + escapeHtml(c.id) + '">없애기</button><button type="button" class="btn btn--small" data-action="cb-cancel">취소</button></form></li>';
+      if (ui.cbEdit === c.id) return '<li class="pl-row is-editing"><form class="cb-form" data-cb-form="' + escapeHtml(c.id) + '">' + lcIcon(c, 30) + '<label class="visually-hidden" for="cb-in">' + escapeHtml(c.name) + ' 예산</label>' + calcWrap('<input type="text" id="cb-in" name="amount" inputmode="numeric" data-price-input value="' + formatNumber(c.budget) + '" autocomplete="off">') + '<button type="submit" class="btn btn--primary btn--small">저장</button><button type="button" class="btn btn--small" data-action="cb-clear" data-id="' + escapeHtml(c.id) + '">없애기</button><button type="button" class="btn btn--small" data-action="cb-cancel">취소</button></form></li>';
       return '<li class="pl-row">' + lcIcon(c, 34) + '<div class="pl-row__b"><b>' + escapeHtml(c.name) + '</b><small>' + formatNumber(c.budget) + '원 중 ' + pct + '% · ' + (over ? '<span class="is-up">' + formatNumber(used - c.budget) + '원 넘음</span>' : formatNumber(c.budget - used) + '원 남음') + '</small>' +
         '<div class="rp-bar"><span style="width:' + Math.min(100, pct) + '%;background:' + (over ? '#E36B6B' : c.color) + '"></span></div></div><b class="pl-row__amt">' + formatNumber(used) + '</b>' +
         '<button type="button" class="lc-btn" data-action="cb-edit" data-id="' + escapeHtml(c.id) + '" aria-label="' + escapeHtml(c.name) + ' 예산 고치기">✎</button></li>';
     }).join('') + '</ul>';
     var noB = catsOf('out').filter(function (c) { return !c.excl && !(c.budget > 0); });
     if (noB.length) html += '<form class="cb-add-form"><label class="visually-hidden" for="cb-add-cat">분류</label><select id="cb-add-cat" name="cat">' + noB.map(function (c) { return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>'; }).join('') + '</select>' +
-      '<label class="visually-hidden" for="cb-add-amt">예산</label><input type="text" id="cb-add-amt" name="amount" inputmode="numeric" data-price-input placeholder="예: 300,000" autocomplete="off"><button type="submit" class="btn btn--small btn--primary">예산 추가</button></form>';
+      '<label class="visually-hidden" for="cb-add-amt">예산</label>' + calcWrap('<input type="text" id="cb-add-amt" name="amount" inputmode="numeric" data-price-input placeholder="예: 300,000" autocomplete="off">') + '<button type="submit" class="btn btn--small btn--primary">예산 추가</button></form>';
     return html + '</section>';
   }
   function submitRecForm(form) {
@@ -3593,7 +3754,7 @@ datesSorted().forEach(function (d) {
       '<div class="sheet__head"><h2 id="ledger-form-title" tabindex="-1">' + (e ? '기록 수정' : '기록 추가') + '</h2>' +
       '<button type="button" class="icon-btn" data-action="ledger-close" aria-label="닫기">' + svgIcon('close', 20) + '</button></div>' +
       '<div class="seg seg--3" role="radiogroup" aria-label="종류">' + ledgerChips('type', [{ value: 'out', label: '지출' }, { value: 'in', label: '수입' }, { value: 'move', label: '이체·저축' }], tab) + '</div>' +
-      '<div class="field lg-amt"><label for="ledger-amount">금액</label><input type="text" id="ledger-amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (d ? escapeHtml(d.amount) : e ? formatNumber(e.amount) : '') + '" placeholder="0"><span aria-hidden="true">원</span></div>' +
+      '<div class="field lg-amt"><label for="ledger-amount">금액</label><input type="text" id="ledger-amount" inputmode="numeric" autocomplete="off" data-price-input value="' + (d ? escapeHtml(d.amount) : e ? formatNumber(e.amount) : '') + '" placeholder="0"><span aria-hidden="true">원</span>' + calcBtnHtml() + '</div>' +
       '<div class="field"><label for="ledger-text">내용</label><input type="text" id="ledger-text" maxlength="' + LEDGER_TEXT_MAX + '" autocomplete="off" value="' + escapeHtml(d ? d.text : e ? e.text : '') + '" placeholder="예: 스타벅스 · 점심 국밥 9천원"></div>' +
       '<div id="lf-box">' + ledgerFavRow() + '</div>' +
       '<fieldset class="chips-field"><legend>분류 <small class="mut">길게 누르면 고치기</small></legend><div class="lc-grid" id="ledger-cat-grid">' + ledgerCatGrid(tab, d ? d.cat : e ? e.cat : '') + '</div></fieldset>' +
