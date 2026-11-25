@@ -24,7 +24,7 @@
   // 화면에서 숨긴 공간(데이터는 그대로 보관·동기화): 출산 당일 · 택일 · 작명
   var HIDDEN_VIEWS = ['birthday', 'picks', 'names'];
   function shownView(v) { return HIDDEN_VIEWS.indexOf(v) !== -1 ? 'home' : v; }
-  var VIEWS = ['portal', 'ledger', 'calendar', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'growth', 'babylog', 'vaccine'];
+  var VIEWS = ['portal', 'ledger', 'calendar', 'home', 'checklist', 'notes', 'picks', 'names', 'settings', 'supports', 'memos', 'birthday', 'growth', 'babylog', 'vaccine', 'supplies'];
   // 이도로그 분류는 '출산'·'육아' 묶음으로 나뉜다. 예전 데이터는 이름으로 한 번 정한다.
   var GROUPS = ['birth', 'baby'];
   function defaultGroupFor(name) { var n = String(name || ''); if (/맞이|의류|출산|병원|조리원/.test(n)) return 'birth'; return /육아|이유식|예방접종|성장/i.test(n) ? 'baby' : 'birth'; }
@@ -624,7 +624,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerWho: [], ledgerFavs: [], ledgerRecs: [], ledgerInst: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {}, events: [] };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerWho: [], ledgerFavs: [], ledgerRecs: [], ledgerInst: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {}, events: [], supplies: [], supplyWarn: 7 };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -883,7 +883,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerWho: ledgerWho, ledgerFavs: ledgerFavs, ledgerRecs: ledgerRecs, ledgerInst: ledgerInst, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates, events: normalizeEvents(raw.events) } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerWho: ledgerWho, ledgerFavs: ledgerFavs, ledgerRecs: ledgerRecs, ledgerInst: ledgerInst, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates, events: normalizeEvents(raw.events), supplies: normalizeSupplies(raw.supplies), supplyWarn: normalizeSupplyWarn(raw.supplyWarn) } };
   }
 
   /* ---------- storage ---------- */
@@ -1235,6 +1235,7 @@
     if (ui.view === 'growth') ui.grForm = null;
     if (ui.view === 'babylog') { ui.blEdit = null; ui.blSelect = false; ui.blSel = {}; closeBlGuide(); }
     if (ui.view === 'vaccine') closeVxSheet(true);
+    if (suOpenState && view !== 'supplies') suClose(true);
     ui.view = view;
     if (view === 'notes' || view === 'memos') ui.recordTab = view;
     if (view === 'picks' || view === 'names') ui.planTab = view;
@@ -1296,6 +1297,7 @@
     var vgr = $('#view-growth'); if (vgr) vgr.hidden = ui.view !== 'growth';
     var vbl = $('#view-babylog'); if (vbl) vbl.hidden = ui.view !== 'babylog';
     var vvx = $('#view-vaccine'); if (vvx) vvx.hidden = ui.view !== 'vaccine';
+    var vsu = $('#view-supplies'); if (vsu) vsu.hidden = ui.view !== 'supplies';
     var vmm = $('#view-memos'); if (vmm) vmm.hidden = ui.view !== 'memos';
     var vc = $('#view-checklist'), vn = $('#view-notes'), vp = $('#view-picks'), vm = $('#view-names');
     if (vc) vc.hidden = ui.view !== 'checklist';
@@ -1355,6 +1357,7 @@
     renderGrowth();
     renderBabyLog();
     renderVaccine();
+    renderSupplies();
     var searchBox = $('#search-wrap');
     if (searchBox) searchBox.hidden = !ui.searchOpen || ui.editMode || ui.view !== 'checklist';
     var rtg = $('#role-toggle'); if (rtg) { rtg.setAttribute('aria-pressed', ui.showRoles ? 'true' : 'false'); rtg.classList.toggle('is-active', ui.showRoles); }
@@ -2478,6 +2481,15 @@ datesSorted().forEach(function (d) {
     back: '<path d="M15 18l-6-6 6-6"/>',
     next: '<path d="M9 6l6 6-6 6"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    shelf: '<path d="M4 3v18M20 3v18M4 9h16M4 15h16M4 21h16"/><rect x="6.5" y="5" width="3" height="4" rx="1"/><path d="M12 9V6.5a1.5 1.5 0 0 1 3 0V9"/><circle cx="8.5" cy="13" r="2"/><rect x="13" y="11.5" width="4.5" height="3.5" rx="1"/><path d="M7 21v-3.5h3V21M14 21v-4h3v4"/>',
+    pacifier: '<path d="M12 3.5a3 3 0 0 1 3 3V9H9V6.5a3 3 0 0 1 3-3z"/><path d="M5.5 9h13a2 2 0 0 1 0 4h-13a2 2 0 0 1 0-4z"/><path d="M12 13v2.5"/><circle cx="12" cy="18.3" r="2.8"/>',
+    can: '<path d="M6.5 7h11v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2z"/><path d="M5.5 3.5h13V7h-13z"/><path d="M9.5 11.5h5M9.5 15h5"/>',
+    wipes: '<rect x="3" y="8" width="18" height="11.5" rx="2.5"/><path d="M9 8c0-2.3 1.3-4.5 3-4.5S15 5.7 15 8"/><path d="M8 13.5h8"/>',
+    diaper: '<path d="M3 6.5h18V10a9 9 0 0 1-18 0z"/><path d="M8 13c1.1 1.6 2.5 2.4 4 2.4s2.9-.8 4-2.4"/>',
+    brush: '<path d="M11 21V11.5h2V21z"/><path d="M8.5 3h7v8.5h-7z"/><path d="M11 3v8.5M13 3v8.5"/>',
+    pill: '<path d="M4.9 13.4l8.5-8.5a3.5 3.5 0 0 1 5 5l-8.5 8.5a3.5 3.5 0 0 1-5-5z"/><path d="M9.2 9.2l5.6 5.6"/>',
+    lotion: '<path d="M10 2.5h5M12.5 2.5v4"/><path d="M10.5 6.5h4"/><path d="M8 10a2.5 2.5 0 0 1 2.5-2.5h4A2.5 2.5 0 0 1 17 10v10a1.5 1.5 0 0 1-1.5 1.5h-6A1.5 1.5 0 0 1 8 20z"/><path d="M8 13.5h9"/>',
+    detergent: '<path d="M8 2.5h5v3H8z"/><path d="M6 8a2.5 2.5 0 0 1 2.5-2.5H13l3.5 3.5h1A2.5 2.5 0 0 1 20 11.5v8a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 6 19.5z"/><path d="M10 14.5h6"/>',
     calc: '<rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M8.5 6.5h7M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5h.01M8.5 18h.01M12 18h3.5"/>',
     settings: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
     breast: '<path d="M12 20.5s-7.5-4.6-7.5-10.4A4.3 4.3 0 0 1 12 7.4a4.3 4.3 0 0 1 7.5 2.7c0 5.8-7.5 10.4-7.5 10.4z"/><path d="M12 10.8c-1.1 1.4-1.7 2.3-1.7 3a1.7 1.7 0 0 0 3.4 0c0-.7-.6-1.6-1.7-3z"/>',
@@ -2514,7 +2526,8 @@ datesSorted().forEach(function (d) {
     baby: [
       { label: '예방접종', icon: 'syringe', view: 'vaccine' },
       { label: '성장 기록', icon: 'growth', view: 'growth' },
-      { label: '육아 일지', icon: 'book', view: 'babylog' }
+      { label: '육아 일지', icon: 'book', view: 'babylog' },
+      { label: '용품 관리', icon: 'shelf', view: 'supplies' }
     ]
   };
   function fixedTileMeta(view) {
@@ -2525,6 +2538,7 @@ datesSorted().forEach(function (d) {
     if (view === 'names') return state.names.length ? '후보 ' + state.names.length : '';
     if (view === 'growth') { var lg = latestGrowth('weight'); return lg ? formatKg(lg.weight) : (state.growth.length ? state.growth.length + '번' : '시작하기'); }
     if (view === 'vaccine') { var nx = vxCurrent(); if (!nx) return vxDoneCount() ? '모두 완료' : ''; if (!state.birthDate) return vxDoneCount() + '회'; var dd = daysFromToday(vxGroupDate(nx.g)); return dd > 0 ? '다음 D-' + dd : '지금 차례'; }
+    if (view === 'supplies') return suTileMeta();
     if (view === 'babylog') { var lf = lastFeed(); return lf ? '수유 ' + agoText(lf.t) : '시작하기'; }
     return '';
   }
@@ -4847,6 +4861,7 @@ datesSorted().forEach(function (d) {
     var dn = $('#device-name'); if (dn && document.activeElement !== dn) { dn.value = ui.deviceName; dn.placeholder = ui.deviceName ? '예: 남편, 아내' : '예: 남편, 아내 (지금은 ' + autoName() + ')'; }
     var dd = $('#due-date'); if (dd && document.activeElement !== dd) dd.value = state.dueDate || '';
     var an = $('#anniversary'); if (an && document.activeElement !== an) an.value = state.anniversary || '';
+    var swi = $('#supply-warn'); if (swi && document.activeElement !== swi) swi.value = suWarn();
     var wb = $('#week-base'); if (wb && document.activeElement !== wb) wb.value = state.weekBase || '';
     var tr = $('#toast-remote'); if (tr) tr.checked = ui.toastRemote;
     renderArchive();
@@ -5760,6 +5775,192 @@ datesSorted().forEach(function (d) {
     html += '<p class="gr-foot">질병관리청 국가예방접종 표준 일정으로 자동 계산했어요. 실제 접종 시기와 백신 종류는 소아과와 상의하세요.</p>';
     $('#vaccine-body').innerHTML = html;
     var m = $('#vx-modal'); if (m && !m.hidden && !isTyping()) { if (ui.vxSheet) m.querySelector('.modal__box').innerHTML = vxSheetHtml(); else if (ui.vxInfo) m.querySelector('.modal__box').innerHTML = vxInfoHtml(ui.vxInfo); }
+  }
+
+  /* ---------- 용품 관리 (진열장) ---------- */
+  // 물건마다 개봉한 날 + 사용 기한(일·개월) → 버리는 날. 개봉한 날도 쓴 날로 센다(5/1 + 3개월 → 7/31)
+  // 버리는 날이 가까운 것부터 진열장 위 칸 왼쪽에 놓는다. '곧 교체' 기준(기본 7일)은 설정에서 바꾸고 가족과 공유한다
+  var SU_NAME_MAX = 20, SU_MAX = 60, SU_HIST_MAX = 12, SU_WARN_DEFAULT = 7, SU_PER_ROW = 4;
+  var SU_PRESETS = [['d', 14, '2주'], ['d', 21, '3주'], ['m', 1, '1개월'], ['m', 2, '2개월'], ['m', 3, '3개월'], ['m', 6, '6개월'], ['m', 12, '1년']];
+  var SU_ICON_RULES = [
+    [/젖꼭지|노리개|쪽쪽이|공갈/, 'pacifier'], [/젖병|빨대컵|보틀|컵/, 'bottle'], [/분유|이유식|퓨레|떡뻥|과자/, 'can'],
+    [/물티슈|티슈|손수건|가제/, 'wipes'], [/기저귀/, 'diaper'], [/칫솔|치약|구강/, 'brush'],
+    [/약|시럽|해열|영양제|유산균|비타민|연고/, 'pill'], [/로션|크림|오일|선크림|파우더|보습/, 'lotion'],
+    [/세제|섬유|유연|세정|샴푸|워시|비누|클렌저|소독/, 'detergent'], [/장난감|딸랑이|인형|치발기/, 'toy'], [/옷|턱받이|양말|모자|우주복/, 'shirt']
+  ];
+  function normalizeSupplies(raw) {
+    var out = [], seen = {};
+    (Array.isArray(raw) ? raw : []).forEach(function (u) {
+      if (!u || typeof u !== 'object' || typeof u.id !== 'string' || !u.id || seen[u.id] || out.length >= 60) return;
+      var name = typeof u.name === 'string' ? u.name.trim().slice(0, 20) : '';
+      if (!name || !isIsoDate(u.open)) return;
+      var pu = u.pu === 'd' ? 'd' : 'm', pn = typeof u.pn === 'number' && isFinite(u.pn) ? Math.round(u.pn) : 1;
+      pn = Math.max(1, Math.min(pu === 'd' ? 999 : 60, pn));
+      var hist = (Array.isArray(u.hist) ? u.hist : []).filter(function (h) { return h && isIsoDate(h.o) && isIsoDate(h.r); }).slice(0, 12).map(function (h) { return { o: h.o, r: h.r }; });
+      seen[u.id] = true;
+      out.push({ id: u.id, name: name, open: u.open, pu: pu, pn: pn, by: typeof u.by === 'string' ? u.by.trim().slice(0, 12) : '', at: typeof u.at === 'number' && isFinite(u.at) ? u.at : 0, hist: hist });
+    });
+    return out;
+  }
+  function normalizeSupplyWarn(v) { return typeof v === 'number' && isFinite(v) ? Math.max(1, Math.min(60, Math.round(v))) : 7; }
+  function suWarn() { return normalizeSupplyWarn(state.supplyWarn); }
+  function suIcon(name) { for (var i = 0; i < SU_ICON_RULES.length; i++) if (SU_ICON_RULES[i][0].test(name || '')) return SU_ICON_RULES[i][1]; return 'box'; }
+  function suFind(id) { for (var i = 0; i < state.supplies.length; i++) if (state.supplies[i].id === id) return state.supplies[i]; return null; }
+  // 버리는 날(ISO): 일 단위는 개봉일 + n - 1일, 개월 단위는 n개월 뒤 같은 날(없으면 그달 말일)의 전날
+  function suEndOf(open, pu, pn) {
+    var d = dateOf(open), e;
+    if (pu === 'd') e = new Date(d.getFullYear(), d.getMonth(), d.getDate() + pn - 1);
+    else {
+      var last = new Date(d.getFullYear(), d.getMonth() + pn + 1, 0).getDate();
+      e = new Date(d.getFullYear(), d.getMonth() + pn, Math.min(d.getDate(), last) - 1);
+    }
+    return isoOf(e);
+  }
+  function suEnd(u) { return suEndOf(u.open, u.pu, u.pn); }
+  function suStatus(left) { return left < 0 ? 'over' : left <= suWarn() ? 'soon' : 'ok'; }
+  function suDdText(n) { return n < 0 ? (-n) + '일 지남' : n === 0 ? '오늘까지' : 'D-' + n; }
+  function suPerLabel(pu, pn) { return pu === 'd' ? (pn % 7 === 0 && pn <= 70 ? pn / 7 + '주' : pn + '일') : (pn % 12 === 0 ? pn / 12 + '년' : pn + '개월'); }
+  function suDateText(iso) { var d = dateOf(iso); return d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + ' (' + WEEKDAYS[d.getDay()] + ')'; }
+  function suShort(iso) { var d = dateOf(iso); return (d.getMonth() + 1) + '/' + d.getDate(); }
+  function suSorted() {
+    return state.supplies.map(function (u) { return { u: u, end: suEnd(u) }; })
+      .sort(function (a, b) { return a.end < b.end ? -1 : a.end > b.end ? 1 : a.u.name.localeCompare(b.u.name, 'ko'); });
+  }
+  function suCounts() {
+    var c = { over: 0, soon: 0, ok: 0 };
+    state.supplies.forEach(function (u) { c[suStatus(daysFromToday(suEnd(u)))]++; });
+    return c;
+  }
+  function suTileMeta() {
+    if (!state.supplies.length) return '시작하기';
+    var c = suCounts(), n = c.over + c.soon;
+    return n ? '교체 ' + n + '개' : state.supplies.length + '개';
+  }
+  function renderSupplies() {
+    var view = $('#view-supplies'); if (!view || ui.view !== 'supplies') return;
+    var list = suSorted(), c = suCounts(), warn = suWarn();
+    var html = '<div class="su-sum">' + (list.length ? '<span class="su-pill su--over">지남 ' + c.over + '</span><span class="su-pill su--soon">' + warn + '일 안에 ' + c.soon + '</span><span class="su-pill su--ok">여유 ' + c.ok + '</span>' : '') +
+      '<button type="button" class="su-warn-link" data-action="su-settings">곧 교체 기준 ' + warn + '일 ›</button></div>';
+    var cells = list.map(function (x) {
+      var u = x.u, n = daysFromToday(x.end), s = suStatus(n), id = escapeHtml(u.id), nm = escapeHtml(u.name);
+      return '<button type="button" class="su-it" data-action="su-edit" data-id="' + id + '" data-focus-key="su:' + id + '" aria-label="' + nm + ', 버리는 날 ' + escapeHtml(suDateText(x.end)) + ', ' + suDdText(n) + '">' +
+        '<span class="su-dd su--' + s + '" aria-hidden="true">' + suDdText(n) + '</span>' +
+        '<span class="su-jar su-jar--' + s + '" aria-hidden="true">' + svgIcon(suIcon(u.name), 26) + '</span>' +
+        '<span class="su-nm" aria-hidden="true">' + nm + '</span></button>';
+    });
+    if (list.length < SU_MAX) cells.push('<button type="button" class="su-it su-it--add" data-action="su-new" data-focus-key="su:add" aria-label="용품 추가"><span class="su-dd" aria-hidden="true">&nbsp;</span><span class="su-jar su-jar--add" aria-hidden="true">＋</span><span class="su-nm" aria-hidden="true">추가</span></button>');
+    var rows = [];
+    for (var i = 0; i < cells.length; i += SU_PER_ROW) rows.push(cells.slice(i, i + SU_PER_ROW));
+    while (rows.length < 2) rows.push([]);
+    html += '<div class="su-cab" role="list" aria-label="용품 진열장">' + rows.map(function (r) {
+      return '<div class="su-shelf">' + r.map(function (cell) { return '<div class="su-slot" role="listitem">' + cell + '</div>'; }).join('') + '</div><div class="su-plank" aria-hidden="true"></div>';
+    }).join('') + '</div>';
+    html += list.length ? '<p class="su-note">버리는 날이 가까운 것부터 위 칸 왼쪽에 놓여요. 용품을 누르면 고치거나 새 걸로 교체할 수 있어요.</p>'
+      : '<p class="su-note">젖병 · 분유 · 물티슈처럼 열고 나서 쓸 수 있는 기한이 있는 용품을 올려 두세요. 개봉한 날과 사용 기한을 적으면 버리는 날을 알아서 계산해요.</p>';
+    $('#supplies-body').innerHTML = html;
+  }
+
+  // 등록 · 수정 창
+  var suOpenState = false;
+  function suOpen(id) {
+    var u = id ? suFind(id) : null; if (id && !u) return;
+    ui.suForm = u ? u.id : 'new';
+    ui.suDraft = { name: u ? u.name : '', open: u ? u.open : todayStamp(), pu: u ? u.pu : 'm', pn: u ? u.pn : 1 };
+    ui.suDraft.custom = !SU_PRESETS.some(function (p) { return p[0] === ui.suDraft.pu && p[1] === ui.suDraft.pn; });
+    var m = $('#su-modal'); if (!m) return;
+    suRenderForm();
+    m.hidden = false; suOpenState = true; document.body.classList.add('has-modal');
+    try { window.history.pushState({ view: 'supplies', sheet: true }, ''); } catch (e) { /* ignore */ }
+    var f = u ? $('#su-modal-title') : $('#su-name'); if (f) f.focus();
+  }
+  function suClose(fromHistory) {
+    var m = $('#su-modal'), was = ui.suForm;
+    if (!m || m.hidden) { suOpenState = false; return; }
+    m.hidden = true; suOpenState = false; ui.suForm = null; ui.suDraft = null;
+    document.body.classList.remove('has-modal');
+    if (!fromHistory) dropSheetHistory();
+    var back = document.querySelector('[data-focus-key="su:' + (was && was !== 'new' && suFind(was) ? was : 'add') + '"]'); if (back) back.focus({ preventScroll: true });
+  }
+  function suResHtml(d) {
+    if (!isIsoDate(d.open)) return '<span class="su-res__l">버리는 날</span><b>개봉한 날을 골라 주세요</b>';
+    if (!(d.pn >= 1)) return '<span class="su-res__l">버리는 날</span><b>사용 기한을 적어 주세요</b>';
+    var end = suEndOf(d.open, d.pu, d.pn), n = daysFromToday(end);
+    return '<span class="su-res__l">버리는 날 (자동 계산 · ' + suPerLabel(d.pu, d.pn) + ')</span><b>' + suDateText(end) + '</b><span class="su-dd su--' + suStatus(n) + '">' + suDdText(n) + '</span>';
+  }
+  function suRenderForm() {
+    var m = $('#su-modal'), d = ui.suDraft; if (!m || !d) return;
+    var u = ui.suForm !== 'new' ? suFind(ui.suForm) : null;
+    var chips = SU_PRESETS.map(function (p) { var on = !d.custom && d.pu === p[0] && d.pn === p[1]; return '<button type="button" class="su-chip' + (on ? ' is-on' : '') + '" data-action="su-per" data-u="' + p[0] + '" data-n="' + p[1] + '" aria-pressed="' + on + '">' + p[2] + '</button>'; }).join('') +
+      '<button type="button" class="su-chip' + (d.custom ? ' is-on' : '') + '" data-action="su-per-custom" aria-pressed="' + d.custom + '">직접 입력</button>';
+    var custom = d.custom ? '<div class="su-custom"><label class="visually-hidden" for="su-pn">사용 기한 숫자</label><input type="number" id="su-pn" inputmode="numeric" min="1" max="' + (d.pu === 'd' ? 999 : 60) + '" value="' + d.pn + '">' +
+      '<label class="visually-hidden" for="su-pu">단위</label><select id="su-pu"><option value="d"' + (d.pu === 'd' ? ' selected' : '') + '>일</option><option value="m"' + (d.pu === 'm' ? ' selected' : '') + '>개월</option></select></div>' : '';
+    var hist = u && u.hist.length ? '<details class="su-hist"><summary>지난 교체 ' + u.hist.length + '번</summary><ul>' + u.hist.map(function (h) { return '<li>' + suShort(h.o) + ' 개봉 → ' + suShort(h.r) + ' 교체 (' + (1 + Math.round((dateOf(h.r) - dateOf(h.o)) / 86400000)) + '일)</li>'; }).join('') + '</ul></details>' : '';
+    var who = u && u.by ? '<p class="su-by">' + escapeHtml(u.by) + ' 등록</p>' : '';
+    m.querySelector('.modal__box').innerHTML = '<form id="su-form" class="cal-form su-form" novalidate><div class="modal__head"><h3 class="modal__title" id="su-modal-title" tabindex="-1">' + (u ? '용품 고치기' : '용품 추가') + '</h3><button type="button" class="modal__close" data-action="su-close" aria-label="닫기">×</button></div>' +
+      '<label class="cal-f"><span>물건 이름</span><span class="su-name"><span class="su-name__ico" id="su-ico" aria-hidden="true">' + svgIcon(suIcon(d.name), 24) + '</span><input type="text" id="su-name" name="name" maxlength="' + SU_NAME_MAX + '" value="' + escapeHtml(d.name) + '" placeholder="예: 젖병, 분유, 물티슈" autocomplete="off"></span></label>' +
+      '<label class="cal-f"><span>개봉한 날</span><input type="date" id="su-open" name="open" value="' + escapeHtml(d.open) + '" required></label>' +
+      '<div class="cal-f" role="group" aria-labelledby="su-per-l"><span id="su-per-l">사용 기한 <small>한 번 정하면 교체할 때도 그대로</small></span><div class="su-chips">' + chips + '</div>' + custom + '</div>' +
+      '<p class="su-res" id="su-res" aria-live="polite">' + suResHtml(d) + '</p>' + hist + who +
+      '<div class="su-acts">' + (u ? '<button type="button" class="btn btn--danger" data-action="su-del">삭제</button><button type="button" class="btn" data-action="su-replace">새 걸로 교체</button>' : '') +
+      '<button type="submit" class="btn btn--primary">저장</button></div></form>';
+  }
+  function suReadForm() {
+    var d = ui.suDraft; if (!d) return null;
+    var n = $('#su-name'), o = $('#su-open'), pn = $('#su-pn'), pu = $('#su-pu');
+    if (n) d.name = n.value;
+    if (o) d.open = o.value;
+    if (d.custom && pn) { var v = parseInt(pn.value, 10); d.pn = isFinite(v) ? v : 0; }
+    if (d.custom && pu) d.pu = pu.value === 'd' ? 'd' : 'm';
+    return d;
+  }
+  function suRefresh() {
+    var d = suReadForm(); if (!d) return;
+    var r = $('#su-res'); if (r) r.innerHTML = suResHtml(d);
+    var ic = $('#su-ico'); if (ic) ic.innerHTML = svgIcon(suIcon(d.name), 24);
+  }
+  function suRerender(focusSel) { suReadForm(); suRenderForm(); var f = focusSel && $(focusSel); if (f) f.focus(); }
+  function suValid(d) {
+    var name = String(d.name || '').trim().slice(0, SU_NAME_MAX);
+    if (!name) { showToast('물건 이름을 적어 주세요.'); var n = $('#su-name'); if (n) n.focus(); return null; }
+    if (!isIsoDate(d.open)) { showToast('개봉한 날을 골라 주세요.'); var o = $('#su-open'); if (o) o.focus(); return null; }
+    var max = d.pu === 'd' ? 999 : 60;
+    if (!(d.pn >= 1 && d.pn <= max)) { showToast('사용 기한은 1~' + max + (d.pu === 'd' ? '일' : '개월') + ' 사이로 적어 주세요.'); var p = $('#su-pn'); if (p) p.focus(); return null; }
+    return { name: name, open: d.open, pu: d.pu, pn: Math.round(d.pn) };
+  }
+  function suSave(replace) {
+    var d = suReadForm(); if (!d) return;
+    var f = suValid(d); if (!f) return;
+    var u = ui.suForm !== 'new' ? suFind(ui.suForm) : null;
+    if (!u && state.supplies.length >= SU_MAX) { showToast('용품은 ' + SU_MAX + '개까지 올릴 수 있어요.'); return; }
+    if (u) {
+      var before = JSON.parse(JSON.stringify(u));
+      u.name = f.name; u.pu = f.pu; u.pn = f.pn; u.open = f.open;
+      if (replace) {
+        var today = todayStamp();
+        u.hist.unshift({ o: before.open, r: today < before.open ? before.open : today });
+        u.hist = u.hist.slice(0, SU_HIST_MAX);
+        u.open = today;
+      }
+      suClose(); commit();
+      act('supplies', (replace ? '용품 교체: ' : '용품 수정: ') + u.name);
+      showToast(replace ? '‘' + u.name + '’ 새 걸로 바꿨어요. 버리는 날 ' + suShort(suEnd(u)) : '‘' + u.name + '’을(를) 저장했어요.', replace ? function () {
+        var cur = suFind(before.id); if (!cur) return;
+        Object.keys(before).forEach(function (k) { cur[k] = before[k]; }); commit(); showToast('교체를 취소했어요.');
+      } : null);
+    } else {
+      var nu = { id: uid(), name: f.name, open: f.open, pu: f.pu, pn: f.pn, by: myName(), at: Date.now(), hist: [] };
+      state.supplies.push(nu);
+      suClose(); commit();
+      act('supplies', '용품 추가: ' + nu.name);
+      showToast('‘' + nu.name + '’ 올렸어요. 버리는 날 ' + suShort(suEnd(nu)));
+    }
+  }
+  function suDelete() {
+    var u = ui.suForm !== 'new' ? suFind(ui.suForm) : null; if (!u) return;
+    var idx = state.supplies.indexOf(u);
+    state.supplies.splice(idx, 1);
+    suClose(); commit(); act('supplies', '용품 삭제: ' + u.name);
+    showToast('‘' + u.name + '’을(를) 내렸어요.', function () { state.supplies.splice(Math.min(idx, state.supplies.length), 0, u); commit(); showToast('삭제를 취소했어요.'); });
   }
 
   /* ---------- 성장 기록 ---------- */
@@ -6763,6 +6964,8 @@ datesSorted().forEach(function (d) {
       careTasks: state.careTasks,
       careDates: state.careDates,
       events: state.events,
+      supplies: state.supplies,
+      supplyWarn: state.supplyWarn,
       ledger: state.ledger,
       ledgerCats: state.ledgerCats,
       ledgerPays: state.ledgerPays,
@@ -7234,6 +7437,33 @@ datesSorted().forEach(function (d) {
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && calOpenState) { e.preventDefault(); calClose(); } });
     }
 
+    // 용품 관리 (진열장)
+    var suView = $('#view-supplies');
+    if (suView) {
+      suView.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-action]'); if (!b) return;
+        switch (b.dataset.action) {
+          case 'su-new': suOpen(null); break;
+          case 'su-edit': suOpen(b.dataset.id); break;
+          case 'su-close': suClose(); break;
+          case 'su-per': { var d = suReadForm(); if (!d) break; d.custom = false; d.pu = b.dataset.u; d.pn = parseInt(b.dataset.n, 10); suRerender('[data-action="su-per"][data-u="' + d.pu + '"][data-n="' + d.pn + '"]'); break; }
+          case 'su-per-custom': { var dc = suReadForm(); if (!dc) break; dc.custom = true; suRerender('#su-pn'); break; }
+          case 'su-replace': suSave(true); break;
+          case 'su-del': suDelete(); break;
+          case 'su-settings': setView('settings', 'mamibag'); { var sw = $('#supply-warn'); if (sw) { sw.scrollIntoView({ block: 'center' }); sw.focus({ preventScroll: true }); } } break;
+        }
+      });
+      suView.addEventListener('submit', function (e) { if (e.target.id !== 'su-form') return; e.preventDefault(); suSave(false); });
+      suView.addEventListener('input', function (e) { if (e.target.closest('#su-form')) suRefresh(); });
+      suView.addEventListener('change', function (e) {
+        if (e.target.id === 'su-pu') { var d = suReadForm(); if (d && d.pu === 'm' && d.pn > 60) d.pn = 60; suRerender('#su-pu'); return; }
+        if (e.target.closest('#su-form')) suRefresh();
+      });
+      var smod = $('#su-modal');
+      if (smod) smod.addEventListener('click', function (e) { if (e.target === smod) suClose(); });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && suOpenState) { e.preventDefault(); suClose(); } });
+    }
+
     // 가계부
     var ledgerView = $('#view-ledger');
     if (ledgerView) {
@@ -7591,6 +7821,15 @@ datesSorted().forEach(function (d) {
       if (v === (state.anniversary || '')) return;
       state.anniversary = v; commit(); act('due', v ? '결혼기념일을 ' + formatNoteDate(v) + '로 설정' : '결혼기념일 지움');
       showToast(v ? '결혼기념일을 저장했습니다.' : '결혼기념일을 지웠습니다.');
+    });
+    var swInput = $('#supply-warn');
+    if (swInput) swInput.addEventListener('change', function () {
+      var raw = parseInt(swInput.value, 10);
+      if (!isFinite(raw)) { swInput.value = suWarn(); return; }
+      var v = normalizeSupplyWarn(raw); swInput.value = v;
+      if (v === suWarn()) return;
+      state.supplyWarn = v; commit(); act('supplies', '용품 곧 교체 기준: ' + v + '일 전');
+      showToast('버리는 날 ' + v + '일 전부터 ‘곧 교체’로 표시해요.');
     });
     var trInput = $('#toast-remote');
     if (trInput) trInput.addEventListener('change', function () { ui.toastRemote = trInput.checked; saveUiPrefs(); });
@@ -8395,6 +8634,7 @@ datesSorted().forEach(function (d) {
       if (ui.ledgerForm) { closeLedgerForm(true); return; }
       if (goalOpen) { closeGoal(true); return; }
       if (calOpenState) { calClose(true); return; }
+      if (suOpenState) { suClose(true); return; }
       var v = e.state && VIEWS.indexOf(e.state.view) !== -1 ? e.state.view : 'portal';
       setView(v, v === 'settings' ? ui.settingsFrom : undefined, true);
     });

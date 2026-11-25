@@ -144,6 +144,9 @@
     (s.vaccines || []).forEach(function (v) { doc.vaccines[v.id] = { date: v.date || '', place: v.place || '', who: v.who || '' }; });
     doc.babyLog = {};
     (s.babyLog || []).forEach(function (e) { doc.babyLog[e.id] = { kind: e.kind, t: e.t, who: e.who || '', detail: e.detail || '' }; });
+    doc.supplies = {};
+    (s.supplies || []).forEach(function (u) { var d = { name: u.name || '', open: u.open || '', pu: u.pu === 'd' ? 'd' : 'm', pn: u.pn || 1, by: u.by || '', at: u.at || 0 }; if (u.hist && u.hist.length) d.hist = u.hist.map(function (h) { return { o: h.o, r: h.r }; }); doc.supplies[u.id] = d; });
+    doc.supplyWarn = typeof s.supplyWarn === 'number' ? s.supplyWarn : 7;
     doc.anniversary = s.anniversary || '';
     doc.budget = typeof s.budget === 'number' ? s.budget : 0;
     doc.ledger = {};
@@ -214,6 +217,8 @@
       careDates: (doc.careDates && typeof doc.careDates === 'object') ? doc.careDates : {},
       vaccines: Object.keys(doc.vaccines || {}).map(function (id) { var v = doc.vaccines[id] || {}; return { id: id, date: v.date || '', place: v.place || '', who: v.who || '' }; }),
       babyLog: Object.keys(doc.babyLog || {}).map(function (id) { var e = doc.babyLog[id] || {}; return { id: id, kind: e.kind || '', t: typeof e.t === 'number' ? e.t : 0, who: e.who || '', detail: e.detail || '' }; }),
+      supplies: Object.keys(doc.supplies || {}).map(function (id) { var u = doc.supplies[id] || {}; var h = u.hist ? (Array.isArray(u.hist) ? u.hist : Object.keys(u.hist).map(function (k) { return u.hist[k]; })) : []; return { id: id, name: u.name || '', open: u.open || '', pu: u.pu === 'd' ? 'd' : 'm', pn: typeof u.pn === 'number' ? u.pn : 1, by: u.by || '', at: typeof u.at === 'number' ? u.at : 0, hist: h.filter(function (x) { return x && typeof x === 'object'; }).map(function (x) { return { o: x.o || '', r: x.r || '' }; }) }; }),
+      supplyWarn: typeof doc.supplyWarn === 'number' ? doc.supplyWarn : 7,
       anniversary: typeof doc.anniversary === 'string' ? doc.anniversary : '',
       budget: typeof doc.budget === 'number' ? doc.budget : 0,
       ledger: Object.keys(doc.ledger || {}).map(function (id) { var e = doc.ledger[id] || {}; return { id: id, date: e.date, type: e.type, amount: e.amount, cat: e.cat, text: e.text || '', who: e.who || '', pay: e.pay || '', t: typeof e.t === 'number' ? e.t : 0, src: e.src || '', rec: e.rec || '', inst: e.inst || '' }; }),
@@ -234,14 +239,14 @@
   }
 
   function isEmptyDoc(doc) {
-    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !Object.keys(doc.vaccines || {}).length && !Object.keys(doc.careTasks || {}).length && !Object.keys(doc.events || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
+    return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !Object.keys(doc.vaccines || {}).length && !Object.keys(doc.careTasks || {}).length && !Object.keys(doc.events || {}).length && !Object.keys(doc.supplies || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
   }
 
   // Multi-path update: only entities that changed, null for removed ones.
   function diff(prev, next) {
     var updates = {};
     prev = prev || { categories: {}, items: {}, notes: {}, highlights: '' };
-    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'ledgerCats', 'ledgerFavs', 'ledgerRecs', 'ledgerInst', 'birthTasks', 'growth', 'babyLog', 'vaccines', 'careTasks', 'events'].forEach(function (group) {
+    ['categories', 'items', 'notes', 'dates', 'names', 'supports', 'memos', 'ledger', 'ledgerCats', 'ledgerFavs', 'ledgerRecs', 'ledgerInst', 'birthTasks', 'growth', 'babyLog', 'vaccines', 'careTasks', 'events', 'supplies'].forEach(function (group) {
       var a = prev[group] || {}, b = next[group] || {};
       Object.keys(b).forEach(function (id) {
         if (!a[id] || JSON.stringify(a[id]) !== JSON.stringify(b[id])) updates[group + '/' + id] = b[id];
@@ -257,6 +262,7 @@
     if (JSON.stringify(prev.careDates || null) !== JSON.stringify(next.careDates || null)) updates.careDates = next.careDates || null;
     if ((prev.anniversary || '') !== (next.anniversary || '')) updates.anniversary = next.anniversary || '';
     if ((prev.budget || 0) !== (next.budget || 0)) updates.budget = next.budget || 0;
+    if ((prev.supplyWarn || 7) !== (next.supplyWarn || 7)) updates.supplyWarn = next.supplyWarn || 7;
     if ((prev.memo || '') !== (next.memo || '')) updates.memo = next.memo || '';
     if (JSON.stringify(prev.spendTags || null) !== JSON.stringify(next.spendTags || null)) updates.spendTags = next.spendTags || null;
     if (JSON.stringify(prev.ledgerPays || null) !== JSON.stringify(next.ledgerPays || null)) updates.ledgerPays = next.ledgerPays || null;

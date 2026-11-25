@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="luckybbu">
   <meta name="mobile-web-app-capable" content="yes">
-  <link rel="stylesheet" href="./style.css?v=20261123a">
+  <link rel="stylesheet" href="./style.css?v=20261125a">
 </head>
 <body>
   <a class="skip-link" href="#main-area">본문으로 건너뛰기</a>
@@ -274,6 +274,19 @@
     <div id="growth-body" class="baby-body"></div>
   </section>
 
+  <!-- ===== 용품 관리 (진열장) ===== -->
+  <section id="view-supplies" class="view supplies" role="region" aria-labelledby="supplies-title" hidden>
+    <div class="notes__head">
+      <div class="view-back">
+        <button type="button" class="btn btn--small" data-action="go-home" aria-label="홈으로">←</button>
+        <h2 id="supplies-title" class="notes__title">🧺 용품 관리</h2>
+      </div>
+      <button type="button" class="btn btn--primary btn--small" data-action="su-new">+ 용품</button>
+    </div>
+    <div id="supplies-body" class="baby-body"></div>
+    <div class="modal" id="su-modal" role="dialog" aria-modal="true" aria-labelledby="su-modal-title" hidden><div class="modal__box"></div></div>
+  </section>
+
   <!-- ===== 육아 일지 ===== -->
   <section id="view-babylog" class="view babylog" role="region" aria-labelledby="babylog-title" hidden>
     <div class="notes__head">
@@ -321,6 +334,12 @@
         <input type="date" id="week-base"></div>
       <div class="field"><label for="anniversary">결혼기념일 (포털에 함께한 날 표시, 결혼한 날 = 1일)</label>
         <input type="date" id="anniversary"></div>
+    </section>
+
+    <section class="settings-card" aria-labelledby="set-supply-title">
+      <h3 id="set-supply-title" class="settings-card__title">🧺 용품 관리</h3>
+      <div class="field"><label for="supply-warn">곧 교체 기준 (버리는 날 며칠 전부터 노란색으로 표시, 가족과 공유됨)</label>
+        <div class="su-warn-row"><input type="number" id="supply-warn" inputmode="numeric" min="1" max="60" step="1"><span>일 전부터</span></div></div>
     </section>
 
     <section class="settings-card" id="archive-card" aria-labelledby="archive-title">
@@ -410,9 +429,9 @@
     <button type="button" class="toast__close" id="toast-close" aria-label="알림 닫기">×</button>
   </div>
 
-  <script src="./firebase-config.js?v=20261123a"></script>
-  <script src="./app.js?v=20261123a"></script>
-  <script src="./sync.js?v=20261123a"></script>
+  <script src="./firebase-config.js?v=20261125a"></script>
+  <script src="./app.js?v=20261125a"></script>
+  <script src="./sync.js?v=20261125a"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
