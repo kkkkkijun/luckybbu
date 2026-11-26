@@ -2122,16 +2122,6 @@ body:not([data-space="calendar"]) .cal-fab { display: none; }
 .su-warn-row span { font-size: 0.9rem; color: var(--muted); }
 @media (min-width: 560px) { .su-shelf { grid-template-columns: repeat(4, minmax(0, 120px)); justify-content: space-around; } }
 
-/* ---------- 달별 예산 (이 달만 / 이 달부터 계속) ---------- */
-.bscope { display: inline-flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
-.bscope__o { position: relative; display: inline-flex; }
-.bscope__o input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.bscope__o span { display: inline-flex; align-items: center; min-height: 36px; padding: 0 12px; border: 1.5px solid var(--border); border-radius: 999px; background: #fff; font-size: 0.84rem; font-weight: 600; color: var(--muted); cursor: pointer; }
-.bscope__o input:checked + span { border-color: #7FCBA8; background: var(--mint-soft); color: var(--mint-ink); font-weight: 800; }
-.bscope__o input:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 1px; }
+/* ---------- 달별 예산 ---------- */
 .bscope__hint { flex-basis: 100%; margin: 2px 0 0; font-size: 0.74rem; color: var(--muted); line-height: 1.5; }
 .ledger-budget-form .btn { flex: 0 0 auto; }
-.bd-only { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 999px; background: var(--lav-soft); color: var(--lav-ink); font-size: 0.7rem; font-weight: 800; vertical-align: 1px; }
-.bd-off { margin: 8px 2px 0; font-size: 0.8rem; color: var(--muted); line-height: 1.7; }
-.cb-form .bscope, .cb-add-form .bscope { margin: 2px 0; }
-.ledger-budget-form .bscope__o { flex-basis: auto; font-size: inherit; color: inherit; }
