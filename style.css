@@ -2125,3 +2125,23 @@ body:not([data-space="calendar"]) .cal-fab { display: none; }
 /* ---------- 달별 예산 ---------- */
 .bscope__hint { flex-basis: 100%; margin: 2px 0 0; font-size: 0.74rem; color: var(--muted); line-height: 1.5; }
 .ledger-budget-form .btn { flex: 0 0 auto; }
+
+/* ---------- 분류별 지출: 쓴 돈 / 그달 예산 + 연필 ---------- */
+.ledger-legend--budget { gap: 4px 18px; }
+.ledger-legend--budget li { min-height: 34px; }
+.ledger-legend__amt { white-space: nowrap; }
+.ledger-legend__bud { font-weight: 500; color: var(--muted); font-size: 0.92em; }
+.ledger-legend__amt.is-green { color: #1F7A57; }
+.ledger-legend__amt.is-orange { color: #C2621A; }
+.ledger-legend__amt.is-red { color: #C0392B; }
+.ledger-legend__pen { flex: none; width: 32px; height: 32px; margin: -4px -6px -4px 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: none; color: #B3AFB8; cursor: pointer; padding: 0; }
+.ledger-legend__pen:hover { color: var(--peach-ink); background: var(--peach-soft); }
+.ledger-legend__pen:focus-visible { outline: 3px solid var(--focus); }
+.ledger-legend--budget li.is-editing { grid-column: 1 / -1; flex-wrap: wrap; padding: 6px 0; }
+.ledger-legend--budget li.is-editing .ledger-legend__name { flex: 0 0 auto; font-weight: 700; }
+.cb-inline { flex: 1 1 100%; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.cb-inline .calc-wrap { flex: 1 1 0; min-width: 0; }
+.cb-inline input { flex: 1 1 0 !important; min-width: 0; min-height: 38px; border: 1px solid var(--border); border-radius: 10px; padding: 0 8px; font: inherit; font-size: 0.92rem; text-align: right; }
+.cb-inline .calc-btn { min-height: 38px; width: 40px; }
+.cb-inline .btn { flex: 0 0 auto; }
+@media (max-width: 559px) { .ledger-legend--budget { grid-template-columns: 1fr; } }
