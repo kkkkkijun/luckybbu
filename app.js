@@ -117,7 +117,8 @@
       seen[id] = true; names[type + ':' + name] = true;
       out.push({ id: id, name: name, type: type, icon: LC_ICONS[c.icon] ? c.icon : 'tag',
         color: typeof c.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(c.color) ? c.color : '#BDBDBD', excl: type === 'out' && c.excl === true,
-        budget: typeof c.budget === 'number' && c.budget > 0 && isFinite(c.budget) ? Math.min(Math.round(c.budget), PRICE_MAX) : 0 });
+        budget: typeof c.budget === 'number' && c.budget > 0 && isFinite(c.budget) ? Math.min(Math.round(c.budget), PRICE_MAX) : 0,
+        bFrom: normalizeMonthMap(c.bFrom), bOnly: normalizeMonthMap(c.bOnly) });
     });
     return out.slice(0, 80);
   }
@@ -624,7 +625,7 @@
     DEFAULT_TEMPLATE.forEach(function (cat) {
       categories.push({ id: uid(), name: cat.name, icon: cat.icon, doneTabs: false, subs: [], group: defaultGroupFor(cat.name) });
     });
-    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerWho: [], ledgerFavs: [], ledgerRecs: [], ledgerInst: [], budget: 0, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {}, events: [], supplies: [], supplyWarn: 7 };
+    return { version: DATA_VERSION, categories: categories, items: items, notes: [], highlights: '', picks: emptyPicks(), dates: [], names: [], dueDate: '', anniversary: '', weekBase: '', goal: emptyGoal(), hospDoneAt: 0, memo: '', memos: [], supports: [], ledger: [], ledgerCats: [], ledgerPays: [], ledgerWho: [], ledgerFavs: [], ledgerRecs: [], ledgerInst: [], budget: 0, budgetFrom: {}, budgetOnly: {}, birthTasks: [], birthDate: '', growth: [], babyLog: [], vaccines: [], spendTags: [], careTasks: [], careDates: {}, events: [], supplies: [], supplyWarn: 7 };
   }
 
   // Validates and normalises an unknown object into app state. Returns { ok, data, error }.
@@ -781,6 +782,7 @@
     var ledgerWho = Array.isArray(raw.ledgerWho) ? raw.ledgerWho.filter(function (t) { return typeof t === 'string' && t.trim(); }).map(function (t) { return t.trim().slice(0, 12); }).filter(function (t, i, a) { return a.indexOf(t) === i && t !== '함께'; }).slice(0, 10) : [];
     var ledgerPays = Array.isArray(raw.ledgerPays) ? raw.ledgerPays.filter(function (t) { return typeof t === 'string' && t.trim(); }).map(function (t) { return t.trim().slice(0, LP_NAME_MAX); }).filter(function (t, i, a) { return a.indexOf(t) === i; }).slice(0, 20) : [];
     var budget = typeof raw.budget === 'number' && isFinite(raw.budget) && raw.budget > 0 ? Math.min(Math.round(raw.budget), PRICE_MAX) : 0;
+    var budgetFrom = normalizeMonthMap(raw.budgetFrom), budgetOnly = normalizeMonthMap(raw.budgetOnly);
     var memo = typeof raw.memo === 'string' ? raw.memo.replace(/\r\n?/g, '\n').slice(0, MEMO_MAX) : '';
     var memos = [];
     var seenMemo = {};
@@ -883,7 +885,7 @@
       seenVx[v.id] = true;
       vaccines.push({ id: v.id, date: v.date, place: typeof v.place === 'string' ? v.place.trim().slice(0, 40) : '', who: typeof v.who === 'string' ? v.who.trim().slice(0, 12) : '' });
     });
-    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerWho: ledgerWho, ledgerFavs: ledgerFavs, ledgerRecs: ledgerRecs, ledgerInst: ledgerInst, budget: budget, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates, events: normalizeEvents(raw.events), supplies: normalizeSupplies(raw.supplies), supplyWarn: normalizeSupplyWarn(raw.supplyWarn) } };
+    return { ok: true, migrated: migrated, data: { version: DATA_VERSION, categories: categories, items: items, notes: notes, highlights: highlights, picks: picks, dates: dates, names: names, dueDate: dueDate, anniversary: anniversary, weekBase: weekBase, goal: goal, hospDoneAt: hospDoneAt, memo: memo, memos: memos, supports: supports, ledger: ledger, ledgerCats: ledgerCats, ledgerPays: ledgerPays, ledgerWho: ledgerWho, ledgerFavs: ledgerFavs, ledgerRecs: ledgerRecs, ledgerInst: ledgerInst, budget: budget, budgetFrom: budgetFrom, budgetOnly: budgetOnly, birthTasks: birthTasks, birthDate: birthDate, growth: growth, babyLog: babyLog, vaccines: vaccines, spendTags: spendTags, careTasks: careTasks, careDates: careDates, events: normalizeEvents(raw.events), supplies: normalizeSupplies(raw.supplies), supplyWarn: normalizeSupplyWarn(raw.supplyWarn) } };
   }
 
   /* ---------- storage ---------- */
@@ -3327,21 +3329,26 @@ datesSorted().forEach(function (d) {
     html += '<section class="ledger-sum" aria-labelledby="ledger-sum-title">' +
       '<h3 class="ledger-sum__label" id="ledger-sum-title">' + mo + '월 지출</h3>' +
       '<p class="ledger-sum__num">' + formatNumber(out) + '원</p>';
+    var mb = monthBudget(m), bv = mb.v;
+    var onlyTag = mb.only ? ' <span class="bd-only" title="기본 ' + (mb.def ? formatNumber(mb.def) + '원' : '없음') + '">' + mo + '월만</span>' : '';
     if (ui.budgetEdit) {
-      html += '<form class="ledger-budget-form" data-action="ledger-budget"><label for="ledger-budget-input">한 달 예산</label>' +
-        calcWrap('<input type="text" id="ledger-budget-input" inputmode="numeric" autocomplete="off" data-price-input value="' + (state.budget ? formatNumber(state.budget) : '') + '" placeholder="예: 2,000,000">') +
+      html += '<form class="ledger-budget-form" data-action="ledger-budget"><label for="ledger-budget-input">' + mo + '월 예산</label>' +
+        calcWrap('<input type="text" id="ledger-budget-input" inputmode="numeric" autocomplete="off" data-price-input value="' + (bv ? formatNumber(bv) : '') + '" placeholder="예: 2,000,000">') +
+        scopeHtml('bscope', m, mb.only ? 'only' : 'from', 'bsc') +
         '<button type="submit" class="btn btn--primary btn--small">저장</button>' +
-        (state.budget ? '<button type="button" class="btn btn--small" data-action="ledger-budget-clear">예산 없애기</button>' : '') +
-        '<button type="button" class="btn btn--small" data-action="ledger-budget-cancel">취소</button></form>';
-    } else if (state.budget) {
-      var pct = Math.round(out / state.budget * 100), left = state.budget - out;
+        (bv ? '<button type="button" class="btn btn--small" data-action="ledger-budget-clear">예산 없애기</button>' : '') +
+        (mb.only ? '<button type="button" class="btn btn--small" data-action="ledger-budget-reset">기본으로 (' + (mb.def ? formatNumber(mb.def) + '원' : '없음') + ')</button>' : '') +
+        '<button type="button" class="btn btn--small" data-action="ledger-budget-cancel">취소</button>' +
+        '<p class="bscope__hint">‘' + mo + '월부터 계속’은 다음 달에도 이어지고, 지난달 예산은 그대로예요. ‘' + mo + '월만’은 이 달에만 써요.</p></form>';
+    } else if (bv) {
+      var pct = Math.round(out / bv * 100), left = bv - out;
       var daysLeft = m === currentMonth() ? new Date(parseInt(m.slice(0, 4), 10), mo, 0).getDate() - new Date().getDate() + 1 : 0;
       html += '<div class="ledger-bar" role="progressbar" aria-label="예산 사용" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.min(100, pct) + '"><span style="width:' + Math.min(100, pct) + '%"' + (left < 0 ? ' class="is-over"' : '') + '></span></div>' +
-        '<p class="ledger-sum__budget">예산 ' + formatNumber(state.budget) + '원 중 ' + pct + '% · ' + (left >= 0 ? '남은 예산 <strong>' + formatNumber(left) + '원</strong>' : '<strong>' + formatNumber(-left) + '원</strong> 넘었어요') +
+        '<p class="ledger-sum__budget">예산 ' + formatNumber(bv) + '원' + onlyTag + ' 중 ' + pct + '% · ' + (left >= 0 ? '남은 예산 <strong>' + formatNumber(left) + '원</strong>' : '<strong>' + formatNumber(-left) + '원</strong> 넘었어요') +
         (left > 0 && daysLeft > 0 ? ' · 남은 ' + daysLeft + '일 하루 <strong>' + formatNumber(Math.floor(left / daysLeft)) + '원</strong>' : '') +
         ' <button type="button" class="link-btn" data-action="ledger-budget-edit">예산 수정</button></p>';
     } else {
-      html += '<p class="ledger-sum__budget"><button type="button" class="link-btn" data-action="ledger-budget-edit">한 달 예산 정하기</button></p>';
+      html += '<p class="ledger-sum__budget">' + (mb.only ? mo + '월은 예산 없이 봐요' + onlyTag + ' ' : '') + '<button type="button" class="link-btn" data-action="ledger-budget-edit">' + (mb.only ? '예산 수정' : '한 달 예산 정하기') + '</button></p>';
     }
     var net = inn - out;
     html += '<div class="ledger-sum__row"><div><span>수입</span><strong>' + formatNumber(inn) + '원</strong></div>' +
@@ -3431,7 +3438,7 @@ datesSorted().forEach(function (d) {
       '<p class="rp-head__lbl">지출</p><p class="rp-head__num">' + formatNumber(cur.out) + '원</p>' +
       (prev.out ? '<p class="rp-head__cmp ' + (d > 0 ? 'is-up' : 'is-down') + '">' + cmpLabel + ' ' + wonDiff(d) + (pct ? ' (' + pct + '% ' + (d > 0 ? '늘었어요' : '줄었어요') + ')' : '') + '</p>' : '<p class="rp-head__cmp">' + pmo + '월 기록이 없어 비교하지 않아요</p>') +
       '<div class="rp-head__row"><div><span>수입</span><b>' + formatNumber(cur.inn) + '원</b></div><div><span>수입 − 지출</span><b>' + wonDiff(cur.inn - cur.out) + '</b></div>' + (cur.moved ? '<div><span>저축·이체</span><b>' + formatNumber(cur.moved) + '원</b></div>' : '') + '</div>' +
-      (state.budget ? '<p class="rp-head__budget">예산 ' + formatNumber(state.budget) + '원 중 ' + Math.round(cur.out / state.budget * 100) + '% ' + (cur.out > state.budget ? '· ' + formatNumber(cur.out - state.budget) + '원 넘었어요' : '썼어요') + '</p>' : '') + '</section>';
+      (function () { var bv = monthBudget(m).v; return bv ? '<p class="rp-head__budget">예산 ' + formatNumber(bv) + '원 중 ' + Math.round(cur.out / bv * 100) + '% ' + (cur.out > bv ? '· ' + formatNumber(cur.out - bv) + '원 넘었어요' : '썼어요') + '</p>' : ''; })() + '</section>';
     // 한 줄 요약
     var tips = [], cats = Object.keys(cur.byCat).concat(Object.keys(prev.byCat)).filter(function (c, i, arr) { return arr.indexOf(c) === i; });
     var diffs = cats.map(function (c) { return { c: c, d: (cur.byCat[c] || 0) - (prev.byCat[c] || 0) }; });
@@ -3672,19 +3679,31 @@ datesSorted().forEach(function (d) {
     html += '</section>';
     // 분류별 예산
     var spent = {}; state.ledger.forEach(function (e) { if (e.type === 'out' && !isMove(e) && e.date.slice(0, 7) === m) spent[e.cat] = (spent[e.cat] || 0) + e.amount; });
-    var withB = catsOf('out').filter(function (c) { return !c.excl && c.budget > 0; }), sumB = 0;
-    withB.forEach(function (c) { sumB += c.budget; });
-    html += '<section class="ledger-card pl"><h3 class="ledger-card__title pl-h"><span>분류별 예산</span><span class="notes__count">' + parseInt(m.slice(5, 7), 10) + '월 · 합 ' + formatNumber(sumB) + '원' + (state.budget ? ' / 전체 ' + formatNumber(state.budget) + '원' : '') + '</span></h3>';
+    var cbs = {}; catsOf('out').forEach(function (c) { cbs[c.id] = catBudget(c, m); });
+    var withB = catsOf('out').filter(function (c) { return !c.excl && cbs[c.id].v > 0; }), sumB = 0, mn = parseInt(m.slice(5, 7), 10);
+    withB.forEach(function (c) { sumB += cbs[c.id].v; });
+    var totalB = monthBudget(m).v;
+    html += '<section class="ledger-card pl"><h3 class="ledger-card__title pl-h"><span>분류별 예산</span><span class="notes__count">' + parseInt(m.slice(5, 7), 10) + '월 · 합 ' + formatNumber(sumB) + '원' + (totalB ? ' / 전체 ' + formatNumber(totalB) + '원' : '') + '</span></h3>';
     if (withB.length) html += '<ul class="pl-list">' + withB.map(function (c) {
-      var used = spent[c.name] || 0, pct = Math.round(used / c.budget * 100), over = used > c.budget;
-      if (ui.cbEdit === c.id) return '<li class="pl-row is-editing"><form class="cb-form" data-cb-form="' + escapeHtml(c.id) + '">' + lcIcon(c, 30) + '<label class="visually-hidden" for="cb-in">' + escapeHtml(c.name) + ' 예산</label>' + calcWrap('<input type="text" id="cb-in" name="amount" inputmode="numeric" data-price-input value="' + formatNumber(c.budget) + '" autocomplete="off">') + '<button type="submit" class="btn btn--primary btn--small">저장</button><button type="button" class="btn btn--small" data-action="cb-clear" data-id="' + escapeHtml(c.id) + '">없애기</button><button type="button" class="btn btn--small" data-action="cb-cancel">취소</button></form></li>';
-      return '<li class="pl-row">' + lcIcon(c, 34) + '<div class="pl-row__b"><b>' + escapeHtml(c.name) + '</b><small>' + formatNumber(c.budget) + '원 중 ' + pct + '% · ' + (over ? '<span class="is-up">' + formatNumber(used - c.budget) + '원 넘음</span>' : formatNumber(c.budget - used) + '원 남음') + '</small>' +
+      var cb = cbs[c.id], bv = cb.v, id = escapeHtml(c.id), nm = escapeHtml(c.name);
+      var used = spent[c.name] || 0, pct = Math.round(used / bv * 100), over = used > bv;
+      var tag = cb.only ? ' <span class="bd-only" title="기본 ' + (cb.def ? formatNumber(cb.def) + '원' : '없음') + '">' + mn + '월만</span>' : '';
+      if (ui.cbEdit === c.id) return '<li class="pl-row is-editing"><form class="cb-form" data-cb-form="' + id + '">' + lcIcon(c, 30) + '<label class="visually-hidden" for="cb-in">' + nm + ' 예산</label>' + calcWrap('<input type="text" id="cb-in" name="amount" inputmode="numeric" data-price-input value="' + formatNumber(bv) + '" autocomplete="off">') +
+        scopeHtml('cbscope', m, cb.only ? 'only' : 'from', 'cbs') +
+        '<button type="submit" class="btn btn--primary btn--small">저장</button><button type="button" class="btn btn--small" data-action="cb-clear" data-id="' + id + '">없애기</button>' +
+        (cb.only ? '<button type="button" class="btn btn--small" data-action="cb-reset" data-id="' + id + '">기본으로 (' + (cb.def ? formatNumber(cb.def) + '원' : '없음') + ')</button>' : '') +
+        '<button type="button" class="btn btn--small" data-action="cb-cancel">취소</button></form></li>';
+      return '<li class="pl-row">' + lcIcon(c, 34) + '<div class="pl-row__b"><b>' + nm + tag + '</b><small>' + formatNumber(bv) + '원 중 ' + pct + '% · ' + (over ? '<span class="is-up">' + formatNumber(used - bv) + '원 넘음</span>' : formatNumber(bv - used) + '원 남음') + '</small>' +
         '<div class="rp-bar"><span style="width:' + Math.min(100, pct) + '%;background:' + (over ? '#E36B6B' : c.color) + '"></span></div></div><b class="pl-row__amt">' + formatNumber(used) + '</b>' +
-        '<button type="button" class="lc-btn" data-action="cb-edit" data-id="' + escapeHtml(c.id) + '" aria-label="' + escapeHtml(c.name) + ' 예산 고치기">✎</button></li>';
+        '<button type="button" class="lc-btn" data-action="cb-edit" data-id="' + id + '" aria-label="' + nm + ' 예산 고치기">✎</button></li>';
     }).join('') + '</ul>';
-    var noB = catsOf('out').filter(function (c) { return !c.excl && !(c.budget > 0); });
+    // 이 달만 '예산 없음'으로 둔 분류는 따로 알려 주고 되돌릴 수 있게
+    var offB = catsOf('out').filter(function (c) { return !c.excl && cbs[c.id].only && !cbs[c.id].v && cbs[c.id].def > 0; });
+    if (offB.length) html += '<p class="bd-off">' + mn + '월만 예산 없음: ' + offB.map(function (c) { return escapeHtml(c.name) + ' <button type="button" class="link-btn" data-action="cb-reset" data-id="' + escapeHtml(c.id) + '">기본(' + formatNumber(cbs[c.id].def) + '원)으로</button>'; }).join(' · ') + '</p>';
+    var noB = catsOf('out').filter(function (c) { return !c.excl && !(cbs[c.id].v > 0); });
     if (noB.length) html += '<form class="cb-add-form"><label class="visually-hidden" for="cb-add-cat">분류</label><select id="cb-add-cat" name="cat">' + noB.map(function (c) { return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>'; }).join('') + '</select>' +
-      '<label class="visually-hidden" for="cb-add-amt">예산</label>' + calcWrap('<input type="text" id="cb-add-amt" name="amount" inputmode="numeric" data-price-input placeholder="예: 300,000" autocomplete="off">') + '<button type="submit" class="btn btn--small btn--primary">예산 추가</button></form>';
+      '<label class="visually-hidden" for="cb-add-amt">예산</label>' + calcWrap('<input type="text" id="cb-add-amt" name="amount" inputmode="numeric" data-price-input placeholder="예: 300,000" autocomplete="off">') +
+      scopeHtml('cbscope', m, 'from', 'cba') + '<button type="submit" class="btn btn--small btn--primary">예산 추가</button></form>';
     return html + '</section>';
   }
   function submitRecForm(form) {
@@ -3872,15 +3891,81 @@ datesSorted().forEach(function (d) {
       showToast('되돌렸어요.');
     });
   }
-  function saveBudget() {
-    var input = $('#ledger-budget-input');
-    var pp = parsePrice(input.value);
+  /* ---------- 달별 예산 ----------
+     기본 금액(budget) + '이 달부터 계속'(from: { 'YYYY-MM': 원 }) + '이 달만'(only: { 'YYYY-MM': 원 }).
+     그달 예산 = 이 달만 값 → 없으면 그달까지 가장 최근의 '부터 계속' 값 → 없으면 기본 금액. 0 = 예산 없음.
+     '부터 계속'으로 바꿔도 그 전 달들은 예전 금액이 그대로 남는다. 한 달 예산과 분류별 예산이 같은 규칙을 쓴다 */
+  function normalizeMonthMap(m) {
+    var out = {};
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return out;
+    Object.keys(m).filter(function (k) { return /^\d{4}-\d{2}$/.test(k) && typeof m[k] === 'number' && isFinite(m[k]) && m[k] >= 0; })
+      .sort().slice(-240).forEach(function (k) { out[k] = Math.min(Math.round(m[k]), PRICE_MAX); });
+    return out;
+  }
+  function planned(base, from, m) {
+    var v = base || 0;
+    Object.keys(from || {}).sort().forEach(function (k) { if (k <= m) v = from[k]; });
+    return v;
+  }
+  function effBudget(base, from, only, m) {
+    var def = planned(base, from, m);
+    if (only && Object.prototype.hasOwnProperty.call(only, m)) return { v: only[m], only: true, def: def };
+    return { v: def, only: false, def: def };
+  }
+  function monthBudget(m) { return effBudget(state.budget, state.budgetFrom, state.budgetOnly, m); }
+  function catBudget(c, m) { return effBudget(c.budget, c.bFrom, c.bOnly, m); }
+  // obj: { base 키, from 키, only 키 }를 가진 대상(state 또는 분류)에 그달 금액을 적용
+  function setBudgetFor(obj, keys, m, v, scope) {
+    var from = obj[keys.from] = normalizeMonthMap(obj[keys.from]), only = obj[keys.only] = normalizeMonthMap(obj[keys.only]);
+    if (scope === 'reset') { delete only[m]; return; }
+    if (scope === 'only') { only[m] = v; return; }
+    // 이 달부터 계속: 뒤에 잡혀 있던 '부터 계속'은 지우고(이번 값이 이어지게), 이 달의 '이 달만'도 지운다. 뒤 달의 '이 달만'은 그대로 둔다
+    Object.keys(from).forEach(function (k) { if (k > m) delete from[k]; });
+    delete only[m];
+    var before = planned(obj[keys.base], from, prevMonthOf(m));
+    var hasEarlier = Object.keys(from).some(function (k) { return k < m; });
+    delete from[m];
+    if (v === before) return; // 앞달과 같으면 따로 적을 필요가 없다
+    if (!hasEarlier && !obj[keys.base] && !anyLedgerBefore(m)) { obj[keys.base] = v; return; } // 처음 정하는 예산이고 그 전 기록도 없으면 기본 금액으로
+    from[m] = v;
+  }
+  function prevMonthOf(m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7) - 1; if (mo < 1) { mo = 12; y--; } return y + '-' + (mo < 10 ? '0' : '') + mo; }
+  function anyLedgerBefore(m) { return state.ledger.some(function (e) { return e.date.slice(0, 7) < m; }); }
+  function bMonth(m) { return parseInt(m.slice(5, 7), 10) + '월'; }
+  function scopeHtml(name, m, cur, idp) {
+    var opt = function (v, label) { return '<label class="bscope__o"><input type="radio" name="' + name + '" value="' + v + '"' + (cur === v ? ' checked' : '') + ' id="' + idp + '-' + v + '"><span>' + label + '</span></label>'; };
+    return '<span class="bscope" role="radiogroup" aria-label="적용할 달">' + opt('from', bMonth(m) + '부터 계속') + opt('only', bMonth(m) + '만') + '</span>';
+  }
+  function scopeOf(form, name) { var r = form && form.querySelector('input[name="' + name + '"]:checked'); return r && r.value === 'only' ? 'only' : 'from'; }
+  function saveBudget(clear, reset) {
+    var input = $('#ledger-budget-input'), form = input && input.closest('form'), m = ledgerMonth();
+    var pp = parsePrice(clear ? '' : input.value);
     if (!pp.ok) { showToast('예산은 숫자로 적어 주세요.'); input.focus(); return; }
-    state.budget = pp.value || 0;
+    var scope = reset ? 'reset' : scopeOf(form, 'bscope'), v = pp.value || 0;
+    setBudgetFor(state, { base: 'budget', from: 'budgetFrom', only: 'budgetOnly' }, m, v, scope);
     ui.budgetEdit = false;
     commit();
-    act('ledger', state.budget ? '가계부 한 달 예산 ' + formatWon(state.budget) : '가계부 예산 없앰');
-    showToast(state.budget ? '한 달 예산을 ' + formatWon(state.budget) + '으로 정했어요.' : '예산을 없앴어요.');
+    var b = monthBudget(m), lbl = bMonth(m);
+    var msg = reset ? lbl + ' 예산을 기본(' + (b.v ? formatWon(b.v) : '없음') + ')으로 되돌렸어요.'
+      : scope === 'only' ? (v ? lbl + '만 예산 ' + formatWon(v) + '으로 정했어요.' : lbl + '은 예산 없이 볼게요.')
+      : (v ? lbl + '부터 한 달 예산 ' + formatWon(v) + '이에요.' : lbl + '부터 예산을 없앴어요.');
+    act('ledger', '가계부 ' + msg);
+    showToast(msg);
+  }
+  function saveCatBudget(fm, clear, reset) {
+    var m = ledgerMonth(), cid = fm.dataset.cbForm || (fm.elements.cat && fm.elements.cat.value);
+    var cb = ownCats().filter(function (x) { return x.id === cid; })[0]; if (!cb) return;
+    var pb = clear || reset ? { ok: true, value: 0 } : parsePrice(fm.elements.amount.value);
+    if (!clear && !reset && (!pb.ok || !pb.value)) { showToast('예산을 숫자로 적어 주세요.'); fm.elements.amount.focus(); return; }
+    var scope = reset ? 'reset' : scopeOf(fm, 'cbscope');
+    setBudgetFor(cb, { base: 'budget', from: 'bFrom', only: 'bOnly' }, m, clear ? 0 : pb.value, scope);
+    ui.cbEdit = null; commit();
+    var b = catBudget(cb, m), lbl = bMonth(m), nm = '‘' + cb.name + '’ ';
+    var msg = reset ? nm + lbl + ' 예산을 기본(' + (b.v ? formatWon(b.v) : '없음') + ')으로 되돌렸어요.'
+      : clear ? nm + (scope === 'only' ? lbl + '만 예산 없이 볼게요.' : lbl + '부터 예산을 없앴어요.')
+      : nm + (scope === 'only' ? lbl + '만 ' : lbl + '부터 ') + formatWon(pb.value);
+    act('ledger', '분류 예산: ' + msg);
+    showToast(msg);
   }
   // 자주 쓰는 내역
   function lfUse(id) {
@@ -6973,7 +7058,9 @@ datesSorted().forEach(function (d) {
       ledgerFavs: state.ledgerFavs,
       ledgerRecs: state.ledgerRecs,
       ledgerInst: state.ledgerInst,
-      budget: state.budget
+      budget: state.budget,
+      budgetFrom: state.budgetFrom,
+      budgetOnly: state.budgetOnly
     }, null, pretty ? 2 : 0);
   }
 
@@ -7517,7 +7604,8 @@ datesSorted().forEach(function (d) {
           }
           case 'cb-edit': ui.cbEdit = b.dataset.id; renderLedger(); var ci = $('#cb-in'); if (ci) ci.focus(); break;
           case 'cb-cancel': ui.cbEdit = null; renderLedger(); break;
-          case 'cb-clear': { var cc = ownCats().filter(function (x) { return x.id === b.dataset.id; })[0]; if (cc) { cc.budget = 0; ui.cbEdit = null; commit(); showToast('‘' + cc.name + '’ 예산을 없앴어요.'); } break; }
+          case 'cb-clear': { var cf = b.closest('form'); if (cf) saveCatBudget(cf, true); break; }
+          case 'cb-reset': { var rf2 = b.closest('form'); if (rf2) saveCatBudget(rf2, false, true); else { var rc = ownCats().filter(function (x) { return x.id === b.dataset.id; })[0]; if (rc) { var tmp = document.createElement('form'); tmp.dataset.cbForm = rc.id; saveCatBudget(tmp, false, true); } } break; }
           case 'rp-allcats': ui.rpAllCats = !ui.rpAllCats; renderLedger(); break;
           case 'ledger-goto': ui.ledgerMonth = b.dataset.month; renderLedger(); var gb = ledgerView.querySelector('[data-action="ledger-goto"][data-month="' + b.dataset.month + '"]'); if (gb) gb.focus({ preventScroll: true }); break;
           case 'ledger-day': ui.ledgerDay = b.dataset.date; renderLedger(); var db = ledgerView.querySelector('[data-action="ledger-day"][data-date="' + b.dataset.date + '"]'); if (db) db.focus({ preventScroll: true }); break;
@@ -7531,7 +7619,8 @@ datesSorted().forEach(function (d) {
           }
           case 'ledger-budget-edit': ui.budgetEdit = true; renderLedger(); var bi = $('#ledger-budget-input'); if (bi) bi.focus(); break;
           case 'ledger-budget-cancel': ui.budgetEdit = false; renderLedger(); break;
-          case 'ledger-budget-clear': $('#ledger-budget-input').value = ''; saveBudget(); break;
+          case 'ledger-budget-clear': saveBudget(true); break;
+          case 'ledger-budget-reset': saveBudget(false, true); break;
           // 자주 쓰는 내역
           case 'lf-use': lfUse(b.dataset.id); break;
           case 'lf-save': lfSave(); break;
@@ -7588,10 +7677,7 @@ datesSorted().forEach(function (d) {
         else if (e.target.matches('.rec-form')) { e.preventDefault(); submitRecForm(e.target); }
         else if (e.target.matches('.cb-form, .cb-add-form')) {
           e.preventDefault();
-          var fm = e.target, cid = fm.dataset.cbForm || fm.elements.cat.value, pb = parsePrice(fm.elements.amount.value);
-          if (!pb.ok || !pb.value) { showToast('예산을 숫자로 적어 주세요.'); fm.elements.amount.focus(); return; }
-          var cb = ownCats().filter(function (x) { return x.id === cid; })[0]; if (!cb) return;
-          cb.budget = pb.value; ui.cbEdit = null; commit(); act('ledger', '분류 예산: ' + cb.name + ' ' + formatWon(pb.value)); showToast('‘' + cb.name + '’ 한 달 예산 ' + formatWon(pb.value));
+          saveCatBudget(e.target);
         }
         else if (e.target.dataset.action === 'ledger-budget') { e.preventDefault(); saveBudget(); }
       });

@@ -149,6 +149,8 @@
     doc.supplyWarn = typeof s.supplyWarn === 'number' ? s.supplyWarn : 7;
     doc.anniversary = s.anniversary || '';
     doc.budget = typeof s.budget === 'number' ? s.budget : 0;
+    doc.budgetFrom = s.budgetFrom && Object.keys(s.budgetFrom).length ? monthMap(s.budgetFrom) : null;
+    doc.budgetOnly = s.budgetOnly && Object.keys(s.budgetOnly).length ? monthMap(s.budgetOnly) : null;
     doc.ledger = {};
     (s.ledger || []).forEach(function (e) { var d = { date: e.date, type: e.type, amount: e.amount, cat: e.cat || '', text: e.text || '', who: e.who || '', pay: e.pay || '', t: e.t || 0 }; if (e.src) d.src = e.src; if (e.rec) d.rec = e.rec; if (e.inst) d.inst = e.inst; doc.ledger[e.id] = d; });
     doc.ledgerRecs = {};
@@ -156,7 +158,7 @@
     doc.ledgerInst = {};
     (s.ledgerInst || []).forEach(function (p, i) { doc.ledgerInst[p.id] = { text: p.text || '', total: p.total, months: p.months, cat: p.cat || '', pay: p.pay || '', who: p.who || '', start: p.start, n: p.n || 0, closed: !!p.closed, order: i }; });
     doc.ledgerCats = {};
-    (s.ledgerCats || []).forEach(function (c, i) { doc.ledgerCats[c.id] = { name: c.name, type: c.type, icon: c.icon || '', color: c.color || '', excl: !!c.excl, budget: c.budget || 0, order: i }; });
+    (s.ledgerCats || []).forEach(function (c, i) { var d = { name: c.name, type: c.type, icon: c.icon || '', color: c.color || '', excl: !!c.excl, budget: c.budget || 0, order: i }; if (c.bFrom && Object.keys(c.bFrom).length) d.bFrom = monthMap(c.bFrom); if (c.bOnly && Object.keys(c.bOnly).length) d.bOnly = monthMap(c.bOnly); doc.ledgerCats[c.id] = d; });
     doc.ledgerFavs = {};
     (s.ledgerFavs || []).forEach(function (f, i) { doc.ledgerFavs[f.id] = { text: f.text || '', amount: f.amount || 0, type: f.type || 'out', cat: f.cat || '', pay: f.pay || '', order: i }; });
     doc.ledgerPays = (s.ledgerPays && s.ledgerPays.length) ? s.ledgerPays.slice() : null;
@@ -221,10 +223,12 @@
       supplyWarn: typeof doc.supplyWarn === 'number' ? doc.supplyWarn : 7,
       anniversary: typeof doc.anniversary === 'string' ? doc.anniversary : '',
       budget: typeof doc.budget === 'number' ? doc.budget : 0,
+      budgetFrom: monthMap(doc.budgetFrom),
+      budgetOnly: monthMap(doc.budgetOnly),
       ledger: Object.keys(doc.ledger || {}).map(function (id) { var e = doc.ledger[id] || {}; return { id: id, date: e.date, type: e.type, amount: e.amount, cat: e.cat, text: e.text || '', who: e.who || '', pay: e.pay || '', t: typeof e.t === 'number' ? e.t : 0, src: e.src || '', rec: e.rec || '', inst: e.inst || '' }; }),
       ledgerRecs: sortedEntries(doc.ledgerRecs).map(function (r) { return { id: r.id, text: r.text || '', amount: r.amount, type: r.type, cat: r.cat || '', pay: r.pay || '', who: r.who || '', freq: r.freq, start: r.start, end: r.end || '', n: r.n || 0, gen: r.gen || 0 }; }),
       ledgerInst: sortedEntries(doc.ledgerInst).map(function (p) { return { id: p.id, text: p.text || '', total: p.total, months: p.months, cat: p.cat || '', pay: p.pay || '', who: p.who || '', start: p.start, n: p.n || 0, closed: p.closed === true }; }),
-      ledgerCats: sortedEntries(doc.ledgerCats).map(function (c) { return { id: c.id, name: c.name, type: c.type, icon: c.icon || '', color: c.color || '', excl: c.excl === true, budget: typeof c.budget === 'number' ? c.budget : 0 }; }),
+      ledgerCats: sortedEntries(doc.ledgerCats).map(function (c) { return { id: c.id, name: c.name, type: c.type, icon: c.icon || '', color: c.color || '', excl: c.excl === true, budget: typeof c.budget === 'number' ? c.budget : 0, bFrom: monthMap(c.bFrom), bOnly: monthMap(c.bOnly) }; }),
       ledgerFavs: sortedEntries(doc.ledgerFavs).map(function (f) { return { id: f.id, text: f.text || '', amount: typeof f.amount === 'number' ? f.amount : 0, type: f.type || 'out', cat: f.cat || '', pay: f.pay || '' }; }),
       ledgerPays: asArr(doc.ledgerPays).filter(function (t) { return typeof t === 'string'; }),
       ledgerWho: asArr(doc.ledgerWho).filter(function (t) { return typeof t === 'string'; }),
@@ -238,6 +242,13 @@
     };
   }
 
+  // 달별 예산 { 'YYYY-MM': 원 } (0 = 그달 예산 없음). 키 순서를 정렬해 두어 비교가 흔들리지 않게 한다
+  function monthMap(m) {
+    var out = {};
+    if (!m || typeof m !== 'object') return out;
+    Object.keys(m).filter(function (k) { return /^\d{4}-\d{2}$/.test(k) && typeof m[k] === 'number' && isFinite(m[k]) && m[k] >= 0; }).sort().forEach(function (k) { out[k] = m[k]; });
+    return out;
+  }
   function isEmptyDoc(doc) {
     return !doc || (!Object.keys(doc.categories || {}).length && !Object.keys(doc.items || {}).length && !Object.keys(doc.notes || {}).length && !Object.keys(doc.dates || {}).length && !Object.keys(doc.names || {}).length && !Object.keys(doc.supports || {}).length && !Object.keys(doc.memos || {}).length && !Object.keys(doc.ledger || {}).length && !Object.keys(doc.birthTasks || {}).length && !Object.keys(doc.growth || {}).length && !Object.keys(doc.babyLog || {}).length && !Object.keys(doc.vaccines || {}).length && !Object.keys(doc.careTasks || {}).length && !Object.keys(doc.events || {}).length && !Object.keys(doc.supplies || {}).length && !doc.birthDate && !doc.highlights && !doc.memo && !doc.dueDate && !doc.anniversary && !(doc.picks && (doc.picks.gpt || doc.picks.claude)));
   }
@@ -262,6 +273,8 @@
     if (JSON.stringify(prev.careDates || null) !== JSON.stringify(next.careDates || null)) updates.careDates = next.careDates || null;
     if ((prev.anniversary || '') !== (next.anniversary || '')) updates.anniversary = next.anniversary || '';
     if ((prev.budget || 0) !== (next.budget || 0)) updates.budget = next.budget || 0;
+    if (JSON.stringify(prev.budgetFrom || null) !== JSON.stringify(next.budgetFrom || null)) updates.budgetFrom = next.budgetFrom || null;
+    if (JSON.stringify(prev.budgetOnly || null) !== JSON.stringify(next.budgetOnly || null)) updates.budgetOnly = next.budgetOnly || null;
     if ((prev.supplyWarn || 7) !== (next.supplyWarn || 7)) updates.supplyWarn = next.supplyWarn || 7;
     if ((prev.memo || '') !== (next.memo || '')) updates.memo = next.memo || '';
     if (JSON.stringify(prev.spendTags || null) !== JSON.stringify(next.spendTags || null)) updates.spendTags = next.spendTags || null;
